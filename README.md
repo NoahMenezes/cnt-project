@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SecureShare – End-to-End Encrypted sharing platform
 
-## Getting Started
+A full-stack, production-ready Next.js application for securely sharing files and messages using **Hybrid Encryption (RSA + AES)**.
 
-First, run the development server:
+## 🔐 Security Architecture
 
+- **Hybrid Encryption**: AES-GCM 256-bit for data encryption, RSA-OAEP for AES key encryption.
+- **Client-Side Crypto**: All encryption and decryption happen in the user's browser using the native Web Crypto API.
+- **Zero-Knowledge**: The backend (Prisma + SQLite) only stores encrypted blobs and public RSA keys. Plaintext never leaves your machine.
+- **Password-Based Key Derivation**: Private keys are stored in `localStorage`, but they are further encrypted using **PBKDF2** with a user-provided master password.
+
+## 🚀 Getting Started
+
+### 1. Environment Setup
+Add your Clerk API keys to `.env`:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_publishable_key
+CLERK_SECRET_KEY=your_secret_key
+DATABASE_URL="file:./dev.db"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Install Dependencies
+```bash
+pnpm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Initialize Database
+```bash
+npx prisma migrate dev --name init
+npx prisma generate
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 4. Run Development Server
+```bash
+npm run dev
+```
 
-## Learn More
+## 🛠️ Features
 
-To learn more about Next.js, take a look at the following resources:
+- ✅ **RSA Key Management**: Generate, export, and delete cryptographic keys.
+- ✅ **Secure File Upload**: Drag and drop files, encrypt locally, and submit to the vault.
+- ✅ **Secure Messaging**: Peer-to-peer encrypted chat with bubble decryption.
+- ✅ **Premium UI**: Modern dark theme with glassmorphism and Framer Motion animations.
+- ✅ **QR Code Integration**: Share public keys via QR code for easy importing.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 📁 Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `/app`: Next.js App Router routes and API endpoints.
+- `/lib/crypto`: Core Web Crypto API logic (RSA-OAEP, AES-GCM, PBKDF2).
+- `/lib/db`: Prisma client singleton.
+- `/hooks`: Custom React hooks for cryptographic state management.
+- `/components`: Shared UI components.
 
-## Deploy on Vercel
+## 🔒 Limitations (Demo Only)
+- For this demo, encrypted file blobs are stored as base64 in the SQLite database. In a production environment, you should upload the encrypted blob to S3/equivalent.
+- Maximum file size currently limited by browser memory (~50MB).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+Built with 🔐 Hybrid Encryption.
