@@ -8,18 +8,16 @@ export function useCrypto() {
     const [isKeyGenerated, setIsKeyGenerated] = useState(false);
     const [loading, setLoading] = useState(true);
 
+
+
     useEffect(() => {
-        // Check if public key is in backend (initial load)
-        fetch("/api/user")
-            .then((res) => res.json())
-            .then((data) => {
-                if (data && data.publicKey) {
-                    setPublicKey(data.publicKey);
-                    setIsKeyGenerated(true);
-                }
-                setLoading(false);
-            })
-            .catch(() => setLoading(false));
+        const storedPriv = localStorage.getItem("ss_priv_key");
+        const storedPub = localStorage.getItem("ss_pub_key");
+        if (storedPriv && storedPub) {
+            setPublicKey(storedPub);
+            setIsKeyGenerated(true);
+        }
+        setLoading(false);
     }, []);
 
     const generateNewKeyPair = async (password: string) => {
@@ -29,13 +27,7 @@ export function useCrypto() {
             const pubKeyBase64 = await cryptoLib.exportPublicKey(keyPair.publicKey);
             const encryptedPriv = await cryptoLib.exportPrivateKey(keyPair.privateKey, password);
 
-            // Save public key to backend
-            await fetch("/api/user", {
-                method: "POST",
-                body: JSON.stringify({ publicKey: pubKeyBase64 }),
-            });
-
-            // Save encrypted private key to localStorage
+            localStorage.setItem("ss_pub_key", pubKeyBase64);
             localStorage.setItem("ss_priv_key", JSON.stringify(encryptedPriv));
 
             setPublicKey(pubKeyBase64);
@@ -58,6 +50,7 @@ export function useCrypto() {
 
     const clearKeys = () => {
         localStorage.removeItem("ss_priv_key");
+        localStorage.removeItem("ss_pub_key");
         setPublicKey(null);
         setIsKeyGenerated(false);
     };

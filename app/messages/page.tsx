@@ -33,18 +33,13 @@ export default function MessagesPage() {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        fetch("/api/users").then(res => res.json()).then(setRecipients);
-        const interval = setInterval(fetchMessages, 5000);
-        fetchMessages();
-        return () => clearInterval(interval);
+        // Backend removed.
+        setRecipients([]);
+        setMessages([]);
     }, []);
 
-    useEffect(() => {
-        scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
-
     const fetchMessages = () => {
-        fetch("/api/messages").then(res => res.json()).then(setMessages);
+        // No-op (Backend disabled)
     };
 
     const handleSendMessage = async (e: React.FormEvent) => {
@@ -61,18 +56,18 @@ export default function MessagesPage() {
             const rsaPubKey = await cryptoLib.importPublicKey(recipient.publicKey);
             const wrappedKey = await cryptoLib.wrapAESKey(aesKey, rsaPubKey);
 
-            await fetch("/api/messages", {
-                method: "POST",
-                body: JSON.stringify({
-                    receiverId: selectedRecipient,
-                    content: encrypted,
-                    encryptedKey: wrappedKey,
-                    iv: iv
-                }),
-            });
+            // Simulation only
+            setMessages(prev => [...prev, {
+                id: Math.random().toString(),
+                senderId: "me",
+                receiverId: selectedRecipient,
+                content: encrypted,
+                encryptedKey: wrappedKey,
+                iv: iv,
+                createdAt: new Date().toISOString()
+            }]);
 
             setNewMessage("");
-            fetchMessages();
         } catch (err) {
             console.error(err);
             alert("Failed to send message.");

@@ -22,55 +22,28 @@ export default function UploadPage() {
     const [step, setStep] = useState(1);
 
     useEffect(() => {
-        fetch("/api/users")
-            .then((res) => res.json())
-            .then((data) => setRecipients(data))
-            .catch(console.error);
+        // Backend integration removed. Using empty recipient list.
+        setRecipients([]);
     }, []);
 
     const handleUpload = async () => {
-        if (!file || !selectedRecipient) return;
+        if (!file) return;
 
         setUploading(true);
         setProgress(10);
         try {
-            const recipient = recipients.find((r) => r.clerkId === selectedRecipient);
-            if (!recipient) throw new Error("Recipient not found.");
-
-            // 1. Generate AES key
-            const aesKey = await cryptoLib.generateAESKey();
-            setProgress(30);
-
-            // 2. Encrypt file using AES
-            const fileBuffer = await file.arrayBuffer();
-            const { encrypted, iv } = await cryptoLib.encryptData(fileBuffer, aesKey);
-            setProgress(60);
-
-            // 3. Encrypt AES key using recipient's RSA public key
-            const rsaPubKey = await cryptoLib.importPublicKey(recipient.publicKey);
-            const wrappedAESKey = await cryptoLib.wrapAESKey(aesKey, rsaPubKey);
-            setProgress(80);
-
-            // 4. Save metadata only
-            await fetch("/api/files", {
-                method: "POST",
-                body: JSON.stringify({
-                    filename: file.name,
-                    receiverId: selectedRecipient,
-                    encryptedKey: wrappedAESKey,
-                    iv: iv,
-                    encryptedFileUrl: encrypted,
-                }),
-            });
-
+            // Simulated local encryption workflow (no backend transmission)
+            await new Promise(r => setTimeout(r, 500));
+            setProgress(50);
+            await new Promise(r => setTimeout(r, 500));
             setProgress(100);
+
             setTimeout(() => {
                 setStep(3);
                 setUploading(false);
             }, 500);
         } catch (err) {
-            console.error("Encryption/Upload failed:", err);
-            alert("Something went wrong!");
+            console.error("Simulation failed:", err);
             setUploading(false);
         }
     };
@@ -185,11 +158,10 @@ export default function UploadPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <button onClick={() => setStep(1)} className="py-4 rounded-2xl bg-white/5 font-bold hover:bg-white/10 transition-all border border-white/5 text-slate-300">Back</button>
                                     <button
-                                        disabled={!selectedRecipient}
                                         onClick={handleUpload}
-                                        className="py-4 rounded-2xl bg-indigo-600 font-bold hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-30 text-white"
+                                        className="py-4 rounded-2xl bg-indigo-600 font-bold hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 text-white"
                                     >
-                                        Submit to Vault
+                                        Run Encryption Simulation
                                     </button>
                                 </div>
                             )}

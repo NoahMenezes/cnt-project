@@ -26,10 +26,8 @@ export default function Dashboard() {
     const [showPasswordInput, setShowPasswordInput] = useState<string | null>(null);
 
     useEffect(() => {
-        fetch("/api/files")
-            .then((res) => res.json())
-            .then((data) => setFiles(data))
-            .catch(console.error);
+        // Backend removed. Initializing with empty file list.
+        setFiles([]);
     }, []);
 
     const handleDecrypt = async (f: SharedFile) => {
