@@ -1,69 +1,52 @@
-import type { Metadata } from 'next'
-import { ClerkProvider, Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs'
-import { Geist, Geist_Mono } from 'next/font/google'
-import './globals.css'
-import Link from 'next/link'
+"use client";
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-})
+import './globals.css';
+import Link from 'next/link';
+import { Shield } from 'lucide-react';
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-})
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
-export const metadata: Metadata = {
-  title: 'SecureShare - End-to-End Encrypted Platform',
-  description: 'Securely share files and messages with end-to-end encryption.',
+function Navbar() {
+    return (
+        <header style={{
+            position: 'fixed', top: 0, width: '100%', zIndex: 100,
+            borderBottom: '1px solid var(--border-glow)',
+            background: 'rgba(10, 10, 15, 0.85)',
+            backdropFilter: 'blur(16px)',
+        }}>
+            <div style={{
+                maxWidth: 1400, margin: '0 auto', padding: '0 1.5rem',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', height: 64
+            }}>
+                <Link href="/" style={{
+                    display: 'flex', alignItems: 'center', gap: '0.6rem',
+                    textDecoration: 'none', color: 'var(--accent-primary)',
+                }}>
+                    <Shield size={24} />
+                    <span className="font-display" style={{ fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.02em' }}>
+                        DecenChat
+                    </span>
+                </Link>
+            </div>
+        </header>
+    );
 }
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
-  return (
-    <ClerkProvider>
-      <html lang="en" className="dark">
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-950 text-slate-100 min-h-screen flex flex-col`}>
-          <header className="fixed top-0 w-full z-50 border-b border-white/10 bg-black/50 backdrop-blur-md flex justify-between items-center px-6 lg:px-12 h-16">
-            <Link href="/" className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-              SecureShare
-            </Link>
-            <nav className="hidden md:flex gap-8 items-center text-sm font-medium text-slate-400">
-              <Link href="/dashboard" className="hover:text-white transition-colors">Dashboard</Link>
-              <Link href="/upload" className="hover:text-white transition-colors">Upload</Link>
-              <Link href="/messages" className="hover:text-white transition-colors">Messages</Link>
-              <Link href="/key-management" className="hover:text-white transition-colors">Keys</Link>
-            </nav>
-            <div className="flex items-center gap-4">
-              <Show when="signed-out">
-                <SignInButton mode="modal">
-                  <button className="text-sm font-medium hover:text-white transition-colors">
-                    Sign In
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all">
-                    Get Started
-                  </button>
-                </SignUpButton>
-              </Show>
-              <Show when="signed-in">
-                <UserButton />
-              </Show>
-            </div>
-          </header>
-          <main className="flex-1 mt-16">
-            {children}
-          </main>
-          <footer className="py-8 border-t border-white/5 text-center text-slate-500 text-sm">
-            &copy; {new Date().getFullYear()} SecureShare. Built with 🔐 Hybrid Encryption.
-          </footer>
-        </body>
-      </html>
-    </ClerkProvider>
-  )
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <html lang="en" className={cn("font-sans", geist.variable)}>
+            <head>
+                <title>DecenChat — Trustless. Serverless. Unbreakable.</title>
+                <meta name="description" content="Decentralized end-to-end encrypted messenger. RSA+AES hybrid encryption on Ethereum. No server. No backdoor. Just math." />
+            </head>
+            <body>
+                <Navbar />
+                <main style={{ paddingTop: 64, minHeight: '100vh', position: 'relative', zIndex: 1 }}>
+                    {children}
+                </main>
+            </body>
+        </html>
+    );
 }

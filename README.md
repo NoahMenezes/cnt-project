@@ -1,45 +1,60 @@
-# SecureShare – Client-Side Encrypted Platform
+# DecenChat — Trustless. Serverless. Unbreakable.
 
-A frontend-only Next.js application for securely managing files and messages using **Hybrid Encryption (RSA + AES)**.
+A decentralized end-to-end encrypted messenger DApp built with **Next.js**, **Web Crypto API**, and **Ethereum**.
 
-## 🔐 Security Architecture
+## 🔐 What It Does
 
-- **Hybrid Encryption**: AES-GCM 256-bit for data encryption, RSA-OAEP for AES key encryption.
-- **Client-Side Crypto**: All encryption and decryption happen in the user's browser using the native Web Crypto API.
-- **Local Key Storage**: Private keys are stored in `localStorage`, encrypted using **PBKDF2** with a user-provided master password.
-- **Pure Frontend**: This version of the project contains zero backend code. Encryption workflows are simulated for demonstration.
+DecenChat eliminates centralized servers entirely:
+- **RSA-OAEP 2048-bit** key pairs generated in your browser
+- **AES-256-GCM** encrypts each message with a unique session key
+- **Public keys** stored on Ethereum smart contract
+- **Encrypted message bundles** stored on-chain as events
+- **Private keys** never leave your browser
+- **Zero external crypto libraries** — Web Crypto API only
 
 ## 🚀 Getting Started
 
-### 1. Environment Setup
-Add your Clerk API keys to `.env`:
-```bash
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_publishable_key
-CLERK_SECRET_KEY=your_secret_key
-```
-
-### 2. Install Dependencies
+### 1. Install Dependencies
 ```bash
 pnpm install
 ```
 
-### 3. Run Development Server
+### 2. Run Development Server
 ```bash
 pnpm dev
 ```
 
-## 🛠️ Features
-
-- ✅ **RSA Key Management**: Generate, export, and delete cryptographic keys locally.
-- ✅ **Secure UI**: Modern dark theme with glassmorphism and Framer Motion animations.
-- ✅ **QR Code Integration**: Share public keys via QR code for easy importing.
-- ✅ **Encryption Simulation**: Test the RSA+AES workflow without a backend.
+### 3. (Optional) Deploy Smart Contract
+```bash
+npx hardhat node                                    # Start local node
+npx hardhat run scripts/deploy.js --network localhost  # Deploy contract
+# Update NEXT_PUBLIC_CONTRACT_ADDRESS in .env
+```
 
 ## 📁 Project Structure
 
-- `/app`: Next.js App Router routes and frontend pages.
-- `/lib/crypto`: Core Web Crypto API logic (RSA-OAEP, AES-GCM, PBKDF2).
-- `/hooks`: Custom React hooks for cryptographic state management.
+- `/app` — Next.js App Router pages
+  - `/` — Landing page
+  - `/app/messenger` — Encrypted messenger
+  - `/app/keys` — Key management
+  - `/app/explainer` — Interactive 7-step encryption visualizer
+  - `/app/tamper` — Live tamper detection demo
+  - `/app/audit` — On-chain audit trail
+  - `/app/about` — Project information
+- `/lib/crypto` — Web Crypto API utilities (RSA, AES, bundle assembly)
+- `/lib/ethereum.js` — Ethers.js helpers
+- `/lib/constants` — Contract ABI and network config
+- `/contracts` — Solidity smart contract
+
+## 🛡️ Security Architecture
+
+| Layer | Algorithm | Key Size |
+|-------|-----------|----------|
+| Key Exchange | RSA-OAEP | 2048-bit |
+| Bulk Encryption | AES-GCM | 256-bit |
+| Authentication | GCM Auth Tag | 128-bit |
+| IV | Random | 96-bit |
+| Key Registry | Ethereum Smart Contract | On-chain |
 
 ---
-Built with 🔐 Hybrid Encryption.
+Built with 🔐 Hybrid RSA-OAEP + AES-256-GCM — Zero Trust Architecture
