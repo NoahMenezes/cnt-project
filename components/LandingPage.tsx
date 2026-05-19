@@ -2,8 +2,14 @@
 
 import React from "react";
 import { motion } from "motion/react";
-import { ChevronRight, Menu, Search, Sparkles, Paperclip, Reply, Forward, Archive, Trash2, MoreHorizontal } from "lucide-react";
+import { ChevronRight, Menu } from "lucide-react";
 import { LogoMark, AppleButton, SectionEyebrow } from "./SharedPrimitives";
+import dynamic from "next/dynamic";
+
+const IphoneCanvas = dynamic(
+  () => import("./IphoneCanvas").then((mod) => mod.IphoneCanvas),
+  { ssr: false }
+);
 
 export function LandingPage() {
 
@@ -88,216 +94,9 @@ export function LandingPage() {
           </motion.h1>
         </section>
 
-        {/* Section 4 — Inbox mockup */}
+        {/* Section 4 — iPhone 3D Model Showcase */}
         <section className="max-w-6xl mx-auto px-6 py-16 md:py-24 w-full">
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 1.1, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#0e1014]/90 backdrop-blur-2xl shadow-2xl"
-          >
-            {/* Title bar */}
-            <div className="h-12 border-b border-white/10 flex items-center px-4 relative">
-              <div className="flex items-center gap-2 absolute left-4">
-                <div className="w-3 h-3 rounded-full bg-[#ff5f57]"></div>
-                <div className="w-3 h-3 rounded-full bg-[#febc2e]"></div>
-                <div className="w-3 h-3 rounded-full bg-[#28c840]"></div>
-              </div>
-              <div className="w-full text-center text-xs text-white/50 font-medium">Aura — Inbox</div>
-            </div>
-
-            {/* Body */}
-            <div className="flex flex-col md:grid md:grid-cols-12 h-auto md:h-[520px]">
-              
-              {/* Sidebar */}
-              <div className="hidden md:flex flex-col col-span-3 border-r border-white/10 bg-black/30 p-4">
-                <button className="flex items-center justify-center gap-2 rounded-lg bg-white text-black text-xs font-semibold px-3 py-2 hover:bg-white/90 transition-colors w-full mb-6">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Compose with Aura
-                </button>
-
-                <div className="flex flex-col gap-1 text-sm font-medium">
-                  <div className="flex items-center justify-between px-3 py-1.5 rounded-md bg-white/10 text-white cursor-pointer">
-                    <span>Inbox</span>
-                    <span className="text-xs">12</span>
-                  </div>
-                  <div className="flex items-center justify-between px-3 py-1.5 rounded-md text-white/60 hover:bg-white/5 cursor-pointer">
-                    <span>Starred</span>
-                    <span className="text-xs">3</span>
-                  </div>
-                  <div className="flex items-center justify-between px-3 py-1.5 rounded-md text-white/60 hover:bg-white/5 cursor-pointer">
-                    <span>Sent</span>
-                  </div>
-                  <div className="flex items-center justify-between px-3 py-1.5 rounded-md text-white/60 hover:bg-white/5 cursor-pointer">
-                    <span>Drafts</span>
-                    <span className="text-xs">2</span>
-                  </div>
-                  <div className="flex items-center justify-between px-3 py-1.5 rounded-md text-white/60 hover:bg-white/5 cursor-pointer">
-                    <span>Archive</span>
-                  </div>
-                  <div className="flex items-center justify-between px-3 py-1.5 rounded-md text-white/60 hover:bg-white/5 cursor-pointer">
-                    <span>Trash</span>
-                  </div>
-                </div>
-
-                <div className="mt-8 mb-2 px-3 text-[10px] uppercase tracking-widest text-white/40 font-semibold">Labels</div>
-                <div className="flex flex-col gap-1 text-sm font-medium">
-                  {[
-                    { label: 'Work', color: '#00d2ff' },
-                    { label: 'Personal', color: '#A4F4FD' },
-                    { label: 'Travel', color: '#f59e0b' },
-                    { label: 'Finance', color: '#10b981' }
-                  ].map((l) => (
-                    <div key={l.label} className="flex items-center gap-2 px-3 py-1.5 rounded-md text-white/60 hover:bg-white/5 cursor-pointer">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }}></div>
-                      <span>{l.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Message list */}
-              <div className="hidden md:flex flex-col col-span-4 border-r border-white/10 overflow-y-auto">
-                <div className="p-3 border-b border-white/10 sticky top-0 bg-[#0e1014]/90 backdrop-blur-md z-10">
-                  <div className="relative">
-                    <Search className="w-4 h-4 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input type="text" placeholder="Search mail" className="w-full bg-white/5 border border-white/10 rounded-md py-1.5 pl-9 pr-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-brand/50" />
-                  </div>
-                </div>
-
-                <div className="flex flex-col">
-                  {/* Msg 1 */}
-                  <div className="p-4 border-b border-white/5 bg-brand/10 cursor-pointer relative">
-                    <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-brand"></div>
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="font-semibold text-sm text-white flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-brand"></span>
-                        Linear
-                      </span>
-                      <span className="text-xs text-brand font-medium">9:41 AM</span>
-                    </div>
-                    <div className="text-sm font-medium text-white/90 mb-1 truncate">Weekly product digest</div>
-                    <div className="text-xs text-white/50 truncate">Your team shipped 23 issues this week...</div>
-                  </div>
-                  {/* Msg 2 */}
-                  <div className="p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer">
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="font-semibold text-sm text-white flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-brand"></span>
-                        Sophia Chen
-                      </span>
-                      <span className="text-xs text-brand font-medium">8:12 AM</span>
-                    </div>
-                    <div className="text-sm font-medium text-white/90 mb-1 truncate">Re: Q3 roadmap review</div>
-                    <div className="text-xs text-white/50 truncate">Thanks for sending the deck over. I had a few thoughts...</div>
-                  </div>
-                  {/* Msg 3 */}
-                  <div className="p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer">
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="font-semibold text-sm text-white/70">Figma</span>
-                      <span className="text-xs text-white/40">Yesterday</span>
-                    </div>
-                    <div className="text-sm text-white/70 mb-1 truncate">Marcus commented on your file</div>
-                    <div className="text-xs text-white/40 truncate">Love the new direction on the landing hero.</div>
-                  </div>
-                  {/* Msg 4 */}
-                  <div className="p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer">
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="font-semibold text-sm text-white/70">Stripe</span>
-                      <span className="text-xs text-white/40">Yesterday</span>
-                    </div>
-                    <div className="text-sm text-white/70 mb-1 truncate">Payout of $12,480.00 sent</div>
-                    <div className="text-xs text-white/40 truncate">Your payout is on its way to your bank...</div>
-                  </div>
-                  {/* Msg 5 */}
-                  <div className="p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer">
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="font-semibold text-sm text-white/70">Vercel</span>
-                      <span className="text-xs text-white/40">Mon</span>
-                    </div>
-                    <div className="text-sm text-white/70 mb-1 truncate">Deployment ready for aura-web</div>
-                    <div className="text-xs text-white/40 truncate">Preview is live at aura-web-g3f.vercel.app</div>
-                  </div>
-                  {/* Msg 6 */}
-                  <div className="p-4 hover:bg-white/5 cursor-pointer">
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="font-semibold text-sm text-white/70">GitHub</span>
-                      <span className="text-xs text-white/40">Mon</span>
-                    </div>
-                    <div className="text-sm text-white/70 mb-1 truncate">[aura/core] PR #482 approved</div>
-                    <div className="text-xs text-white/40 truncate">david-lim approved your pull request.</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Reader */}
-              <div className="flex flex-col col-span-12 md:col-span-5 h-[400px] md:h-auto overflow-y-auto bg-[#0a0c0f]">
-                {/* Toolbar */}
-                <div className="flex items-center justify-between p-3 border-b border-white/10 sticky top-0 bg-[#0a0c0f]/90 backdrop-blur-md z-10">
-                  <div className="flex gap-1">
-                    <button className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/5 text-white/60 hover:text-white transition-colors">
-                      <Reply className="w-4 h-4" />
-                    </button>
-                    <button className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/5 text-white/60 hover:text-white transition-colors">
-                      <Forward className="w-4 h-4" />
-                    </button>
-                    <div className="w-px h-4 bg-white/10 mx-1 self-center"></div>
-                    <button className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/5 text-white/60 hover:text-white transition-colors">
-                      <Archive className="w-4 h-4" />
-                    </button>
-                    <button className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/5 text-white/60 hover:text-white transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <button className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/5 text-white/60 hover:text-white transition-colors">
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="p-6 md:p-8 flex-1 overflow-y-auto">
-                  <h2 className="text-2xl font-semibold mb-6">Weekly product digest</h2>
-                  
-                  <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#00d2ff] to-[#0B2551] flex items-center justify-center text-sm font-semibold">L</div>
-                      <div>
-                        <div className="text-sm font-semibold">Linear</div>
-                        <div className="text-xs text-white/50">to me · 9:41 AM</div>
-                      </div>
-                    </div>
-                    <div className="px-2 py-0.5 rounded-full border border-white/10 text-xs font-medium bg-white/5">Work</div>
-                  </div>
-
-                  <div className="liquid-glass rounded-xl p-4 mb-8">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Sparkles className="w-4 h-4 text-[#A4F4FD]" />
-                      <span className="text-xs font-semibold text-[#A4F4FD]">Summary by Aura</span>
-                    </div>
-                    <p className="text-sm text-white/80 leading-relaxed">
-                      Your team closed 23 issues, merged 14 PRs, and shipped 2 features. Top contributor: Marcus. No action needed.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4 text-sm text-white/80 leading-relaxed">
-                    <p>Hi team,</p>
-                    <p>Here is your weekly digest of everything happening across your projects. This was a strong week with significant progress on the Q3 roadmap.</p>
-                    <p>Twenty-three issues were closed, fourteen pull requests were merged, and two customer-facing features went out. The velocity trend continues to climb.</p>
-                    <p>Let me know if you would like a deeper breakdown by project or contributor.</p>
-                    <p className="text-white/50 mt-6">— The Linear team</p>
-                  </div>
-
-                  <div className="mt-8 pt-6 border-t border-white/10">
-                    <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer text-sm">
-                      <Paperclip className="w-4 h-4 text-white/50" />
-                      <span>digest-may-6.pdf</span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </motion.div>
+          <IphoneCanvas />
         </section>
 
         {/* Section 5 — FeatureTriage */}
