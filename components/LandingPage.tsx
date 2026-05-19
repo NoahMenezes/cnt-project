@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { motion } from "motion/react";
+import React, { useRef } from "react";
+import { motion, useScroll, useTransform } from "motion/react";
 import { ChevronRight, Menu } from "lucide-react";
 import { LogoMark, AppleButton, SectionEyebrow } from "./SharedPrimitives";
 import dynamic from "next/dynamic";
@@ -12,6 +12,16 @@ const IphoneCanvas = dynamic(
 );
 
 export function LandingPage() {
+  const zoomContainerRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: zoomContainerRef,
+    offset: ["start start", "end end"]
+  });
+
+  // Fade out the canvas at the very end of the scroll (0.8 to 1)
+  const canvasOpacity = useTransform(scrollYProgress, [0.8, 1], [1, 0]);
+  // Fade in the real website content when the canvas fades out
+  const websiteOpacity = useTransform(scrollYProgress, [0.8, 1], [0, 1]);
 
   return (
     <div className="relative min-h-screen bg-[#0c0c0c] text-white overflow-hidden">
@@ -94,10 +104,15 @@ export function LandingPage() {
           </motion.h1>
         </section>
 
-        {/* Section 4 — iPhone 3D Model Showcase */}
-        <section className="max-w-6xl mx-auto px-6 py-16 md:py-24 w-full">
-          <IphoneCanvas />
+        {/* Section 4 — iPhone 3D Zoom Showcase */}
+        <section ref={zoomContainerRef} className="relative h-[300vh] w-full z-20">
+          <motion.div style={{ opacity: canvasOpacity }} className="sticky top-0 h-screen w-full overflow-hidden flex items-center justify-center">
+            <IphoneCanvas progress={scrollYProgress} />
+          </motion.div>
         </section>
+
+        {/* Real Website Content (Revealed through the phone) */}
+        <motion.div style={{ opacity: websiteOpacity }} className="relative z-30 bg-[#0c0c0c] flex flex-col items-center">
 
         {/* Section 5 — FeatureTriage */}
         <section className="max-w-6xl mx-auto px-6 py-20 md:py-28 w-full">
@@ -213,6 +228,7 @@ export function LandingPage() {
 
         {/* Footer padding */}
         <div className="h-12 w-full"></div>
+        </motion.div>
       </div>
     </div>
   );
