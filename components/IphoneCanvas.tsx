@@ -30,7 +30,7 @@ export function IphoneCanvas() {
           <Environment preset="city" />
           
           <ContactShadows 
-            position={[0, -5.0, 0]} 
+            position={[0, -4.5, 0]} 
             opacity={0.6} 
             scale={10} 
             blur={2.5} 

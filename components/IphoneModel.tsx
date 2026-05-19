@@ -17,7 +17,7 @@ export function IphoneModel() {
   });
 
   return (
-    <group ref={modelRef} scale={32} position={[0, -5.0, 0]}>
+    <group ref={modelRef} scale={32} position={[0, -0.5, 0]}>
       <primitive object={scene} />
     </group>
   );
