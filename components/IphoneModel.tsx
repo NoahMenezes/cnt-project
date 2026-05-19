@@ -16,24 +16,23 @@ export function IphoneModel({ progress }: { progress?: MotionValue<number> }) {
     if (modelRef.current && progress) {
       const p = progress.get(); // 0 to 1
       
-      // Move the phone towards the camera (camera is at z=10).
-      // Max z is ~9.8 so it completely fills the screen without clipping the camera.
-      // Easing the movement slightly so it starts slow and accelerates
-      const easeP = p * p;
-      modelRef.current.position.z = easeP * 9.5;
-      
-      // Center the phone perfectly vertically as it comes closer
-      modelRef.current.position.y = -0.5 + (easeP * 0.5);
+      // Uniformly scale the phone up exponentially so it stays perfectly 1:1
+      // Initial scale is 32. At p=1, scale reaches ~4000.
+      const currentScale = 32 + Math.pow(p, 4) * 4000;
+      modelRef.current.scale.set(currentScale, currentScale, currentScale);
 
-      // Keep it fixed facing the camera
+      // Keep it fixed perfectly facing the camera
       modelRef.current.rotation.y = 0;
       modelRef.current.rotation.x = 0;
     }
   });
 
   return (
-    <group ref={modelRef} scale={32} position={[0, -5.0, 0]}>
-      <primitive object={scene} />
+    // Keep the main group strictly at the origin
+    <group ref={modelRef} position={[0, 0, 0]}>
+      {/* Offset the primitive so the exact center of the screen is at [0,0,0] */}
+      {/* -0.5 divided by 32 base scale = -0.015625 */}
+      <primitive object={scene} position={[0, -0.015625, 0]} />
     </group>
   );
 }
