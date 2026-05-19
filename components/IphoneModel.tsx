@@ -16,14 +16,15 @@ export function IphoneModel({ progress }: { progress?: MotionValue<number> }) {
     if (modelRef.current && progress) {
       const p = progress.get(); // 0 to 1
       
-      // Uniformly scale the phone up exponentially so it stays perfectly 1:1
-      // Initial scale is 32. At p=1, scale reaches ~4000.
-      const currentScale = 32 + Math.pow(p, 4) * 4000;
+      // Uniformly scale the phone up so it stays perfectly 1:1
+      // Using p^2 instead of p^4 for a more gradual, visible expansion
+      const currentScale = 32 + Math.pow(p, 2) * 5000;
       modelRef.current.scale.set(currentScale, currentScale, currentScale);
 
-      // Keep it fixed perfectly facing the camera
-      modelRef.current.rotation.y = 0;
+      // Keep it fixed facing the camera (Math.PI shows the front screen)
+      modelRef.current.rotation.y = Math.PI;
       modelRef.current.rotation.x = 0;
+      modelRef.current.rotation.z = 0;
     }
   });
 

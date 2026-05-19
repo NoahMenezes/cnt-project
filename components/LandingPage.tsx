@@ -15,7 +15,7 @@ export function LandingPage() {
   const zoomContainerRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: zoomContainerRef,
-    offset: ["start start", "end end"]
+    offset: ["start end", "end end"]
   });
 
   // Fade out the canvas at the very end of the scroll (0.8 to 1)
