@@ -1,26 +1,25 @@
 "use client";
 
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { 
   Inbox as InboxIcon, 
   Send, 
   Key, 
   Settings, 
   Plus, 
-  Menu,
-  X,
   Mail,
   User,
   Shield,
-  Trash2
+  Trash2,
+  LogOut
 } from "lucide-react";
 
 import { EmailComposer, type EmailData } from "../../components/EmailComposer";
 import { Inbox, type EmailItem } from "../../components/Inbox";
 import { EmailViewer } from "../../components/EmailViewer";
 import { KeyManagement } from "../../components/KeyManagement";
-import { Button } from "../../components/ui/button";
+import { UserButton } from "@clerk/nextjs";
 
 // Mock Emails
 const MOCK_EMAILS: EmailItem[] = [
@@ -68,7 +67,6 @@ export default function DashboardPage() {
 
   const handleSendEmail = (data: EmailData) => {
     console.log("Sending email:", data);
-    // In a real app, we would add it to the 'sent' list
     setIsComposeOpen(false);
   };
 
@@ -102,13 +100,14 @@ export default function DashboardPage() {
             animate={{ opacity: 1 }}
             className="h-full"
           >
-            <div className="p-4 border-b bg-background/50 backdrop-blur-sm flex justify-between items-center">
-              <h2 className="text-xl font-semibold flex items-center gap-2">
-                <InboxIcon className="w-5 h-5" /> Inbox
-              </h2>
-              <div className="flex gap-2">
-                 <Button variant="ghost" size="icon"><Trash2 className="w-4 h-4" /></Button>
-              </div>
+            <div className="p-6 border-b border-white/10 backdrop-blur-sm flex justify-between items-center">
+              <motion.h2 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-2xl font-bold text-white flex items-center gap-3"
+              >
+                <InboxIcon className="w-6 h-6 text-cyan-400" /> Inbox
+              </motion.h2>
             </div>
             <Inbox 
               emails={emails} 
@@ -122,49 +121,100 @@ export default function DashboardPage() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-6"
+            className="p-8 max-h-screen overflow-y-auto"
           >
-            <KeyManagement userId="user_123" />
+            <motion.h2 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-3xl font-bold text-white mb-8"
+            >
+              Key Management
+            </motion.h2>
+            <div className="grid grid-cols-1 gap-6">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1 }}
+                className="rounded-2xl border border-cyan-400/30 bg-white/5 backdrop-blur-xl overflow-hidden hover:border-cyan-400/60 transition-all duration-300"
+              >
+                <KeyManagement userId="user_123" />
+              </motion.div>
+            </div>
           </motion.div>
         );
       case "sent":
         return (
-          <div className="p-12 text-center text-muted-foreground">
-            <Send className="w-12 h-12 mx-auto mb-4 opacity-20" />
-            <p>Your sent messages will appear here.</p>
-          </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-12 text-center h-full flex flex-col items-center justify-center"
+          >
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.1, type: "spring" }}
+            >
+              <div className="p-6 rounded-full bg-gradient-to-br from-cyan-400/20 to-blue-600/20 border border-cyan-400/30 mb-6">
+                <Send className="w-12 h-12 text-cyan-400 opacity-50" />
+              </div>
+            </motion.div>
+            <p className="text-white/50 text-lg">Your sent messages will appear here.</p>
+          </motion.div>
         );
       case "settings":
         return (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="p-8 max-w-2xl mx-auto space-y-8"
+            className="p-8 max-h-screen overflow-y-auto"
           >
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Settings</h2>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <User className="w-5 h-5" />
-                    <div>
-                      <p className="font-medium">Profile</p>
-                      <p className="text-sm text-muted-foreground">Manage your personal information</p>
-                    </div>
+            <motion.h2 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-3xl font-bold text-white mb-8"
+            >
+              Settings
+            </motion.h2>
+            <div className="space-y-4 max-w-2xl">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+                className="p-6 rounded-xl border border-cyan-400/30 bg-white/5 backdrop-blur-xl hover:border-cyan-400/60 transition-all duration-300 flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-lg bg-cyan-400/20 group-hover:bg-cyan-400/30 transition-all">
+                    <User className="w-5 h-5 text-cyan-400" />
                   </div>
-                  <Button variant="outline">Edit</Button>
-                </div>
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Shield className="w-5 h-5" />
-                    <div>
-                      <p className="font-medium">Security</p>
-                      <p className="text-sm text-muted-foreground">Two-factor authentication & privacy</p>
-                    </div>
+                  <div>
+                    <p className="font-semibold text-white">Profile</p>
+                    <p className="text-sm text-white/50">Manage your personal information</p>
                   </div>
-                  <Button variant="outline">Configure</Button>
                 </div>
-              </div>
+                <button className="px-4 py-2 rounded-lg border border-cyan-400/50 text-cyan-400 hover:bg-cyan-400/10 transition-all text-sm font-medium">
+                  Edit
+                </button>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+                className="p-6 rounded-xl border border-cyan-400/30 bg-white/5 backdrop-blur-xl hover:border-cyan-400/60 transition-all duration-300 flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-lg bg-blue-600/20 group-hover:bg-blue-600/30 transition-all">
+                    <Shield className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white">Security</p>
+                    <p className="text-sm text-white/50">Two-factor authentication & privacy</p>
+                  </div>
+                </div>
+                <button className="px-4 py-2 rounded-lg border border-blue-400/50 text-blue-400 hover:bg-blue-400/10 transition-all text-sm font-medium">
+                  Configure
+                </button>
+              </motion.div>
             </div>
           </motion.div>
         );
@@ -174,73 +224,104 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden text-foreground">
+    <div className="flex h-screen bg-[#0c0c0c] overflow-hidden text-white relative">
+      {/* SVG Noise Filter */}
+      <svg className="absolute w-0 h-0 pointer-events-none">
+        <filter id="dashboard-noise">
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" />
+          <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.15 0" />
+          <feComposite in2="SourceGraphic" operator="in" result="noise" />
+          <feBlend in="SourceGraphic" in2="noise" mode="multiply" />
+        </filter>
+      </svg>
+
       {/* Sidebar */}
-      <aside className="w-64 border-r bg-muted/30 flex flex-col">
-        <div className="p-6">
-          <div className="flex items-center gap-2 font-bold text-xl mb-6">
-            <div className="bg-primary text-primary-foreground p-1 rounded">
-              <Mail className="w-5 h-5" />
-            </div>
-            <span>CipherMail</span>
-          </div>
-          
-          <Button 
-            onClick={() => setIsComposeOpen(true)}
-            className="w-full justify-start gap-2 shadow-sm"
-          >
-            <Plus className="w-4 h-4" /> Compose
-          </Button>
+      <aside className="w-64 border-r border-white/10 bg-white/5 backdrop-blur-xl flex flex-col relative z-20">
+        {/* Background glow effect */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-cyan-500/10 to-blue-600/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
         </div>
 
-        <nav className="flex-1 px-3 space-y-1">
+        <div className="p-6 relative z-10">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-3 font-bold text-xl mb-8"
+          >
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
+              <Mail className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-white">SecureEmail</span>
+          </motion.div>
+          
+          <motion.button 
+            onClick={() => setIsComposeOpen(true)}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-gradient-to-r from-cyan-400 to-blue-600 text-white font-semibold shadow-lg shadow-cyan-400/20 hover:shadow-cyan-400/40 transition-all duration-300"
+          >
+            <Plus className="w-5 h-5" /> Compose
+          </motion.button>
+        </div>
+
+        <nav className="flex-1 px-4 space-y-2 relative z-10">
           <SidebarItem 
-            icon={<InboxIcon className="w-4 h-4" />} 
+            icon={<InboxIcon className="w-5 h-5" />} 
             label="Inbox" 
             active={activeTab === "inbox"} 
             onClick={() => { setActiveTab("inbox"); setSelectedEmailId(null); }} 
             count={emails.filter(e => !e.isRead).length}
           />
           <SidebarItem 
-            icon={<Send className="w-4 h-4" />} 
+            icon={<Send className="w-5 h-5" />} 
             label="Sent" 
             active={activeTab === "sent"} 
             onClick={() => { setActiveTab("sent"); setSelectedEmailId(null); }} 
           />
           <SidebarItem 
-            icon={<Key className="w-4 h-4" />} 
-            label="Key Management" 
+            icon={<Key className="w-5 h-5" />} 
+            label="Keys" 
             active={activeTab === "keys"} 
             onClick={() => { setActiveTab("keys"); setSelectedEmailId(null); }} 
           />
-          <div className="pt-4 mt-4 border-t border-border/50">
+          <div className="pt-4 mt-4 border-t border-white/10">
             <SidebarItem 
-              icon={<Settings className="w-4 h-4" />} 
+              icon={<Settings className="w-5 h-5" />} 
               label="Settings" 
               active={activeTab === "settings"} 
               onClick={() => { setActiveTab("settings"); setSelectedEmailId(null); }} 
             />
           </div>
         </nav>
+
+        <div className="p-4 border-t border-white/10 relative z-10">
+          <UserButton />
+        </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col relative overflow-hidden bg-background">
+      <main className="flex-1 flex flex-col relative overflow-hidden">
+        {/* Background glow effects */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-gradient-to-l from-cyan-500/5 to-transparent rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-1/3 w-[400px] h-[400px] bg-gradient-to-t from-blue-600/5 to-transparent rounded-full blur-3xl" />
+        </div>
+
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab + (selectedEmailId || "")}
-            initial={{ opacity: 0, scale: 0.99 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.99 }}
-            transition={{ duration: 0.15 }}
-            className="h-full overflow-y-auto"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="h-full overflow-y-auto relative z-10"
           >
             {renderContent()}
           </motion.div>
         </AnimatePresence>
       </main>
 
-      {/* Modals */}
+      {/* Compose Modal */}
       <EmailComposer 
         isOpen={isComposeOpen} 
         onClose={() => setIsComposeOpen(false)} 
@@ -260,24 +341,30 @@ interface SidebarItemProps {
 
 function SidebarItem({ icon, label, active, onClick, count }: SidebarItemProps) {
   return (
-    <button
+    <motion.button
       onClick={onClick}
+      whileHover={{ x: 4 }}
+      whileTap={{ scale: 0.95 }}
       className={`
-        w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors
+        w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-all duration-300
         ${active 
-          ? "bg-primary/10 text-primary" 
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"}
+          ? "bg-gradient-to-r from-cyan-400/30 to-blue-600/30 text-cyan-200 border border-cyan-400/50 shadow-lg shadow-cyan-400/20" 
+          : "text-white/60 hover:text-white hover:bg-white/10 border border-transparent"}
       `}
     >
       <div className="flex items-center gap-3">
         {icon}
         <span>{label}</span>
       </div>
-      {count ? (
-        <span className={`px-2 py-0.5 rounded-full text-[10px] ${active ? "bg-primary text-primary-foreground" : "bg-muted-foreground/20"}`}>
+      {count && count > 0 ? (
+        <motion.span 
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className={`px-2.5 py-1 rounded-full text-xs font-bold ${active ? "bg-cyan-400 text-white" : "bg-cyan-400/30 text-cyan-200"}`}
+        >
           {count}
-        </span>
+        </motion.span>
       ) : null}
-    </button>
+    </motion.button>
   );
 }
