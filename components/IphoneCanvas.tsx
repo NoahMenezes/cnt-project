@@ -7,7 +7,7 @@ import { IphoneModel } from "./IphoneModel";
 
 export function IphoneCanvas() {
   return (
-    <div className="w-full h-[550px] md:h-[650px] relative rounded-2xl overflow-hidden border border-white/10 bg-[#0e1014]/60 backdrop-blur-xl shadow-2xl flex items-center justify-center">
+    <div className="w-full h-[550px] md:h-[650px] relative flex items-center justify-center">
       <Suspense fallback={
         <div className="absolute inset-0 flex items-center justify-center text-white/50 text-sm font-medium">
           Loading 3D Model...
@@ -30,7 +30,7 @@ export function IphoneCanvas() {
           <Environment preset="city" />
           
           <ContactShadows 
-            position={[0, -4.5, 0]} 
+            position={[0, -5.0, 0]} 
             opacity={0.6} 
             scale={10} 
             blur={2.5} 

@@ -9,15 +9,15 @@ export function IphoneModel() {
   const { scene } = useGLTF("/iphone_14_pro.glb");
   const modelRef = useRef<THREE.Group>(null);
 
-  // Slow rotation for visual dynamic effect
+  // Slow rotation for visual dynamic effect (right to left)
   useFrame((state) => {
     if (modelRef.current) {
-      modelRef.current.rotation.y = state.clock.getElapsedTime() * 0.25;
+      modelRef.current.rotation.y = -state.clock.getElapsedTime() * 0.25;
     }
   });
 
   return (
-    <group ref={modelRef} scale={18} position={[0, -3.5, 0]}>
+    <group ref={modelRef} scale={32} position={[0, -5.0, 0]}>
       <primitive object={scene} />
     </group>
   );
