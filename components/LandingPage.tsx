@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { motion } from "motion/react";
 import { ChevronRight, Menu, Search, Sparkles, Paperclip, Reply, Forward, Archive, Trash2, MoreHorizontal } from "lucide-react";
-import { AppleLogo, LogoMark, AppleButton, SectionEyebrow } from "./SharedPrimitives";
+import { LogoMark, AppleButton, SectionEyebrow } from "./SharedPrimitives";
 
 export function LandingPage() {
-  const [yearly, setYearly] = useState(true);
 
   return (
     <div className="relative min-h-screen bg-[#0c0c0c] text-white overflow-hidden">
@@ -66,16 +65,15 @@ export function LandingPage() {
         </motion.nav>
 
         {/* Section 2 — Hero */}
-        <section className="pt-16 md:pt-28 pb-20 text-center flex flex-col items-center px-6">
+        <section className="pt-24 md:pt-40 pb-20 text-center flex flex-col items-center px-6">
           <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            className="text-4xl md:text-7xl font-semibold tracking-tight leading-[0.9] flex flex-col items-center"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+            className="text-6xl md:text-9xl lg:text-[180px] font-bold tracking-tighter leading-none"
           >
-            <span className="text-white">Your email.</span>
             <span 
-              className="animate-shiny mt-1 md:mt-2"
+              className="animate-shiny"
               style={{
                 backgroundImage: 'linear-gradient(to right, #091020 0%, #0B2551 12.5%, #A4F4FD 32.5%, #00d2ff 50%, #0B2551 67.5%, #091020 87.5%, #091020 100%)',
                 backgroundSize: '200% auto',
@@ -86,56 +84,10 @@ export function LandingPage() {
                 filter: 'url(#c3-noise)'
               }}
             >
-              Revitalized
+              CipherText
             </span>
           </motion.h1>
-
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
-            className="mt-8 text-white/60 max-w-md text-base leading-[1.5]"
-          >
-            Aura is the premier inbox platform for the current era. It leverages powerful AI to organize, prioritize, and refine your messages into total clarity.
-          </motion.p>
-
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.8 }}
-            className="mt-10 flex flex-col items-center gap-3"
-          >
-            <AppleButton />
-            <span className="text-xs text-white/40">Download for Intel / Apple Silicon</span>
-          </motion.div>
         </section>
-
-        {/* Section 3 — macOS menu bar strip */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.9, duration: 0.8 }}
-          className="w-full h-10 bg-black/40 backdrop-blur-md border-t border-b border-white/10"
-        >
-          <div className="max-w-6xl mx-auto px-6 h-full flex items-center justify-between text-xs">
-            <div className="flex items-center gap-4 text-white">
-              <AppleLogo className="w-3.5 h-3.5" />
-              <span className="font-bold">Aura</span>
-              {['File','Edit','View','Go','Window','Help'].map((item, index) => (
-                <span 
-                  key={item} 
-                  className={`cursor-pointer hover:text-white/70 ${index > 2 ? 'hidden sm:inline' : ''} ${index > 3 ? 'hidden md:inline' : ''}`}
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
-            <div className="flex items-center gap-4 text-white">
-              <Search className="w-3.5 h-3.5" />
-              <span>Wed May 6 1:09 PM</span>
-            </div>
-          </div>
-        </motion.div>
 
         {/* Section 4 — Inbox mockup */}
         <section className="max-w-6xl mx-auto px-6 py-16 md:py-24 w-full">
@@ -399,9 +351,24 @@ export function LandingPage() {
                       </div>
                       <span className="text-xs text-white/40">{group.count}</span>
                     </div>
-                    <div className="pl-3.5 space-y-1">
+                    <div className="pl-3.5 space-y-2">
                       {group.items.map((item, idx) => (
-                        <div key={idx} className="text-xs text-white/60 truncate">{item}</div>
+                        <motion.div 
+                          key={idx} 
+                          initial={{ opacity: 0, y: 15, scale: 0.9 }}
+                          whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                          viewport={{ once: true, margin: "-20px" }}
+                          transition={{ 
+                            duration: 0.5, 
+                            delay: 0.4 + (idx * 0.15), 
+                            type: "spring", 
+                            stiffness: 300, 
+                            damping: 20 
+                          }}
+                          className="text-xs text-white/80 truncate bg-white/5 px-3 py-2 rounded-md border border-white/10 shadow-lg"
+                        >
+                          {item}
+                        </motion.div>
                       ))}
                     </div>
                   </div>
@@ -411,145 +378,6 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* Section 6 — LogoCloud */}
-        <section className="max-w-6xl mx-auto px-6 py-16 md:py-20 w-full">
-          <h3 className="text-center text-xs uppercase tracking-widest text-white/40">Trusted by the world&apos;s most thoughtful teams</h3>
-          <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-6 text-center">
-            {['Linear', 'Vercel', 'Figma', 'Stripe', 'Ramp', 'Notion', 'Loom', 'Arc'].map((logo, i) => (
-              <motion.div
-                key={logo}
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: i * 0.05 }}
-                className="text-sm font-semibold tracking-tight text-white/50 hover:text-white transition-colors cursor-default"
-              >
-                {logo}
-              </motion.div>
-            ))}
-          </div>
-        </section>
-
-        {/* Section 7 — Testimonials */}
-        <section className="max-w-6xl mx-auto px-6 py-20 md:py-28 w-full border-t border-white/10">
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                quote: "Aura gave our leadership team four hours of their week back. It reads like email from the future.",
-                name: "Parker Wilf",
-                role: "Group Product Manager",
-                company: "MERCURY"
-              },
-              {
-                quote: "The command palette alone has changed how I process messages. I can't imagine going back to a traditional client.",
-                name: "Andrew von Rosenbach",
-                role: "Senior Engineering Program Manager",
-                company: "COHERE"
-              },
-              {
-                quote: "Triage that actually understands context. Our team stopped dreading Monday morning inboxes.",
-                name: "Mathies Christensen",
-                role: "Engineering Manager",
-                company: "LUNAR"
-              }
-            ].map((t, i) => (
-              <motion.div 
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: i * 0.1 }}
-                className="liquid-glass rounded-2xl p-6 flex flex-col justify-between h-full"
-              >
-                <blockquote className="text-sm text-white/80 leading-[1.6]">
-                  &quot;{t.quote}&quot;
-                </blockquote>
-                <figcaption className="mt-6 pt-5 border-t border-white/10 flex flex-col gap-0.5">
-                  <span className="text-sm font-semibold">{t.name}</span>
-                  <span className="text-xs text-white/50">{t.role}</span>
-                  <span className="mt-1 text-xs text-white font-semibold tracking-wide uppercase">{t.company}</span>
-                </figcaption>
-              </motion.div>
-            ))}
-          </div>
-        </section>
-
-        {/* Section 8 — Pricing */}
-        <section className="c3-pricing-section w-full">
-          {/* Pricing SVG Noise Filter */}
-          <svg className="absolute w-0 h-0 pointer-events-none">
-            <filter id="c3-noise-pricing">
-              <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="2" stitchTiles="stitch" />
-              <feComponentTransfer><feFuncA type="linear" slope="0.075" /></feComponentTransfer>
-              <feComposite in2="SourceGraphic" operator="in" result="noise" />
-              <feBlend in="SourceGraphic" in2="noise" mode="overlay" />
-            </filter>
-          </svg>
-
-          <div className="c3-watermark-container">
-            <div className="c3-watermark-main">
-              <span className="c3-watermark-line-1">Your email.</span>
-              <span className="c3-watermark-line-2">Revitalized</span>
-            </div>
-          </div>
-
-          <div className="c3-grid">
-            {/* Free */}
-            <div className="c3-card">
-              <div className="c3-tier-small">Free</div>
-              <div className="c3-tier-large">Free</div>
-              <div className="c3-desc">For creators taking their first steps with Forma.</div>
-              <ul className="c3-list">
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Up to 3 projects in the cloud</li>
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Image export up to 1080p</li>
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Basic editing tools</li>
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Free templates and icons</li>
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Access via web and mobile app</li>
-              </ul>
-              <button className="c3-btn">Choose Plan</button>
-            </div>
-
-            {/* Standard */}
-            <div className="c3-card">
-              <div className="c3-tier-small">Standard</div>
-              <div className="c3-tier-large">{yearly ? '$99,99/y' : '$9,99/m'}</div>
-              <div className="c3-desc">For freelancers and small teams who need more freedom and flexibility.</div>
-              <ul className="c3-list">
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Up to 50 projects in the cloud</li>
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Export up to 4K</li>
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Advanced editing toolkit</li>
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Team collaboration (up to 5 members)</li>
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Access to premium template library</li>
-              </ul>
-              <button className="c3-btn">Choose Plan</button>
-            </div>
-
-            {/* Pro */}
-            <div className="c3-card c3-card-pro">
-              <div className="c3-tier-small">Pro</div>
-              <div className="c3-tier-large">{yearly ? '$199,99/y' : '$19,99/m'}</div>
-              <div className="c3-desc">For studios, agencies, and professional creators working with brands.</div>
-              <ul className="c3-list">
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Unlimited projects</li>
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Export up to 8K + animations</li>
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> AI-powered content generation tools</li>
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Unlimited team members</li>
-                <li><span className="c3-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Brand customization</li>
-              </ul>
-              <button className="c3-btn">Choose Plan</button>
-            </div>
-          </div>
-
-          <div className="c3-toggle-wrap">
-            <span className="text-sm font-medium text-white/80">Yearly</span>
-            <button 
-              className={`c3-toggle ${yearly ? 'active' : ''}`}
-              onClick={() => setYearly(!yearly)}
-            >
-              <div className="c3-toggle-knob"></div>
-            </button>
-          </div>
-        </section>
 
         {/* Section 9 — FinalCTA */}
         <section className="max-w-6xl mx-auto px-6 py-20 md:py-32 w-full">
