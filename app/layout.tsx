@@ -1,6 +1,9 @@
+import "./globals.css";
+
 export const metadata = {
-  title: "App",
-  description: "Next.js app",
+  title: "CipherChat — End-to-End Encrypted Messaging",
+  description:
+    "Secure real-time messaging with hybrid RSA + AES encryption. Your messages, only yours.",
 };
 
 export default function RootLayout({
