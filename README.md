@@ -1,16 +1,16 @@
-# DecenChat — Trustless. Serverless. Unbreakable.
+# SecureEmail — Military-Grade Email Encryption
 
-A decentralized end-to-end encrypted messenger DApp built with **Next.js**, **Web Crypto API**, and **Ethereum**.
+A professional email system with end-to-end hybrid encryption using **RSA-2048** + **AES-256-GCM**.
 
 ## 🔐 What It Does
 
-DecenChat eliminates centralized servers entirely:
-- **RSA-OAEP 2048-bit** key pairs generated in your browser
-- **AES-256-GCM** encrypts each message with a unique session key
-- **Public keys** stored on Ethereum smart contract
-- **Encrypted message bundles** stored on-chain as events
-- **Private keys** never leave your browser
-- **Zero external crypto libraries** — Web Crypto API only
+SecureEmail protects your sensitive emails completely:
+- **RSA-2048-OAEP** key pairs generated locally in your browser
+- **AES-256-GCM** encrypts each email with a unique session key
+- **Public keys** registered for secure key exchange
+- **Encrypted emails** stored server-side (ciphertext only)
+- **Private keys** never leave your device
+- **Zero-knowledge architecture** — servers can't read your emails
 
 ## 🚀 Getting Started
 
@@ -24,27 +24,26 @@ pnpm install
 pnpm dev
 ```
 
-### 3. (Optional) Deploy Smart Contract
-```bash
-npx hardhat node                                    # Start local node
-npx hardhat run scripts/deploy.js --network localhost  # Deploy contract
-# Update NEXT_PUBLIC_CONTRACT_ADDRESS in .env
-```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 📁 Project Structure
 
 - `/app` — Next.js App Router pages
-  - `/` — Landing page
-  - `/app/messenger` — Encrypted messenger
-  - `/app/keys` — Key management
-  - `/app/explainer` — Interactive 7-step encryption visualizer
-  - `/app/tamper` — Live tamper detection demo
-  - `/app/audit` — On-chain audit trail
-  - `/app/about` — Project information
-- `/lib/crypto` — Web Crypto API utilities (RSA, AES, bundle assembly)
-- `/lib/ethereum.js` — Ethers.js helpers
-- `/lib/constants` — Contract ABI and network config
-- `/contracts` — Solidity smart contract
+  - `/` — Landing page with feature showcase
+  - `/dashboard` — Full email client interface
+  - `/sign-in` & `/sign-up` — Authentication pages
+- `/components` — Reusable React components
+  - `EmailComposer.tsx` — Modal for composing encrypted emails
+  - `Inbox.tsx` — Email list view with filtering
+  - `EmailViewer.tsx` — Read and decrypt emails
+  - `KeyManagement.tsx` — Manage RSA keypairs
+  - `EmailEncryptionDemo.tsx` — Interactive encryption workflow
+  - `FAQSection.tsx` — Frequently asked questions
+  - `BlogSection.tsx` — Blog posts
+  - `LandingPage.tsx` — Hero section
+- `/lib` — Utility functions
+  - `supabase.ts` — Database client
+  - `utils.ts` — Helper functions
 
 ## 🛡️ Security Architecture
 
@@ -54,7 +53,59 @@ npx hardhat run scripts/deploy.js --network localhost  # Deploy contract
 | Bulk Encryption | AES-GCM | 256-bit |
 | Authentication | GCM Auth Tag | 128-bit |
 | IV | Random | 96-bit |
-| Key Registry | Ethereum Smart Contract | On-chain |
+| Key Storage | Browser IndexedDB | Encrypted |
+
+**Zero-Trust Guarantee:**
+- ✅ Private keys never transmitted
+- ✅ Ciphertext-only database
+- ✅ Browser-side encryption
+- ✅ No key escrow
+- ✅ Recipient-only decryption
+
+## 📋 Features
+
+- **Email Composition** — Write and encrypt emails locally
+- **Inbox Management** — Organize received encrypted emails
+- **Email Decryption** — View and decrypt messages locally
+- **Key Management** — Generate and manage RSA keypairs
+- **Attachment Support** — Encrypt files before transmission
+- **Search & Filter** — Find emails by sender, subject
+- **Security Dashboard** — Monitor encryption status
+- **Responsive Design** — Beautiful UI on all devices
+
+## 🎨 Design System
+
+- **Dark theme** with cyan/blue accents
+- **Glassmorphism** UI components
+- **Smooth animations** with Framer Motion
+- **Professional typography** with Inter + Outfit fonts
+- **Accessibility first** with proper contrast and semantics
+
+## 📚 Tech Stack
+
+- **Next.js 16.2.2** — React framework
+- **React 19.2.4** — UI library
+- **TypeScript** — Type safety
+- **Tailwind CSS v4** — Styling
+- **Framer Motion** — Animations
+- **Clerk** — Authentication
+- **Supabase** — Database (optional)
+- **lucide-react** — Icons
+
+## 🚀 Build & Deploy
+
+```bash
+# Production build
+pnpm build
+
+# Start production server
+pnpm start
+
+# Lint
+pnpm lint
+```
 
 ---
-Built with 🔐 Hybrid RSA-OAEP + AES-256-GCM — Zero Trust Architecture
+
+Built with 🔐 Hybrid RSA-2048 + AES-256-GCM — Zero Trust Email Security
+

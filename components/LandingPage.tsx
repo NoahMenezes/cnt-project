@@ -3,6 +3,7 @@
 import React from "react";
 import { motion } from "motion/react";
 import { ChevronRight, Menu } from "lucide-react";
+import Link from "next/link";
 import { LogoMark, AppleButton, SectionEyebrow } from "./SharedPrimitives";
 import { Timeline } from "./Timeline";
 import { LiveChatAnimation } from "./LiveChatAnimation";
@@ -69,7 +70,7 @@ export function LandingPage() {
                 filter: 'url(#c3-noise)'
               }}
             >
-              CipherText
+              SecureEmail
             </span>
           </motion.h1>
 
@@ -79,9 +80,9 @@ export function LandingPage() {
             transition={{ duration: 0.8, delay: 0.4 }}
             className="mt-6 text-white/60 text-lg md:text-xl font-medium max-w-2xl leading-relaxed"
           >
-            A secure real-time messaging application designed with hybrid cryptography. 
+            Protect your sensitive emails with military-grade hybrid encryption. 
             Your messages are sealed locally using AES-256 and RSA-2048 before transmission. 
-            No key, no access. Not even our servers can read them.
+            Not even our servers can read them.
           </motion.p>
 
           <motion.div
@@ -90,13 +91,13 @@ export function LandingPage() {
             transition={{ duration: 0.8, delay: 0.6 }}
             className="mt-10 flex flex-wrap gap-4 justify-center"
           >
-            <button className="bg-white text-black rounded-full px-8 py-4 text-sm font-semibold hover:scale-[1.03] active:scale-[0.98] transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)] cursor-pointer">
-              Launch Secure App
-            </button>
-            <button className="flex items-center justify-center gap-2 rounded-full border border-white/15 text-white text-sm font-medium px-8 py-4 hover:bg-white/5 transition-all cursor-pointer">
-              View cryptographic specs
+            <Link href="/sign-in" className="bg-white text-black rounded-full px-8 py-4 text-sm font-semibold hover:scale-[1.03] active:scale-[0.98] transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)] inline-block text-center">
+              Start Secure Email
+            </Link>
+            <Link href="/dashboard" className="flex items-center justify-center gap-2 rounded-full border border-white/15 text-white text-sm font-medium px-8 py-4 hover:bg-white/5 transition-all">
+              Open Email Client
               <ChevronRight className="w-4 h-4" />
-            </button>
+            </Link>
           </motion.div>
         </section>
 
@@ -158,6 +159,8 @@ export function LandingPage() {
             </div>
           </div>
         </section>
+
+
         {/* Footer padding */}
         <div className="h-12 w-full"></div>
         </div>

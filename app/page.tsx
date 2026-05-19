@@ -2,21 +2,19 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { LandingPage } from "../components/LandingPage";
-import { BlogSection } from "../components/BlogSection";
-import { CryptoSandbox } from "../components/CryptoSandbox";
+import { EmailEncryptionDemo } from "../components/EmailEncryptionDemo";
 import { MarketingComparison } from "../components/MarketingComparison";
 import { FAQSection } from "../components/FAQSection";
+import { BlogSection } from "../components/BlogSection";
 import { motion, useScroll, useTransform } from "motion/react";
 
-interface ScrollPinnedSectionProps {
-  children: React.ReactNode;
-  zIndex: number;
-}
+export default function Page() {
+  const section1Ref = useRef<HTMLDivElement>(null);
+  const section2Ref = useRef<HTMLDivElement>(null);
+  const section3Ref = useRef<HTMLDivElement>(null);
+  const section4Ref = useRef<HTMLDivElement>(null);
 
-function ScrollPinnedSection({ children, zIndex }: ScrollPinnedSectionProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [contentHeight, setContentHeight] = useState(0);
+  const [heights, setHeights] = useState<number[]>([0, 0, 0, 0]);
   const [windowHeight, setWindowHeight] = useState(0);
 
   useEffect(() => {
@@ -27,88 +25,115 @@ function ScrollPinnedSection({ children, zIndex }: ScrollPinnedSectionProps) {
   }, []);
 
   useEffect(() => {
-    if (!contentRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContentHeight(entry.target.scrollHeight);
-      }
+    const refs = [section1Ref, section2Ref, section3Ref, section4Ref];
+    const observers = refs.map((ref, idx) => {
+      if (!ref.current) return null;
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setHeights((prev) => {
+            const next = [...prev];
+            next[idx] = entry.target.scrollHeight;
+            return next;
+          });
+        }
+      });
+      observer.observe(ref.current);
+      return observer;
     });
-    observer.observe(contentRef.current);
-    return () => observer.disconnect();
+
+    return () => {
+      observers.forEach((observer) => observer?.disconnect());
+    };
   }, []);
 
-  // Track scroll progress of this section's scroll range
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start start", "end end"]
+  const { scrollY } = useScroll();
+
+  // Scroll ranges where each section starts pinning
+  const scrollRange0 = Math.max(0, heights[0] - windowHeight);
+  const scrollRange1 = Math.max(0, heights[0] + heights[1] - windowHeight);
+  const scrollRange2 = Math.max(0, heights[0] + heights[1] + heights[2] - windowHeight);
+  const scrollRange3 = Math.max(0, heights[0] + heights[1] + heights[2] + heights[3] - windowHeight);
+
+  // Counter-translations to pin each section when it fills the screen
+  const y0 = useTransform(scrollY, (val) => {
+    if (val < scrollRange0) return 0;
+    return val - scrollRange0;
   });
 
-  // Track the overlap progress as the next section scrolls up over this one
-  const { scrollYProgress: overlapProgress } = useScroll({
-    target: containerRef,
-    offset: ["end end", "end start"]
+  const y1 = useTransform(scrollY, (val) => {
+    if (val < scrollRange1) return 0;
+    return val - scrollRange1;
   });
 
-  const scrollRange = Math.max(0, contentHeight - windowHeight);
-  
-  // Translate content upward as user scrolls through the wrapper
-  const y = useTransform(scrollYProgress, [0, 1], [0, -scrollRange]);
+  const y2 = useTransform(scrollY, (val) => {
+    if (val < scrollRange2) return 0;
+    return val - scrollRange2;
+  });
 
-  // Scale and opacity transformations as the next section overlaps this one
-  const scale = useTransform(overlapProgress, [0, 0.8], [1, 0.94]);
-  const opacity = useTransform(overlapProgress, [0, 0.8], [1, 0.6]);
+  const y3 = useTransform(scrollY, (val) => {
+    if (val < scrollRange3) return 0;
+    return val - scrollRange3;
+  });
 
-  return (
-    <div 
-      ref={containerRef} 
-      style={{ height: contentHeight ? `${contentHeight}px` : "auto" }}
-      className="relative w-full"
-    >
-      <div 
-        style={{ zIndex }}
-        className="sticky top-0 h-screen w-full overflow-hidden bg-[#0c0c0c]"
-      >
-        <motion.div 
-          ref={contentRef} 
-          style={{ y, scale, opacity }} 
-          className="w-full origin-bottom"
-        >
-          {children}
-        </motion.div>
-      </div>
-    </div>
-  );
-}
+  // Overlap animations (scale & opacity)
+  const overlap0 = useTransform(scrollY, [scrollRange0, scrollRange0 + windowHeight * 0.8], [0, 1]);
+  const scale0 = useTransform(overlap0, [0, 1], [1, 0.94]);
+  const opacity0 = useTransform(overlap0, [0, 1], [1, 0.6]);
 
-export default function Page() {
+  const overlap1 = useTransform(scrollY, [scrollRange1, scrollRange1 + windowHeight * 0.8], [0, 1]);
+  const scale1 = useTransform(overlap1, [0, 1], [1, 0.94]);
+  const opacity1 = useTransform(overlap1, [0, 1], [1, 0.6]);
+
+  const overlap2 = useTransform(scrollY, [scrollRange2, scrollRange2 + windowHeight * 0.8], [0, 1]);
+  const scale2 = useTransform(overlap2, [0, 1], [1, 0.94]);
+  const opacity2 = useTransform(overlap2, [0, 1], [1, 0.6]);
+
+  const overlap3 = useTransform(scrollY, [scrollRange3, scrollRange3 + windowHeight * 0.8], [0, 1]);
+  const scale3 = useTransform(overlap3, [0, 1], [1, 0.94]);
+  const opacity3 = useTransform(overlap3, [0, 1], [1, 0.6]);
+
   return (
     <main className="bg-[#0c0c0c] min-h-screen w-full relative overflow-x-hidden">
-      {/* 1. Landing Page (Hero, Timeline, Features) */}
-      <ScrollPinnedSection zIndex={10}>
+      {/* 1. LandingPage Card */}
+      <motion.div 
+        ref={section1Ref}
+        style={{ y: y0, scale: scale0, opacity: opacity0 }} 
+        className="relative z-10 origin-bottom"
+      >
         <LandingPage />
-      </ScrollPinnedSection>
+      </motion.div>
 
-      {/* 2. Interactive Engine (Crypto Sandbox) */}
-      <ScrollPinnedSection zIndex={20}>
-        <div className="bg-[#0c0c0c] border-t border-white/10 rounded-t-3xl shadow-[0_-20px_50px_rgba(0,0,0,0.8)]">
-          <CryptoSandbox />
-        </div>
-      </ScrollPinnedSection>
+      {/* 2. Interactive Email Encryption Demo Card */}
+      <motion.div 
+        ref={section2Ref}
+        style={{ y: y1, scale: scale1, opacity: opacity1 }} 
+        className="relative z-20 rounded-t-3xl border-t border-white/10 shadow-[0_-30px_60px_rgba(0,0,0,0.9)] bg-[#0c0c0c] origin-bottom"
+      >
+        <EmailEncryptionDemo />
+      </motion.div>
 
-      {/* 3. Risk Assessment & FAQ */}
-      <ScrollPinnedSection zIndex={30}>
-        <div className="bg-[#0c0c0c] border-t border-white/10 rounded-t-3xl shadow-[0_-20px_50px_rgba(0,0,0,0.8)] pb-12">
-          <MarketingComparison />
-          <FAQSection />
-        </div>
-      </ScrollPinnedSection>
+      {/* 3. Risk Assessment / Comparison Card */}
+      <motion.div 
+        ref={section3Ref}
+        style={{ y: y2, scale: scale2, opacity: opacity2 }} 
+        className="relative z-30 rounded-t-3xl border-t border-white/10 shadow-[0_-30px_60px_rgba(0,0,0,0.9)] bg-[#0c0c0c] origin-bottom"
+      >
+        <MarketingComparison />
+      </motion.div>
 
-      {/* 4. Blog Section */}
-      <ScrollPinnedSection zIndex={40}>
-        <div className="bg-[#0c0c0c] border-t border-white/10 rounded-t-3xl shadow-[0_-20px_50px_rgba(0,0,0,0.8)]">
-          <BlogSection />
-        </div>
-      </ScrollPinnedSection>
+      {/* 4. FAQ Accordion Card */}
+      <motion.div 
+        ref={section4Ref}
+        style={{ y: y3, scale: scale3, opacity: opacity3 }} 
+        className="relative z-40 rounded-t-3xl border-t border-white/10 shadow-[0_-30px_60px_rgba(0,0,0,0.9)] bg-[#0c0c0c] origin-bottom"
+      >
+        <FAQSection />
+      </motion.div>
+
+      {/* 5. Blog Section Card (slides over everything) */}
+      <div className="relative z-50">
+        <BlogSection />
+      </div>
     </main>
   );
 }
