@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
-import { ClerkProvider, Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs'
+import { ClerkProvider, Show, UserButton } from '@clerk/nextjs'
 import { Geist, Geist_Mono } from 'next/font/google'
+import { RippleButton } from "@/components/ui/ripple-button"
 import './globals.css'
 
 const geistSans = Geist({
@@ -19,6 +20,10 @@ export const metadata: Metadata = {
     "Secure real-time messaging with hybrid RSA + AES encryption. Your messages, only yours.",
 }
 
+export function RippleButtonDemo() {
+  return <RippleButton rippleColor="#ADD8E6">Click me</RippleButton>
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -29,14 +34,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0c0c0c] text-white`}>
         <ClerkProvider>
           <header className="absolute w-full top-0 z-50 flex justify-end items-center p-4 gap-4 h-16 pointer-events-auto">
-            <Show when="signed-out">
-              <SignInButton />
-              <SignUpButton>
-                <button className="bg-[#6c47ff] text-white rounded-full font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 cursor-pointer">
-                  Sign Up
-                </button>
-              </SignUpButton>
-            </Show>
+            <RippleButtonDemo />
             <Show when="signed-in">
               <UserButton />
             </Show>
