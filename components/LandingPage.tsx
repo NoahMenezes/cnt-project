@@ -41,7 +41,7 @@ export function LandingPage() {
       <div className="relative z-10 flex flex-col min-h-screen">
 
         {/* Section 2 — Hero */}
-        <section className="pt-24 md:pt-40 pb-28 text-center flex flex-col items-center px-6">
+        <section className="pt-16 sm:pt-24 md:pt-40 pb-16 sm:pb-24 md:pb-28 text-center flex flex-col items-center px-4 sm:px-6">
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -56,7 +56,7 @@ export function LandingPage() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-            className="text-6xl md:text-9xl lg:text-[180px] font-bold tracking-tighter leading-none"
+            className="text-3xl sm:text-5xl md:text-6xl lg:text-9xl xl:text-[180px] font-bold tracking-tighter leading-none"
           >
             <span 
               className="animate-shiny"
@@ -78,7 +78,7 @@ export function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
-            className="mt-6 text-white/60 text-lg md:text-xl font-medium max-w-2xl leading-relaxed"
+            className="mt-4 sm:mt-6 text-white/60 text-sm sm:text-base md:text-lg lg:text-xl font-medium max-w-2xl leading-relaxed px-2"
           >
             Protect your sensitive emails with military-grade hybrid encryption. 
             Your messages are sealed locally using AES-256 and RSA-2048 before transmission. 
@@ -89,9 +89,9 @@ export function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
-            className="mt-10 flex flex-wrap gap-4 justify-center"
+            className="mt-6 sm:mt-8 md:mt-10 flex flex-wrap gap-3 sm:gap-4 justify-center px-2"
           >
-            <Link href="/sign-in" className="bg-white text-black rounded-full px-8 py-4 text-sm font-semibold hover:scale-[1.03] active:scale-[0.98] transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)] inline-block text-center">
+            <Link href="/sign-in" className="bg-white text-black rounded-full px-6 sm:px-8 py-3 sm:py-4 text-xs sm:text-sm font-semibold hover:scale-[1.03] active:scale-[0.98] transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)] inline-block text-center">
               Start Secure Email
             </Link>
             <Link href="/dashboard" className="flex items-center justify-center gap-2 rounded-full border border-white/15 text-white text-sm font-medium px-8 py-4 hover:bg-white/5 transition-all">
@@ -108,15 +108,15 @@ export function LandingPage() {
         <div className="relative z-30 bg-[#0c0c0c] flex flex-col items-center">
 
         {/* Section 5 — Features (Structured like BlogSection) */}
-        <section className="w-full bg-[#0c0c0c] text-white py-[80px] px-5 relative z-20 border-t border-white/10 rounded-t-3xl shadow-[0_-20px_50px_rgba(0,0,0,0.8)]">
+        <section className="w-full bg-[#0c0c0c] text-white py-12 sm:py-16 md:py-20 lg:py-[80px] px-4 sm:px-5 relative z-20 border-t border-white/10 rounded-t-3xl shadow-[0_-20px_50px_rgba(0,0,0,0.8)]">
           <div className="max-w-[1200px] mx-auto">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 mb-10 sm:mb-16">
               <div className="max-w-2xl">
                 <div className="inline-block px-3 py-1 bg-white/10 text-white rounded-lg text-xs font-semibold uppercase tracking-wider mb-4">
                   Features
                 </div>
-                <h2 className="font-outfit font-medium text-[48px] md:text-[64px] tracking-[-2.5px] leading-none mb-6">
+                <h2 className="font-outfit font-medium text-2xl sm:text-3xl md:text-5xl lg:text-[48px] xl:text-[64px] tracking-[-2.5px] leading-none mb-4 sm:mb-6">
                   Zero-Trust Architecture
                 </h2>
                 <p className="text-white/60 text-lg font-medium opacity-80 max-w-[480px] leading-[1.6]">
@@ -129,8 +129,8 @@ export function LandingPage() {
             </div>
 
             {/* Featured Feature */}
-            <div className="group border border-white/10 rounded-[20px] bg-[#0e1014] overflow-hidden grid lg:grid-cols-2 min-h-[520px] mb-[25px]">
-              <div className="relative h-[400px] lg:h-auto overflow-hidden">
+            <div className="group border border-white/10 rounded-[20px] bg-[#0e1014] overflow-hidden grid grid-cols-1 lg:grid-cols-2 min-h-[300px] sm:min-h-[400px] md:min-h-[520px] mb-[25px]">
+              <div className="relative h-[300px] sm:h-[350px] lg:h-auto overflow-hidden">
                 <LiveChatAnimation />
                 {/* Brackets */}
                 <div className="absolute top-[15px] left-[15px] w-3 h-3 border-t-[1.5px] border-l-[1.5px] border-white/20"></div>
@@ -139,19 +139,19 @@ export function LandingPage() {
                 <div className="absolute bottom-[15px] right-[15px] w-3 h-3 border-b-[1.5px] border-r-[1.5px] border-white/20"></div>
               </div>
               
-              <div className="p-10 lg:p-[60px] flex flex-col items-start h-full">
-                <span className="bg-white/10 text-white text-xs font-semibold px-3 py-1.5 rounded-full mb-8">
+              <div className="p-6 sm:p-8 md:p-10 lg:p-[60px] flex flex-col items-start h-full">
+                <span className="bg-white/10 text-white text-xs font-semibold px-3 py-1.5 rounded-full mb-4 sm:mb-6 md:mb-8">
                   Core Cryptography
                 </span>
-                <h3 className="font-outfit font-medium text-[32px] md:text-[48px] tracking-[-1.5px] leading-tight mb-4">
+                <h3 className="font-outfit font-medium text-xl sm:text-2xl md:text-3xl lg:text-[32px] xl:text-[48px] tracking-[-1.5px] leading-tight mb-3 sm:mb-4">
                   Hybrid RSA + AES Exchange
                 </h3>
-                <p className="text-white/60 text-[17px] leading-relaxed mb-8">
+                <p className="text-white/60 text-sm sm:text-base md:text-[17px] leading-relaxed mb-6 sm:mb-8">
                   By combining the lightning-fast speed of AES-256 symmetric encryption with the bulletproof security of RSA-2048 asymmetric encryption, CipherText builds a transient secure tunnel for every transmission. No permanent master keys exist.
                 </p>
-                <div className="mt-auto w-full flex items-center justify-between pt-6 border-t border-white/10">
-                  <span className="text-sm text-white/60 font-medium">By CipherText Cryptography Team</span>
-                  <span className="px-3 py-1 rounded-full text-white text-[11px] font-semibold uppercase tracking-wide bg-[#7d1a4a]">
+                <div className="mt-auto w-full flex flex-col sm:flex-row items-start sm:items-center justify-between pt-4 sm:pt-6 border-t border-white/10 gap-3">
+                  <span className="text-xs sm:text-sm text-white/60 font-medium">By CipherText Cryptography Team</span>
+                  <span className="px-3 py-1 rounded-full text-white text-[11px] font-semibold uppercase tracking-wide bg-[#7d1a4a] whitespace-nowrap">
                     HYBRID CRYPTO
                   </span>
                 </div>

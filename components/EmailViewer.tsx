@@ -47,37 +47,40 @@ export function EmailViewer({ email, onBack }: EmailViewerProps) {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="w-full h-full flex flex-col bg-gradient-to-br from-black/40 via-black/30 to-black/40"
+      className="w-full h-full flex flex-col bg-[#08090a]"
     >
       {/* Header */}
-      <div className="p-6 border-b border-white/10 bg-black/40 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
+      <div className="px-4 sm:px-6 md:px-8 py-4 sm:py-6 border-b border-[#23252a] flex items-center justify-between">
+        <div className="flex items-center gap-4 min-w-0">
+          <motion.button
             onClick={onBack}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            whileHover={{ backgroundColor: "#0f1011" }}
+            className="p-2 hover:bg-[#0f1011] rounded-md transition-colors shrink-0"
           >
-            <ArrowLeft className="w-5 h-5 text-white" />
-          </button>
-          <div>
-            <h2 className="text-xl font-bold text-white">{email.subject}</h2>
-            <p className="text-sm text-white/60">From: {email.from}</p>
+            <ArrowLeft className="w-5 h-5 text-[#f7f8f8]" strokeWidth={2} />
+          </motion.button>
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-xl font-semibold text-[#f7f8f8] truncate" style={{ letterSpacing: "-0.12px" }}>
+              {email.subject}
+            </h2>
+            <p className="text-xs sm:text-sm text-[#8a8f98] truncate">From: {email.from}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-white/60 text-xs">
-          <Lock className="w-4 h-4 text-cyan-400" />
-          <span>RSA-2048 Encrypted</span>
+        <div className="flex items-center gap-2 text-[#8a8f98] text-xs shrink-0">
+          <Lock className="w-4 h-4 text-[#e4f222]" strokeWidth={2} />
+          <span className="hidden sm:inline">RSA-2048 Encrypted</span>
         </div>
       </div>
 
       {/* Email Body */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6">
         {!isDecrypted ? (
           <>
             {/* Encrypted Notice */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="liquid-glass border border-cyan-500/30 rounded-2xl p-8 text-center"
+              className="rounded-md border border-[#23252a] bg-[#0f1011] p-6 sm:p-8 text-center"
             >
               <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-cyan-400/20 to-blue-600/20 flex items-center justify-center mx-auto mb-4">
                 <Lock className="w-8 h-8 text-cyan-400" />
@@ -85,38 +88,40 @@ export function EmailViewer({ email, onBack }: EmailViewerProps) {
               <h3 className="text-xl font-bold text-white mb-2">
                 Email Encrypted with Hybrid Cryptography
               </h3>
-              <p className="text-white/60 mb-6 max-w-md mx-auto">
+              <p className="text-[#8a8f98] mb-6 max-w-md mx-auto">
                 This email is encrypted with AES-256-GCM for the message body and RSA-2048-OAEP for the encryption key. Only you can decrypt it using your private key.
               </p>
 
               <div className="grid grid-cols-2 gap-4 mb-8 text-left">
-                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                  <p className="text-xs text-white/50 mb-1">Cipher Algorithm</p>
-                  <p className="font-semibold text-white">AES-256-GCM</p>
+                <div className="bg-[#0f1011] border border-[#23252a] rounded-md p-4">
+                  <p className="text-xs text-[#8a8f98] mb-1">Cipher Algorithm</p>
+                  <p className="font-semibold text-[#f7f8f8]">AES-256-GCM</p>
                 </div>
-                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                  <p className="text-xs text-white/50 mb-1">Key Exchange</p>
-                  <p className="font-semibold text-white">RSA-2048-OAEP</p>
+                <div className="bg-[#0f1011] border border-[#23252a] rounded-md p-4">
+                  <p className="text-xs text-[#8a8f98] mb-1">Key Exchange</p>
+                  <p className="font-semibold text-[#f7f8f8]">RSA-2048-OAEP</p>
                 </div>
               </div>
 
-              <button
+              <motion.button
                 onClick={handleDecrypt}
                 disabled={isDecrypting}
-                className="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-50 text-white font-semibold rounded-lg transition-all flex items-center gap-2 mx-auto"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="px-8 py-3 bg-[#e4f222] hover:bg-[#f0ff33] disabled:opacity-50 text-[#08090a] font-semibold rounded-md transition-all flex items-center gap-2 mx-auto"
               >
                 {isDecrypting ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-[#08090a]/30 border-t-[#08090a] rounded-full animate-spin" />
                     Decrypting...
                   </>
                 ) : (
                   <>
-                    <Lock className="w-4 h-4" />
+                    <Lock className="w-4 h-4" strokeWidth={2} />
                     Decrypt with Private Key
                   </>
                 )}
-              </button>
+              </motion.button>
             </motion.div>
           </>
         ) : (
@@ -125,52 +130,54 @@ export function EmailViewer({ email, onBack }: EmailViewerProps) {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="liquid-glass border border-emerald-500/30 rounded-2xl p-8"
+              className="rounded-md border border-[#23252a] bg-[#0f1011] p-8"
             >
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2 text-emerald-400">
+                <div className="flex items-center gap-2 text-[#e4f222]">
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 2 }}
                   >
-                    <Lock className="w-5 h-5" />
+                    <Lock className="w-5 h-5" strokeWidth={2} />
                   </motion.div>
                   <span className="text-sm font-semibold">Successfully Decrypted</span>
                 </div>
-                <button
+                <motion.button
                   onClick={() => setShowCiphertext(!showCiphertext)}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  whileHover={{ backgroundColor: "#161718" }}
+                  className="p-2 hover:bg-[#161718] rounded-md transition-colors"
                 >
                   {showCiphertext ? (
-                    <EyeOff className="w-4 h-4 text-white/60" />
+                    <EyeOff className="w-4 h-4 text-[#8a8f98]" strokeWidth={2} />
                   ) : (
-                    <Eye className="w-4 h-4 text-white/60" />
+                    <Eye className="w-4 h-4 text-[#8a8f98]" strokeWidth={2} />
                   )}
-                </button>
+                </motion.button>
               </div>
 
               {/* Plaintext */}
-              <p className="text-white/80 leading-relaxed mb-6">
+              <p className="text-[#d0d6e0] leading-relaxed mb-6">
                 {emailBody}
               </p>
 
               {/* Sender Info */}
-              <div className="mt-8 pt-6 border-t border-white/10 space-y-3">
+              <div className="mt-8 pt-6 border-t border-[#23252a] space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-white/50 mb-1">Sender Fingerprint</p>
-                    <p className="text-sm text-white/70 font-mono">SHA-256: A4F7B2D1...</p>
+                    <p className="text-xs text-[#8a8f98] mb-1">Sender Fingerprint</p>
+                    <p className="text-sm text-[#d0d6e0] font-mono">SHA-256: A4F7B2D1...</p>
                   </div>
-                  <button
+                  <motion.button
                     onClick={handleCopyFingerprint}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    whileHover={{ backgroundColor: "#161718" }}
+                    className="p-2 hover:bg-[#161718] rounded-md transition-colors"
                   >
-                    <Copy className="w-4 h-4 text-cyan-400" />
-                  </button>
+                    <Copy className="w-4 h-4 text-[#e4f222]" strokeWidth={2} />
+                  </motion.button>
                 </div>
                 <div>
-                  <p className="text-xs text-white/50 mb-1">Decryption Time</p>
-                  <p className="text-sm text-white/70">1.2 seconds (RSA + AES)</p>
+                  <p className="text-xs text-[#8a8f98] mb-1">Decryption Time</p>
+                  <p className="text-sm text-[#d0d6e0]">1.2 seconds (RSA + AES)</p>
                 </div>
               </div>
             </motion.div>
@@ -180,13 +187,13 @@ export function EmailViewer({ email, onBack }: EmailViewerProps) {
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
-                className="liquid-glass border border-white/10 rounded-2xl p-6"
+                className="rounded-md border border-[#23252a] bg-[#0f1011] p-6"
               >
-                <p className="text-xs text-white/50 mb-3 font-semibold uppercase">
+                <p className="text-xs text-[#8a8f98] mb-3 font-semibold uppercase tracking-wider">
                   Encrypted Ciphertext (Reference)
                 </p>
-                <div className="bg-black/50 p-4 rounded-lg overflow-x-auto">
-                  <code className="text-xs text-white/40 font-mono break-all">
+                <div className="bg-[#08090a] p-4 rounded-md overflow-x-auto">
+                  <code className="text-xs text-[#62666d] font-mono break-all">
                     {ciphertext}
                   </code>
                 </div>
@@ -197,18 +204,27 @@ export function EmailViewer({ email, onBack }: EmailViewerProps) {
       </div>
 
       {/* Footer Actions */}
-      <div className="p-6 border-t border-white/10 bg-black/40 flex items-center gap-3">
-        <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-lg transition-all">
-          <Download className="w-4 h-4" />
+      <div className="p-6 border-t border-[#23252a] bg-[#08090a] flex items-center gap-3">
+        <motion.button
+          whileHover={{ backgroundColor: "#161718" }}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#0f1011] border border-[#23252a] hover:bg-[#161718] text-[#f7f8f8] rounded-md transition-all"
+        >
+          <Download className="w-4 h-4" strokeWidth={2} />
           Download
-        </button>
-        <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-lg transition-all">
-          <Download className="w-4 h-4" />
+        </motion.button>
+        <motion.button
+          whileHover={{ backgroundColor: "#161718" }}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#0f1011] border border-[#23252a] hover:bg-[#161718] text-[#f7f8f8] rounded-md transition-all"
+        >
+          <Download className="w-4 h-4" strokeWidth={2} />
           Save Attachment
-        </button>
-        <button className="px-4 py-3 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 rounded-lg transition-all">
-          <Trash2 className="w-4 h-4" />
-        </button>
+        </motion.button>
+        <motion.button
+          whileHover={{ backgroundColor: "#eb5757" }}
+          className="px-4 py-3 bg-transparent border border-[#eb5757] border-opacity-30 hover:bg-[#eb5757]/10 text-[#eb5757] rounded-md transition-all"
+        >
+          <Trash2 className="w-4 h-4" strokeWidth={2} />
+        </motion.button>
       </div>
     </motion.div>
   );
