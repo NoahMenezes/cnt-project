@@ -7,36 +7,36 @@ const fallbackPosts = [
   {
     id: '1',
     display_order: 1,
-    title: 'Full-Frame vs. Crop Sensor: Which for Photography?',
-    description: "An honest look at the real-world differences between these camera systems to help you choose what's actually right for your photography needs.",
-    author: 'By August Renner (c)',
-    category: 'Gear',
-    category_color: '#7d1a4a',
+    title: 'Why Hybrid Encryption Outperforms TLS-Only Security',
+    description: 'A deep dive into why combining RSA-2048 asymmetric and AES-256 symmetric encryption provides superior end-to-end protection over relying on transport-layer security alone.',
+    author: 'By SecureEmail Research Team',
+    category: 'Cryptography',
+    category_color: '#1a3a8c',
     video_url: 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260507_155500_808e6fdd-761f-4acd-b3be-cb7e6e700def.mp4',
     is_featured: true,
   },
   {
     id: '2',
     display_order: 2,
-    title: 'Finding Natural Light in Unexpected Places',
-    category: 'Lighting',
+    title: 'Zero-Knowledge Architecture: How We Keep Your Keys Off Our Servers',
+    category: 'Security',
     category_color: '#2c4c34',
     video_url: 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260506_030111_a9e15665-d379-4a7f-8116-695bbe452ad1.mp4',
   },
   {
     id: '3',
     display_order: 3,
-    title: 'My Approach to Editing: Creating a Consistent Photography Style',
-    category: 'Editing',
+    title: 'Understanding RSA-2048 Key Generation and Fingerprint Verification',
+    category: 'Deep Dive',
     category_color: '#a63e2d',
     video_url: 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260508_064122_c4750c0e-7476-4b44-94a2-a85a65c63bf2.mp4',
   },
   {
     id: '4',
     display_order: 4,
-    title: 'Pricing Your Photography: Strategies That Work',
-    category: 'Business',
-    category_color: '#1a2b8c',
+    title: 'AES-256-GCM: Authenticated Encryption and Why It Matters',
+    category: 'Standards',
+    category_color: '#4a1a8c',
     video_url: 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260507_154232_f8809bd2-a6c3-4a38-908d-2005e5b3cb3e.mp4',
   }
 ];
@@ -82,10 +82,10 @@ export function BlogSection() {
               Blog
             </div>
             <h2 className="font-outfit font-medium text-[48px] md:text-[64px] tracking-[-2.5px] leading-none mb-6">
-              Behind the lens
+              Security insights
             </h2>
             <p className="text-white/60 text-lg font-medium opacity-80 max-w-[480px] leading-[1.6]">
-              Thoughts, insights, and stories from my photography journey. Take a peek into my creative process and recent projects.
+              Deep dives into cryptographic standards, zero-trust architecture, and the engineering decisions behind SecureEmail's hybrid encryption pipeline.
             </p>
           </div>
           <button className="bg-white text-black rounded-full px-6 py-3 text-sm font-semibold hover:scale-[1.02] transition-transform self-start md:self-end shrink-0">

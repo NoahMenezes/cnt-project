@@ -4,7 +4,7 @@ import React, { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Environment, ContactShadows } from "@react-three/drei";
 import { IphoneModel } from "./IphoneModel";
-import { MotionValue } from "framer-motion";
+import { MotionValue } from "motion/react";
 
 export function IphoneCanvas({ progress }: { progress?: MotionValue<number> }) {
   return (

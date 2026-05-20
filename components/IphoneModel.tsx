@@ -5,7 +5,7 @@ import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-import { MotionValue } from "framer-motion";
+import { MotionValue } from "motion/react";
 
 export function IphoneModel({ progress }: { progress?: MotionValue<number> }) {
   const { scene } = useGLTF("/iphone_14_pro.glb");
