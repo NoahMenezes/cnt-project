@@ -4,6 +4,7 @@ import { Instrument_Serif } from "next/font/google";
 import { Button } from "@/components/ui/button";
 import { motion } from "motion/react";
 import { ArrowUpRight } from "lucide-react";
+import Image from "next/image";
 
 const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
@@ -46,7 +47,7 @@ function HeroSection({ avatarList }: HeroSectionProps) {
                   transition={{ duration: 1, delay: 0.1, ease: "easeInOut" }}
                   className="text-base font-normal max-w-2xl text-muted-foreground"
                 >
-                  At shadcn space, we help small startups tackle the world's
+                  At shadcn space, we help small startups tackle the world{"'"}s
                   biggest challenges with tailored solutions, guiding you from
                   strategy to success in a competitive market.
                 </motion.p>
@@ -69,11 +70,12 @@ function HeroSection({ avatarList }: HeroSectionProps) {
                   <ul className="avatar flex flex-row items-center">
                     {avatarList.map((avatar, index) => (
                       <li key={index} className="-mr-2 z-1 avatar-hover:ml-2">
-                        <img
+                        <Image
                           src={avatar.image}
                           alt="Avatar"
                           width={40}
                           height={40}
+                          unoptimized
                           className="rounded-full border-2 border-white"
                         />
                       </li>
@@ -82,10 +84,13 @@ function HeroSection({ avatarList }: HeroSectionProps) {
                   <div className="gap-1 flex flex-col items-start">
                     <div className="flex gap-1">
                       {Array.from({ length: 5 }).map((_, index) => (
-                        <img
+                        <Image
                           key={index}
                           src="https://images.shadcnspace.com/assets/svgs/icon-star.svg"
                           alt="star"
+                          width={16}
+                          height={16}
+                          unoptimized
                           className="h-4 w-4"
                         />
                       ))}
