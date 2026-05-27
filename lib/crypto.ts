@@ -16,9 +16,7 @@ interface KeyPair {
   privateKey: string;
 }
 
-/**
- * Generate RSA-2048 keypair
- */
+
 export async function generateRSAKeyPair(): Promise<KeyPair> {
   return new Promise((resolve, reject) => {
     const passphrase = process.env.ENCRYPTION_PASSPHRASE || "default-passphrase";
@@ -53,9 +51,7 @@ export async function generateRSAKeyPair(): Promise<KeyPair> {
   });
 }
 
-/**
- * Encrypt plaintext with AES-256-GCM
- */
+
 export function encryptAES(plaintext: string, key: Buffer): EncryptionResult {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
@@ -72,10 +68,7 @@ export function encryptAES(plaintext: string, key: Buffer): EncryptionResult {
   };
 }
 
-/**
- * Decrypt AES-256-GCM encrypted text
- * TODO: Complete implementation
- */
+
 export function decryptAES(
   ciphertext: string,
   key: Buffer,
@@ -96,9 +89,7 @@ export function decryptAES(
   }
 }
 
-/**
- * Encrypt AES key with RSA public key
- */
+
 export function encryptWithRSA(
   plaintext: string | Buffer,
   publicKey: string
@@ -120,9 +111,7 @@ export function encryptWithRSA(
   }
 }
 
-/**
- * Decrypt RSA-encrypted data with private key
- */
+
 export function decryptWithRSA(
   encryptedData: string,
   privateKey: string,
@@ -144,9 +133,7 @@ export function decryptWithRSA(
   }
 }
 
-/**
- * Generate fingerprint from public key
- */
+
 export function generateFingerprint(publicKey: string): string {
   return crypto
     .createHash("sha256")
@@ -157,9 +144,7 @@ export function generateFingerprint(publicKey: string): string {
     ?.join(" ") || "";
 }
 
-/**
- * Hash email for privacy
- */
+
 export function hashEmail(email: string): string {
   return crypto.createHash("sha256").update(email).digest("hex");
 }

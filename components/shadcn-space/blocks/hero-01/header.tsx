@@ -10,6 +10,10 @@ import Logo from "@/assets/logo/logo";
 import { Button } from "@/components/ui/button";
 import { motion } from "motion/react";
 import { ArrowUpRight } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { User } from "@supabase/supabase-js";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export type NavigationSection = {
   title: string;
@@ -36,6 +40,33 @@ const CollaborateButton = ({ className }: { className?: string }) => (
 const Header = ({ navigationData, className }: HeaderProps) => {
   const [sticky, setSticky] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    // Check current session
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+      setAuthLoading(false);
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
+  };
 
   const handleScroll = useCallback(() => {
     setSticky(window.scrollY >= 50);
@@ -100,8 +131,33 @@ const Header = ({ navigationData, className }: HeaderProps) => {
         </div>
 
         {/* Desktop CTA */}
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-center">
           <CollaborateButton className="hidden lg:flex" />
+          {!authLoading && (
+            user ? (
+              <div className="hidden lg:flex items-center gap-3">
+                <span className="text-xs text-muted-foreground max-w-28 truncate">
+                  {user.email}
+                </span>
+                <Button 
+                  onClick={handleSignOut} 
+                  variant="outline" 
+                  className="text-sm font-medium rounded-full h-10 px-4 cursor-pointer"
+                >
+                  Sign Out
+                </Button>
+              </div>
+            ) : (
+              <Link href="/auth">
+                <Button 
+                  variant="outline" 
+                  className="hidden lg:flex text-sm font-medium rounded-full h-10 px-6 cursor-pointer"
+                >
+                  Sign In
+                </Button>
+              </Link>
+            )
+          )}
 
           <div className="lg:hidden">
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -142,63 +198,91 @@ const Header = ({ navigationData, className }: HeaderProps) => {
                         {navigationData.map((item) => (
                           <NavigationMenuItem key={item.title}>
                             <NavigationMenuLink
-                              href={item.href}
-                              className={cn(
-                                "group/nav flex items-center text-2xl font-semibold tracking-tight transition-all p-0 hover:bg-transparent focus:bg-transparent data-[active]:bg-transparent data-[state=open]:bg-transparent",
-                                item.isActive
-                                  ? "text-primary"
-                                  : "text-muted-foreground hover:text-foreground hover:translate-x-2",
-                              )}
-                            >
-                              <div
+                                href={item.href}
                                 className={cn(
-                                  "h-0.5 bg-primary transition-all duration-300 overflow-hidden",
+                                  "group/nav flex items-center text-2xl font-semibold tracking-tight transition-all p-0 hover:bg-transparent focus:bg-transparent data-[active]:bg-transparent data-[state=open]:bg-transparent",
                                   item.isActive
-                                    ? "w-4 mr-2 opacity-100"
-                                    : "w-0 opacity-0 group-hover/nav:w-4 group-hover/nav:mr-2 group-hover/nav:opacity-100",
+                                    ? "text-primary"
+                                    : "text-muted-foreground hover:text-foreground hover:translate-x-2",
                                 )}
-                              />
-                              {item.title}
-                            </NavigationMenuLink>
-                          </NavigationMenuItem>
+                              >
+                                <div
+                                  className={cn(
+                                    "h-0.5 bg-primary transition-all duration-300 overflow-hidden",
+                                    item.isActive
+                                      ? "w-4 mr-2 opacity-100"
+                                      : "w-0 opacity-0 group-hover/nav:w-4 group-hover/nav:mr-2 group-hover/nav:opacity-100",
+                                  )}
+                                />
+                                {item.title}
+                              </NavigationMenuLink>
+                            </NavigationMenuItem>
+                          ))}
+                        </NavigationMenuList>
+                      </NavigationMenu>
+
+                      <div className="w-fit flex flex-col gap-3">
+                        <CollaborateButton />
+                        {!authLoading && (
+                          user ? (
+                            <div className="flex flex-col gap-2 mt-2">
+                              <span className="text-sm text-muted-foreground truncate px-1">
+                                {user.email}
+                              </span>
+                              <Button 
+                                onClick={() => {
+                                  handleSignOut();
+                                  setIsOpen(false);
+                                }} 
+                                variant="outline" 
+                                className="text-sm font-medium rounded-full h-10 px-4 w-full cursor-pointer"
+                              >
+                                Sign Out
+                              </Button>
+                            </div>
+                          ) : (
+                            <Link href="/auth" onClick={() => setIsOpen(false)}>
+                              <Button 
+                                variant="outline" 
+                                className="text-sm font-medium rounded-full h-10 px-6 w-full cursor-pointer mt-2"
+                              >
+                                Sign In
+                              </Button>
+                            </Link>
+                          )
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto flex flex-col gap-4">
+                      <div className="flex gap-3">
+                        {[
+                          "lucide:dribbble",
+                          "lucide:instagram",
+                          "lucide:twitter",
+                          "lucide:linkedin",
+                        ].map((icon) => (
+                          <a
+                            key={icon}
+                            href="#"
+                            className="flex items-center justify-center rounded-full outline outline-border hover:bg-muted transition p-3 shadow-xs"
+                          >
+                            <Icon icon={icon} width={16} height={16} />
+                          </a>
                         ))}
-                      </NavigationMenuList>
-                    </NavigationMenu>
+                      </div>
 
-                    <div className="w-fit">
-                      <CollaborateButton />
+                      <p className="text-sm text-muted-foreground">
+                        © 2026 Shadcn Space
+                      </p>
                     </div>
                   </div>
-
-                  <div className="mt-auto flex flex-col gap-4">
-                    <div className="flex gap-3">
-                      {[
-                        "lucide:dribbble",
-                        "lucide:instagram",
-                        "lucide:twitter",
-                        "lucide:linkedin",
-                      ].map((icon) => (
-                        <a
-                          key={icon}
-                          href="#"
-                          className="flex items-center justify-center rounded-full outline outline-border hover:bg-muted transition p-3 shadow-xs"
-                        >
-                          <Icon icon={icon} width={16} height={16} />
-                        </a>
-                      ))}
-                    </div>
-
-                    <p className="text-sm text-muted-foreground">
-                      © 2026 Shadcn Space
-                    </p>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
         </div>
-      </div>
-    </motion.header>
+      </motion.header>
   );
 };
 
