@@ -6,7 +6,7 @@ import { NavigationMenu, NavigationMenuItem, NavigationMenuLink, NavigationMenuL
 import { cn } from "@/lib/utils";
 import { Icon } from "@iconify/react";
 import { Menu, X } from 'lucide-react';
-import Logo from "@/assets/logo/logo";
+import Logo from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
 import { motion } from "motion/react";
 import { ArrowUpRight } from "lucide-react";
@@ -132,7 +132,9 @@ const Header = ({ navigationData, className }: HeaderProps) => {
 
         {/* Desktop CTA */}
         <div className="flex gap-4 items-center">
-          <CollaborateButton className="hidden lg:flex" />
+          <Link href="/auth" className="hidden lg:flex">
+            <CollaborateButton />
+          </Link>
           {!authLoading && (
             user ? (
               <div className="hidden lg:flex items-center gap-3">
@@ -222,7 +224,9 @@ const Header = ({ navigationData, className }: HeaderProps) => {
                       </NavigationMenu>
 
                       <div className="w-fit flex flex-col gap-3">
-                        <CollaborateButton />
+                        <Link href="/auth" onClick={() => setIsOpen(false)}>
+                          <CollaborateButton />
+                        </Link>
                         {!authLoading && (
                           user ? (
                             <div className="flex flex-col gap-2 mt-2">

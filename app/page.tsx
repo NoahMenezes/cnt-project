@@ -1,4 +1,4 @@
-import AgencyHeroSection from "@/components/shadcn-space/blocks/hero-01";
+import AgencyHeroSection from "@/components/home/home-layout";
 
 export default function Home() {
   return (
