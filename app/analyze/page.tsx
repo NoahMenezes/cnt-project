@@ -131,6 +131,7 @@ export default function OperationPage() {
   
   // ─── Operational Output States ───
   const [ciphertext, setCiphertext] = useState<string>("");
+  const [originalCiphertext, setOriginalCiphertext] = useState<string>("");
   const [encryptedSessionKey, setEncryptedSessionKey] = useState<string>("");
   const [aesIV, setAesIV] = useState<string>("");
   const [aesTag, setAesTag] = useState<string>("");
@@ -247,6 +248,7 @@ export default function OperationPage() {
       // 1. Encrypt plaintext via AES
       const encResult = aesEncryptSim(plaintext, aesKey, aesMode);
       setCiphertext(encResult.ciphertext);
+      setOriginalCiphertext(encResult.ciphertext);
       setAesIV(encResult.iv);
       if (encResult.tag) setAesTag(encResult.tag);
 
@@ -259,6 +261,18 @@ export default function OperationPage() {
       addLog(`RSA encrypted AES session key securely packaged: ${wrappedKey}`, "success");
       addLog(`Ciphertext payload loaded successfully into the Encrypted Workspace. Ready for operations.`, "success");
     }, 600);
+  };
+
+  const handleTamper = () => {
+    if (!ciphertext) return;
+    const arr = ciphertext.split("");
+    for (let i = 0; i < Math.min(5, arr.length); i++) {
+      const idx = Math.floor(Math.random() * arr.length);
+      arr[idx] = String.fromCharCode(97 + Math.floor(Math.random() * 26));
+    }
+    const tampered = arr.join("");
+    setCiphertext(tampered);
+    addLog("Intentionally tampered/corrupted ciphertext payload for testing!", "warn");
   };
 
   // ─── Cryptographic Action: Decrypt ───
@@ -489,49 +503,6 @@ export default function OperationPage() {
                 </div>
               </div>
 
-              {/* Ciphertext / Encrypted Notepad Workspace */}
-              <div className="rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
-                <div className="flex items-center justify-between border-b border-border/20 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Lock className="h-4 w-4 text-orange-400" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-foreground">Encrypted Workspace (Ciphertext Notepad)</span>
-                  </div>
-                  {ciphertext && (
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(ciphertext);
-                        addLog("Copied base64 ciphertext to clipboard.", "info");
-                      }}
-                      className="flex items-center gap-1 text-xs text-foreground/40 hover:text-foreground transition-colors"
-                    >
-                      <Copy className="h-3.5 w-3.5" /> Copy Cipher
-                    </button>
-                  )}
-                </div>
-
-                <textarea
-                  value={ciphertext}
-                  onChange={(e) => setCiphertext(e.target.value)}
-                  readOnly
-                  rows={16}
-                  className="w-full bg-orange-500/[0.02] border border-orange-500/10 rounded-xl p-4 font-mono text-orange-400/80 text-xs leading-relaxed focus:outline-none resize-y"
-                  placeholder="Ciphertext payload will output here after running hybrid encryption..."
-                />
-
-                {ciphertext && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-foreground/[0.02] rounded-xl p-3 border border-border/20 text-xs">
-                    <div>
-                      <p className="text-[10px] text-foreground/40 font-semibold uppercase tracking-wider">Wrapped AES Session Key (RSA Encrypted)</p>
-                      <p className="font-mono text-foreground/80 mt-1 truncate">{encryptedSessionKey}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-foreground/40 font-semibold uppercase tracking-wider">Initialization Vector (IV)</p>
-                      <p className="font-mono text-foreground/80 mt-1">{aesIV || "N/A"}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
             </div>
 
             {/* RIGHT COLUMN: Operations Board & Lab Controls (Span 5) */}
@@ -673,6 +644,91 @@ export default function OperationPage() {
 
             </div>
 
+          </div>
+
+          {/* Ciphertext / Encrypted Notepad Workspace (Full Width) */}
+          <div className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-border/20 pb-4 gap-3">
+              <div className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-orange-400" />
+                <h3 className="text-base font-bold text-foreground">Encrypted Workspace (Ciphertext Notepad)</h3>
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-2.5">
+                {ciphertext && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(ciphertext);
+                        addLog("Copied ciphertext payload to clipboard.", "success");
+                      }}
+                      className="border-border/40 hover:bg-foreground/[0.04] text-xs h-8"
+                    >
+                      <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy Ciphertext
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTamper}
+                      className="border-orange-500/20 hover:bg-orange-500/10 text-orange-400 text-xs h-8"
+                    >
+                      <AlertTriangle className="h-3.5 w-3.5 mr-1.5" /> Tamper Payload (Simulate Intercept)
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setCiphertext(originalCiphertext);
+                        addLog("Restored original untampered ciphertext payload.", "info");
+                      }}
+                      className="border-border/40 hover:bg-foreground/[0.04] text-xs h-8"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Reset Original
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setCiphertext("");
+                        setOriginalCiphertext("");
+                        addLog("Cleared ciphertext workspace.", "info");
+                      }}
+                      className="border-red-500/20 hover:bg-red-500/10 text-red-400 text-xs h-8"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Clear Cipher
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="relative font-mono text-sm leading-relaxed">
+              <textarea
+                value={ciphertext}
+                onChange={(e) => setCiphertext(e.target.value)}
+                rows={12}
+                className="w-full bg-orange-500/[0.02] border border-orange-500/10 rounded-xl p-4 font-mono text-orange-400/80 text-xs leading-relaxed focus:outline-none focus:border-orange-500/30 resize-y"
+                placeholder="Ciphertext payload will output here after running hybrid encryption. You can edit this field to test decryption behavior under payload corruption!"
+              />
+              <div className="absolute bottom-3 right-3 text-[10px] text-orange-400/40">
+                Characters: {ciphertext.length}
+              </div>
+            </div>
+
+            {ciphertext && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-foreground/[0.02] rounded-xl p-4 border border-border/20 text-xs mt-1">
+                <div>
+                  <p className="text-[10px] text-foreground/40 font-semibold uppercase tracking-wider">Wrapped AES Session Key (RSA Encrypted)</p>
+                  <p className="font-mono text-foreground/80 mt-1 truncate">{encryptedSessionKey}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-foreground/40 font-semibold uppercase tracking-wider">Initialization Vector (IV)</p>
+                  <p className="font-mono text-foreground/80 mt-1">{aesIV || "N/A"}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Decrypted Output / Document Restore Notepad (Full Width) */}
