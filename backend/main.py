@@ -491,6 +491,70 @@ def perform_cryptographic_analysis(file_name: str, content: str):
     except Exception as e:
         print(f"Failed to index document in ChromaDB: {e}")
 
+    # Automatically Sync to Supabase in real-time
+    supabase_url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if supabase_url and service_key:
+        try:
+            print(f"Auto-syncing report {report_id} to Supabase from perform_cryptographic_analysis...")
+            headers = {
+                "apikey": service_key,
+                "Authorization": f"Bearer {service_key}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates"
+            }
+            row = {
+                "id": report_id,
+                "file_name": file_name,
+                "type": report["type"],
+                "file_size": report["fileSize"],
+                "analysis_date": report["analysisDate"],
+                "security_score": overall_score,
+                "status": status,
+                "entropy": report["entropy"],
+                "rsa": report["rsa"],
+                "aes": report["aes"],
+                "patterns": report["patterns"],
+                "recommendations": report["recommendations"],
+                "findings": report["findings"]
+            }
+            res = requests.post(f"{supabase_url}/rest/v1/reports", json=row, headers=headers)
+            if res.status_code in [200, 201]:
+                print(f"Auto-sync main report {report_id} succeeded.")
+                
+                # Sync unstructured chunks
+                if unstructured_chunks_list:
+                    chunk_rows = []
+                    for chunk in unstructured_chunks_list:
+                        chunk_rows.append({
+                            "report_id": report_id,
+                            "chunk_id": chunk.get("id"),
+                            "text": chunk.get("text"),
+                            "type": chunk.get("type"),
+                            "length": chunk.get("length")
+                        })
+                    c_res = requests.post(f"{supabase_url}/rest/v1/unstructured_chunks", json=chunk_rows, headers=headers)
+                    if c_res.status_code not in [200, 201]:
+                        print(f"Warning: Auto-sync unstructured_chunks failed: {c_res.status_code}, {c_res.text}")
+
+                # Sync structured parameters
+                if structured_parameters_list:
+                    param_rows = []
+                    for param in structured_parameters_list:
+                        param_rows.append({
+                            "report_id": report_id,
+                            "category": param.get("category"),
+                            "element": param.get("element"),
+                            "value": param.get("value"),
+                            "classification": param.get("classification"),
+                            "status": param.get("status")
+                        })
+                    p_res = requests.post(f"{supabase_url}/rest/v1/structured_parameters", json=param_rows, headers=headers)
+                    if p_res.status_code not in [200, 201]:
+                        print(f"Warning: Auto-sync structured_parameters failed: {p_res.status_code}, {p_res.text}")
+        except Exception as e:
+            print(f"Warning: Auto-sync to Supabase failed: {e}")
+
     return report
 
 
