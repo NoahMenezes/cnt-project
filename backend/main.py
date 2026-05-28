@@ -146,11 +146,27 @@ def detect_patterns(text: str):
         "observations": obs
     }
 
-@app.post("/analyze")
-async def analyze_document(req: AnalysisRequest):
-    content = req.content
-    file_name = req.fileName
-    
+import zipfile
+import xml.etree.ElementTree as ET
+from io import BytesIO
+from fastapi import UploadFile, File
+
+def extract_text_from_docx(file_bytes: bytes) -> str:
+    try:
+        with zipfile.ZipFile(BytesIO(file_bytes)) as docx:
+            xml_content = docx.read('word/document.xml')
+            root = ET.fromstring(xml_content)
+            texts = []
+            for elem in root.iter():
+                if elem.tag.endswith('}t'):
+                    if elem.text:
+                        texts.append(elem.text)
+            return " ".join(texts)
+    except Exception as e:
+        print(f"Failed to parse docx: {e}")
+        return ""
+
+def perform_cryptographic_analysis(file_name: str, content: str):
     # Calculate exact Shannon Entropy
     entropy_val = calculate_entropy(content)
     
@@ -372,3 +388,29 @@ async def analyze_document(req: AnalysisRequest):
         print(f"Failed to index document in ChromaDB: {e}")
 
     return report
+
+@app.post("/analyze/text")
+async def analyze_text(req: AnalysisRequest):
+    return perform_cryptographic_analysis(req.fileName, req.content)
+
+@app.post("/analyze/file")
+async def analyze_file(file: UploadFile = File(...)):
+    file_bytes = await file.read()
+    file_name = file.filename
+    content = ""
+    
+    # Check file extension
+    ext = file_name.split(".")[-1].lower() if "." in file_name else ""
+    if ext == "docx":
+        content = extract_text_from_docx(file_bytes)
+    else:
+        try:
+            content = file_bytes.decode("utf-8", errors="ignore")
+        except Exception:
+            content = f"Binary content of {file_name}"
+            
+    return perform_cryptographic_analysis(file_name, content)
+
+@app.post("/analyze")
+async def analyze_document(req: AnalysisRequest):
+    return perform_cryptographic_analysis(req.fileName, req.content)

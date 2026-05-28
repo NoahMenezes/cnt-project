@@ -376,16 +376,27 @@ export default function AnalyzePage() {
 
     const fetchAnalysis = async () => {
       try {
-        const response = await fetch("http://localhost:8000/analyze", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            fileName,
-            content,
-          }),
-        });
+        let response;
+        if (uploadedFile) {
+          const formData = new FormData();
+          formData.append("file", uploadedFile);
+          response = await fetch("http://localhost:8000/analyze/file", {
+            method: "POST",
+            body: formData,
+          });
+        } else {
+          response = await fetch("http://localhost:8000/analyze/text", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              fileName,
+              content,
+            }),
+          });
+        }
+        
         if (!response.ok) throw new Error("Backend analysis failed");
         const report = await response.json();
         
