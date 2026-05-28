@@ -166,6 +166,27 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
         print(f"Failed to parse docx: {e}")
         return ""
 
+def get_unstructured_chunks(text: str):
+    paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
+    chunks = []
+    for i, p in enumerate(paragraphs):
+        p_type = "Text Paragraph"
+        p_clean = p.lower()
+        if len(p) < 65 and (p.endswith(":") or p.isupper() or p.startswith("LAB") or p.startswith("Expt") or p.startswith("Session")):
+            p_type = "Section Header"
+        elif p.startswith("-") or p.startswith("*") or (p.strip() and p.strip()[0].isdigit() and len(p.strip()) > 2 and p.strip()[1] == "."):
+            p_type = "List Item"
+        elif "def " in p_clean or "import " in p_clean or "{" in p_clean or "=" in p_clean and len(p) > 80:
+            p_type = "Formula / Code"
+            
+        chunks.append({
+            "id": i + 1,
+            "text": p,
+            "length": len(p),
+            "type": p_type
+        })
+    return chunks
+
 def perform_cryptographic_analysis(file_name: str, content: str):
     # Calculate exact Shannon Entropy
     entropy_val = calculate_entropy(content)
