@@ -19,9 +19,7 @@ const NAV = [
   { title: "Dashboard", href: "/dashboard" },
   { title: "Analyze", href: "/analyze" },
   { title: "Hybrid Lab", href: "/hybrid-lab" },
-  { title: "Visualizations", href: "/visualizations" },
   { title: "Reports", href: "/reports", isActive: true },
-  { title: "Learn", href: "/learn" },
   { title: "Profile", href: "/profile" },
 ];
 

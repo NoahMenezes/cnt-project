@@ -10,13 +10,16 @@ import Link from "next/link";
 import {
   Activity, BarChart3, ChevronRight, Clock, Download,
   Settings, TrendingDown, TrendingUp, Zap, Shield,
-  FileText, AlertTriangle, Lock, Brain, Menu,
+  FileText, AlertTriangle, Lock, Brain, Menu, FileSearch,
 } from "lucide-react";
 import {
   CartesianGrid, Line, LineChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis, BarChart, Bar, RadarChart,
   PolarGrid, PolarAngleAxis, Radar,
+  PieChart, Pie, Cell, ScatterChart, Scatter,
+  AreaChart, Area, ReferenceLine, Legend,
 } from "recharts";
+
 
 // ─── Animations ──────────────────────────────────────────────────────────────
 const container: Variants = {
@@ -78,6 +81,291 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+// ─── Constants (visualizations) ──────────────────────────────────────────────
+const DONUT_COLORS = ["#ef4444", "#f97316", "#f59e0b", "#3b82f6"];
+const ENTROPY_COLORS = ["#ef4444", "#f97316", "#f59e0b", "#10b981", "#06b6d4"];
+const TOOLTIP_STYLE = {
+  backgroundColor: "var(--background)", border: "1px solid var(--border)",
+  borderRadius: 8, fontSize: 12, padding: "8px 12px",
+};
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}
+      className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-4">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground">{title}</h3>
+      {children}
+    </motion.div>
+  );
+}
+
+function VisualizationsSection({ reports, hasMounted }: { reports: Report[]; hasMounted: boolean }) {
+  const [activeFilter, setActiveFilter] = useState<"daily" | "weekly" | "monthly">("weekly");
+
+  const chartData = useMemo(() => {
+    // Security trends grouped by date
+    const trendsMap: Record<string, { sum: number; count: number }> = {};
+    reports.forEach((r) => {
+      const d = new Date(r.analysisDate);
+      const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      if (!trendsMap[dateStr]) trendsMap[dateStr] = { sum: 0, count: 0 };
+      trendsMap[dateStr].sum += r.securityScore;
+      trendsMap[dateStr].count += 1;
+    });
+    const securityTrends = Object.entries(trendsMap).map(([date, data]) => ({
+      date, avgScore: Math.round(data.sum / data.count),
+    }));
+
+    // RSA vs AES
+    let rsaCrit = 0, rsaWeak = 0, rsaMod = 0, rsaSec = 0;
+    let aesCrit = 0, aesWeak = 0, aesMod = 0, aesSec = 0;
+    reports.forEach((r) => {
+      if (r.rsa.keySize < 1024) rsaCrit++; else if (r.rsa.keySize < 2048) rsaWeak++;
+      else if (r.rsa.keySize < 4096) rsaMod++; else rsaSec++;
+      if (r.aes.mode === "ECB" && r.aes.passwordComplexity === "Weak") aesCrit++;
+      else if (r.aes.mode === "ECB" || r.aes.passwordComplexity === "Weak") aesWeak++;
+      else if (r.aes.mode === "CBC") aesMod++; else aesSec++;
+    });
+    const rsaVsAES = [
+      { category: "Critical", rsa: rsaCrit, aes: aesCrit },
+      { category: "Weak", rsa: rsaWeak, aes: aesWeak },
+      { category: "Moderate", rsa: rsaMod, aes: aesMod },
+      { category: "Secure", rsa: rsaSec, aes: aesSec },
+    ];
+
+    // Weakness distribution
+    let smallRsa = 0, weakExp = 0, ecbMode = 0, weakPass = 0;
+    reports.forEach((r) => {
+      if (r.rsa.keySize < 2048) smallRsa++;
+      if (r.rsa.exponent === 3) weakExp++;
+      if (r.aes.mode === "ECB") ecbMode++;
+      if (r.aes.passwordComplexity === "Weak") weakPass++;
+    });
+    const totalIssues = (smallRsa + weakExp + ecbMode + weakPass) || 1;
+    const weaknessDistribution = [
+      { name: "Small RSA Key", value: Math.round((smallRsa / totalIssues) * 100), count: smallRsa },
+      { name: "Weak Exponent", value: Math.round((weakExp / totalIssues) * 100), count: weakExp },
+      { name: "ECB Mode", value: Math.round((ecbMode / totalIssues) * 100), count: ecbMode },
+      { name: "Weak Password", value: Math.round((weakPass / totalIssues) * 100), count: weakPass },
+    ].filter(w => w.count > 0);
+    if (weaknessDistribution.length === 0) weaknessDistribution.push({ name: "No Issues", value: 100, count: 0 });
+
+    // Entropy distribution buckets
+    let b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0;
+    reports.forEach((r) => {
+      const e = r.entropy.value;
+      if (e < 2) b1++; else if (e < 4) b2++; else if (e < 6) b3++;
+      else if (e < 7.5) b4++; else b5++;
+    });
+    const entropyDistribution = [
+      { range: "0–2", count: b1 }, { range: "2–4", count: b2 },
+      { range: "4–6", count: b3 }, { range: "6–7.5", count: b4 }, { range: "7.5–8", count: b5 },
+    ];
+
+    // Character frequency (static hex sample)
+    const characterFrequency = [
+      { char: "E", frequency: 182 }, { char: "A", frequency: 165 },
+      { char: "F", frequency: 148 }, { char: "0", frequency: 134 },
+      { char: "B", frequency: 129 }, { char: "C", frequency: 121 },
+      { char: "D", frequency: 118 }, { char: "1", frequency: 112 },
+      { char: "9", frequency: 104 }, { char: "3", frequency: 97 },
+    ];
+
+    // Encryption time vs file size
+    const encryptionTimeVsFileSize = reports.map((r) => {
+      let sizeKB = parseFloat(r.fileSize) || 10;
+      if (r.fileSize.includes("MB")) sizeKB *= 1024;
+      let baseTime = sizeKB * 1.5;
+      if (r.aes.mode === "CBC") baseTime *= 1.2;
+      if (r.rsa.keySize >= 4096) baseTime += 80;
+      else if (r.rsa.keySize >= 2048) baseTime += 30;
+      return { fileSizeKB: Math.round(sizeKB), timeMs: Math.round(baseTime), fileName: r.fileName };
+    });
+
+    // Activity trends
+    const actMap: Record<string, number> = {};
+    reports.forEach((r) => {
+      const dateStr = new Date(r.analysisDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      actMap[dateStr] = (actMap[dateStr] || 0) + 1;
+    });
+    const activityTrends = Object.entries(actMap).map(([date, analyses]) => ({ date, analyses }));
+
+    const totalAnalyses = reports.length;
+    const averageScore = totalAnalyses > 0 ? Math.round(reports.reduce((a, r) => a + r.securityScore, 0) / totalAnalyses) : 0;
+    const weakFindings = reports.reduce((a, r) => a + (r.rsa?.vulnerabilities?.length ?? 0), 0);
+    const mostCommonIssue = smallRsa > ecbMode ? "Weak RSA Key Size" : ecbMode > 0 ? "ECB Mode Encryption" : "None Detected";
+
+    return { securityTrends, rsaVsAES, weaknessDistribution, entropyDistribution, characterFrequency, encryptionTimeVsFileSize, activityTrends, totalAnalyses, averageScore, weakFindings, mostCommonIssue };
+  }, [reports]);
+
+  const stats = hasMounted ? chartData : { totalAnalyses: 0, averageScore: 0, weakFindings: 0, mostCommonIssue: "—" };
+
+  return (
+    <div className="space-y-8 pt-6 border-t border-border/20">
+      <div className="flex items-center gap-3">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground/50">Analytics &amp; Visualizations</h2>
+        <div className="h-px flex-1 bg-border/30" />
+        <Badge variant="outline" className="text-xs border-border/40">
+          <BarChart3 className="h-3 w-3 mr-1" />Analytics
+        </Badge>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { label: "Total Analyses", value: stats.totalAnalyses, icon: FileSearch },
+          { label: "Avg Security Score", value: stats.averageScore, icon: Shield },
+          { label: "Weak Findings", value: stats.weakFindings, icon: AlertTriangle },
+          { label: "Top Issue", value: stats.mostCommonIssue, icon: BarChart3 },
+        ].map(({ label, value, icon: Icon }) => (
+          <motion.div key={label} whileHover={{ y: -4 }} transition={{ duration: 0.2 }}
+            className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+              <Icon className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.25em] text-foreground/40">{label}</p>
+              <p className="text-xl font-bold text-foreground leading-none mt-0.5">{value}</p>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Filter bar */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-foreground/40 uppercase tracking-widest">Range:</span>
+        <div className="flex gap-1 rounded-lg bg-muted/50 p-1">
+          {(["daily", "weekly", "monthly"] as const).map(f => (
+            <button key={f} onClick={() => setActiveFilter(f)}
+              className={`px-4 py-1.5 rounded-md text-xs font-medium capitalize transition-all ${
+                activeFilter === f ? "bg-background text-foreground shadow-sm" : "text-foreground/50 hover:text-foreground"
+              }`}>{f}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Charts grid */}
+      {hasMounted && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <SectionCard title="Security Score Trends">
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={chartData.securityTrends.length ? chartData.securityTrends : [{ date: "No data", avgScore: 0 }]}
+                margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
+                <XAxis dataKey="date" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
+                <YAxis domain={[0, 100]} stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={30} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: "var(--foreground)" }} />
+                <ReferenceLine y={70} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: "Threshold", fill: "#f59e0b", fontSize: 10, position: "right" }} />
+                <Line type="natural" dataKey="avgScore" stroke="var(--primary)" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </SectionCard>
+
+          <SectionCard title="RSA vs AES Issues by Risk Level">
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={chartData.rsaVsAES} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
+                <XAxis dataKey="category" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
+                <YAxis stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={25} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="rsa" name="RSA" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="aes" name="AES" fill="#10b981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </SectionCard>
+
+          <SectionCard title="Weakness Distribution">
+            <div className="flex items-center gap-6">
+              <ResponsiveContainer width="60%" height={200}>
+                <PieChart>
+                  <Pie data={chartData.weaknessDistribution} dataKey="value" nameKey="name"
+                    cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}>
+                    {chartData.weaknessDistribution.map((_: any, i: number) => (
+                      <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: any, n: any) => [`${v}%`, n]} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-2 flex-1">
+                {chartData.weaknessDistribution.map((d: any, i: number) => (
+                  <div key={d.name} className="flex items-center gap-2 text-xs">
+                    <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: DONUT_COLORS[i] }} />
+                    <span className="text-foreground/60 flex-1">{d.name}</span>
+                    <span className="text-foreground font-semibold">{d.value}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Entropy Distribution">
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={chartData.entropyDistribution} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
+                <XAxis dataKey="range" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
+                <YAxis stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={25} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: any) => [v, "Files"]} />
+                <Bar dataKey="count" name="Files" radius={[4, 4, 0, 0]}>
+                  {chartData.entropyDistribution.map((_: any, i: number) => (
+                    <Cell key={i} fill={ENTROPY_COLORS[i % ENTROPY_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </SectionCard>
+
+          <SectionCard title="Character Frequency (Top 10)">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={chartData.characterFrequency} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} horizontal={false} />
+                <XAxis type="number" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="char" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={20} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: any) => [v, "Occurrences"]} />
+                <Bar dataKey="frequency" fill="var(--primary)" radius={[0, 4, 4, 0]} opacity={0.8} />
+              </BarChart>
+            </ResponsiveContainer>
+          </SectionCard>
+
+          <SectionCard title="Encryption Time vs File Size">
+            <ResponsiveContainer width="100%" height={220}>
+              <ScatterChart margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
+                <XAxis dataKey="fileSizeKB" name="File Size" unit=" KB" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
+                <YAxis dataKey="timeMs" name="Time" unit=" ms" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={45} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: any, n: any) => [v, n === "fileSizeKB" ? "KB" : "ms"]} />
+                <Scatter data={chartData.encryptionTimeVsFileSize.length ? chartData.encryptionTimeVsFileSize : [{ fileSizeKB: 0, timeMs: 0 }]} fill="#6366f1" />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </SectionCard>
+
+          <div className="lg:col-span-2">
+            <SectionCard title="Analysis Activity Trends">
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={chartData.activityTrends.length ? chartData.activityTrends : [{ date: "No data", analyses: 0 }]}
+                  margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="actGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
+                  <XAxis dataKey="date" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
+                  <YAxis stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={25} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: any) => [v, "Analyses"]} />
+                  <Area type="natural" dataKey="analyses" stroke="var(--primary)" strokeWidth={2.5} fill="url(#actGrad)" dot={false} activeDot={{ r: 5 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </SectionCard>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const navData = [
@@ -85,9 +373,7 @@ export default function Dashboard() {
     { title: "Dashboard", href: "/dashboard", isActive: true },
     { title: "Analyze", href: "/analyze" },
     { title: "Hybrid Lab", href: "/hybrid-lab" },
-    { title: "Visualizations", href: "/visualizations" },
     { title: "Reports", href: "/reports" },
-    { title: "Learn", href: "/learn" },
     { title: "Profile", href: "/profile" },
   ];
 
@@ -426,6 +712,11 @@ export default function Dashboard() {
                       </Link>
                     </motion.div>
                   </div>
+
+                  {/* ══════════════════════════════════════════════════════════
+                      ANALYTICS & VISUALIZATIONS (merged from /visualizations)
+                  ══════════════════════════════════════════════════════════ */}
+                  <VisualizationsSection reports={reports} hasMounted={hasMounted} />
 
                 </motion.div>
               )}
