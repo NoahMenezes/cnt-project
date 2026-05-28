@@ -70,7 +70,7 @@ function generateRSAPairSim(bits: number) {
     q: q.toString(),
     n: n.toString(),
     e: e.toString(),
-    d: "28374928374982374923847298374", // Mock private exponent
+    d: "",
     publicKey: pubPem,
     privateKey: privPem,
     bits
@@ -119,7 +119,7 @@ export default function OperationPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Workspace Plaintext Editor ───
-  const [plaintext, setPlaintext] = useState<string>("// Welcome to the Operation Lab Cryptographic Editor.\n// Upload a DOCX, PDF, CSV, or Text file, or type your own content here.\n\nHello, Cryptography World!");
+  const [plaintext, setPlaintext] = useState<string>("");
 
   // ─── Cryptographic Settings & State ───
   const [rsaBits, setRsaBits] = useState<number>(2048);
@@ -147,10 +147,6 @@ export default function OperationPage() {
   useEffect(() => {
     setHasMounted(true);
     setRecentList(getReports().slice(0, 5));
-    // Pre-generate keys
-    handleGenerateRSA();
-    handleGenerateAES();
-    
     const handleUpdate = () => {
       setRecentList(getReports().slice(0, 5));
     };
@@ -485,7 +481,7 @@ export default function OperationPage() {
                     onChange={(e) => setPlaintext(e.target.value)}
                     rows={12}
                     className="w-full bg-foreground/[0.03] border border-border/20 rounded-xl p-4 font-mono text-foreground text-xs leading-relaxed focus:outline-none focus:border-primary/50 resize-y"
-                    placeholder="Enter document text or raw lines..."
+                    placeholder="Upload a document above — or start typing your own content here.&#10;&#10;Supported formats: PDF, DOCX, CSV, TXT, JSON"
                   />
                   <div className="absolute bottom-3 right-3 text-[10px] text-foreground/30">
                     Characters: {plaintext.length} | Lines: {plaintext.split("\n").length}
@@ -517,8 +513,8 @@ export default function OperationPage() {
                   value={ciphertext}
                   onChange={(e) => setCiphertext(e.target.value)}
                   readOnly
-                  rows={8}
-                  className="w-full bg-orange-500/[0.02] border border-orange-500/10 rounded-xl p-4 font-mono text-orange-400/80 text-xs leading-relaxed focus:outline-none resize-none"
+                  rows={16}
+                  className="w-full bg-orange-500/[0.02] border border-orange-500/10 rounded-xl p-4 font-mono text-orange-400/80 text-xs leading-relaxed focus:outline-none resize-y"
                   placeholder="Ciphertext payload will output here after running hybrid encryption..."
                 />
 
@@ -631,7 +627,7 @@ export default function OperationPage() {
                       value={aesKey}
                       onChange={(e) => setAesKey(e.target.value)}
                       className="w-full bg-background border border-border/30 rounded-lg px-3 py-1.5 font-mono text-foreground focus:outline-none focus:border-primary/50 text-xs"
-                      placeholder="Enter raw AES key hex..."
+                      placeholder="Click 'Regenerate Key' to generate a secure random AES key..."
                     />
                   </div>
                 </div>
@@ -672,33 +668,6 @@ export default function OperationPage() {
                     )}
                     Save Operation State &amp; Finish
                   </Button>
-                </div>
-              </div>
-
-              {/* Telemetry Process Logging */}
-              <div className="rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
-                <div className="flex items-center justify-between border-b border-border/15 pb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-foreground/60">Cryptographic Process Logs</span>
-                  <button onClick={() => setLogs([])} className="text-[10px] text-foreground/30 hover:text-foreground">Clear Logs</button>
-                </div>
-
-                <div className="h-40 overflow-y-auto space-y-1.5 font-mono text-[10px] leading-relaxed pr-1">
-                  {logs.length === 0 ? (
-                    <div className="h-full flex items-center justify-center text-foreground/20 italic">No operations executed.</div>
-                  ) : (
-                    logs.map((log, i) => (
-                      <div key={i} className="flex items-start gap-1">
-                        <span className="text-foreground/30 shrink-0">[{log.time}]</span>
-                        <span className={
-                          log.type === "success" ? "text-emerald-400" :
-                          log.type === "error" ? "text-red-400" :
-                          log.type === "warn" ? "text-yellow-400" : "text-foreground/60"
-                        }>
-                          {log.msg}
-                        </span>
-                      </div>
-                    ))
-                  )}
                 </div>
               </div>
 
