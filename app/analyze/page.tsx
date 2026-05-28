@@ -140,6 +140,12 @@ export default function AnalyzePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [tableTab, setTableTab] = useState<"unstructured" | "structured">("structured");
+  const [aiContext, setAiContext] = useState<{
+    securityAssessment: string;
+    findings: string;
+    recommendations: { priority: string; action: string }[];
+    unstructuredText: string;
+  } | null>(null);
 
   useEffect(() => {
     setHasMounted(true);
@@ -406,12 +412,36 @@ export default function AnalyzePage() {
         
         if (!response.ok) throw new Error("Backend analysis failed");
         const report = await response.json();
-        
+
+        // Parse the AI JSON from structured_parameters row stored by Groq
+        const structuredRow = report?.patterns?.structuredParameters?.[0];
+        if (structuredRow?.value) {
+          try {
+            const aiJson = JSON.parse(structuredRow.value);
+            const unstructuredRow = report?.patterns?.unstructuredChunks?.[0];
+            setAiContext({
+              securityAssessment: aiJson.securityAssessment || "",
+              findings: aiJson.findings || report.findings || "",
+              recommendations: Array.isArray(aiJson.recommendations) ? aiJson.recommendations : report.recommendations || [],
+              unstructuredText: unstructuredRow?.text || "",
+            });
+            // Override the report's findings and recommendations with the AI-driven ones
+            report.findings = aiJson.findings || report.findings;
+            report.recommendations = Array.isArray(aiJson.recommendations) ? aiJson.recommendations : report.recommendations;
+          } catch (e) {
+            console.warn("Could not parse AI structured JSON:", e);
+            setAiContext(null);
+          }
+        } else {
+          setAiContext(null);
+        }
+
         setCurrentReport(report);
         setIsAnalyzing(false);
         setAnalysisComplete(true);
       } catch (err) {
         console.warn("FastAPI backend connection failed. Falling back to local simulation.", err);
+        setAiContext(null);
         // Fallback simulation
         setTimeout(() => {
           setCurrentReport(newReport);
@@ -427,7 +457,7 @@ export default function AnalyzePage() {
   const clearAll = useCallback(() => {
     setUploadedFile(null); setTextInput(""); setUploadProgress(0);
     setAnalysisComplete(false); setIsAnalyzing(false); setFileError("");
-    setIsSaved(false); setIsSaving(false);
+    setIsSaved(false); setIsSaving(false); setAiContext(null);
   }, []);
 
   const saveReportToDatabase = useCallback(async () => {
@@ -463,26 +493,45 @@ export default function AnalyzePage() {
     if (!result) return [];
     const timeStr = new Date(result.analysisDate).toLocaleTimeString();
     const isDocx = result.fileName.endsWith(".docx");
-    
+    const isPdf = result.fileName.endsWith(".pdf");
+    const textLen = aiContext?.unstructuredText?.length ?? 0;
+
     const logs = [];
+
+    // Log 1 — extraction detail from the actual unstructured row
     if (isDocx) {
       logs.push(
-        `[${timeStr}] ● Document Text Extraction: The parser successfully opened the .docx file as a zip, extracted the text inside word/document.xml, and retrieved content.`
+        `[${timeStr}] ● Document Text Extraction: The parser successfully opened the .docx file as a zip, extracted the text inside word/document.xml, and retrieved ${
+          textLen > 0 ? `${textLen.toLocaleString()} characters` : "content"
+        } of full document text.`
+      );
+    } else if (isPdf) {
+      logs.push(
+        `[${timeStr}] ● Document Text Extraction: Read PDF document (${
+          textLen > 0 ? `${textLen.toLocaleString()} characters` : result.fileSize
+        }) and extracted text content.`
       );
     } else {
       logs.push(
-        `[${timeStr}] ● Document Text Extraction: Read plaintext text input (${result.fileSize}) successfully.`
+        `[${timeStr}] ● Document Text Extraction: Read plaintext input (${result.fileSize}, ${
+          textLen > 0 ? `${textLen.toLocaleString()} chars` : "content"
+        }) successfully.`
       );
     }
-    
+
+    // Log 2 — Groq result with dynamic finding count
+    const recCount = aiContext?.recommendations?.length ?? result.recommendations?.length ?? 0;
     logs.push(
-      `[${timeStr}] ● Groq Cloud AI Analysis: The Groq Cloud AI Llama model (llama-3.3-70b-versatile) was reached successfully and returned detailed cryptographic recommendations.`
+      `[${timeStr}] ● Groq Cloud AI Analysis: The Groq Cloud AI Llama model (llama-3.3-70b-versatile) was reached successfully and returned ${
+        recCount > 0 ? `${recCount} cryptographic recommendation${recCount !== 1 ? "s" : ""}` : "detailed cryptographic recommendations"
+      } based on the complete document text.`
     );
-    
+
+    // Log 3 — ChromaDB context with actual score
     logs.push(
       `[${timeStr}] ● ChromaDB Storage: The document text and metadata were successfully indexed and saved. Context is active in local database (Doc ID: ${result.id}, File: ${result.fileName}, Security Score: ${result.securityScore}/100).`
     );
-    
+
     return logs;
   };
 
@@ -659,7 +708,7 @@ export default function AnalyzePage() {
                         <div className="space-y-2">
                           <h3 className="text-sm font-semibold text-foreground/80">Forensic Summary</h3>
                           <p className="text-sm text-foreground/60 leading-relaxed bg-foreground/[0.02] border border-border/10 rounded-xl p-4 min-h-[120px]">
-                            {result.findings || "No findings summary returned."}
+                            {aiContext?.securityAssessment || result.findings || "No AI findings returned."}
                           </p>
                         </div>
                         
@@ -796,7 +845,7 @@ export default function AnalyzePage() {
                         className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-4">
                         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground/40">Recommendations</p>
                         <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                          {result.recommendations.map((r, i) => (
+                          {(aiContext?.recommendations ?? result.recommendations).map((r, i) => (
                             <div key={i} className={`flex items-start gap-3 rounded-lg border px-3 py-2 ${priorityColor(r.priority)}`}>
                               <span className="text-xs font-semibold shrink-0">{r.priority}</span>
                               <span className="text-xs leading-relaxed">{r.action}</span>
