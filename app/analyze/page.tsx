@@ -645,18 +645,30 @@ export default function AnalyzePage() {
                   <Link href="/reports"><Button variant="ghost" size="sm" className="text-xs gap-1 text-foreground/50 hover:text-foreground">View All <ChevronRight className="h-3 w-3" /></Button></Link>
                 </div>
                 <div className="space-y-2">
-                  {recent.map((item) => (
-                    <Link key={item.id} href={`/reports/${item.id}`}>
-                      <div className="flex items-center gap-4 rounded-lg border border-border/20 bg-background/40 px-4 py-3 hover:border-border/40 hover:bg-background/60 transition-all cursor-pointer">
-                        <FileText className="h-4 w-4 text-foreground/40 shrink-0" />
-                        <span className="text-sm text-foreground flex-1 truncate">{item.fileName}</span>
-                        <span className="text-xs text-foreground/40">{item.date}</span>
-                        <span className="text-sm font-bold" style={{ color: scoreColor(item.score) }}>{item.score}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor(item.status)}`}>{item.status}</span>
-                        <ChevronRight className="h-3.5 w-3.5 text-foreground/30" />
-                      </div>
-                    </Link>
-                  ))}
+                  {recent.length === 0 ? (
+                    <div className="text-center py-6 text-sm text-foreground/40">
+                      No recent analyses. Paste text or upload a file above to start.
+                    </div>
+                  ) : (
+                    recent.map((item) => (
+                      <Link key={item.id} href={`/reports?id=${item.id}`}>
+                        <div className="flex items-center gap-4 rounded-lg border border-border/20 bg-background/40 px-4 py-3 hover:border-border/40 hover:bg-background/60 transition-all cursor-pointer">
+                          <FileText className="h-4 w-4 text-foreground/40 shrink-0" />
+                          <span className="text-sm text-foreground flex-1 truncate">{item.fileName}</span>
+                          <span className="text-xs text-foreground/40">
+                            {new Date(item.analysisDate).toLocaleDateString()}
+                          </span>
+                          <span className="text-sm font-bold" style={{ color: scoreColor(item.securityScore) }}>
+                            {item.securityScore}
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor(item.status)}`}>
+                            {item.status}
+                          </span>
+                          <ChevronRight className="h-3.5 w-3.5 text-foreground/30" />
+                        </div>
+                      </Link>
+                    ))
+                  )}
                 </div>
               </motion.div>
 
