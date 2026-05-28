@@ -18,7 +18,8 @@ const NAV = [
   { title: "Home", href: "/" }, { title: "Dashboard", href: "/dashboard" },
   { title: "Analyze", href: "/analyze" }, { title: "Hybrid Lab", href: "/hybrid-lab" },
   { title: "Visualizations", href: "/visualizations", isActive: true },
-  { title: "Reports", href: "/reports" }, { title: "Profile", href: "/profile" },
+  { title: "Reports", href: "/reports" }, { title: "Learn", href: "/learn" },
+  { title: "Profile", href: "/profile" },
 ];
 
 const FILTERS = ["daily", "weekly", "monthly"] as const;

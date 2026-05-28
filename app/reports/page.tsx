@@ -17,7 +17,7 @@ const NAV = [
   { title: "Home", href: "/" }, { title: "Dashboard", href: "/dashboard" },
   { title: "Analyze", href: "/analyze" }, { title: "Hybrid Lab", href: "/hybrid-lab" },
   { title: "Visualizations", href: "/visualizations" }, { title: "Reports", href: "/reports", isActive: true },
-  { title: "Profile", href: "/profile" },
+  { title: "Learn", href: "/learn" }, { title: "Profile", href: "/profile" },
 ];
 
 type Report = typeof reportsRaw.reports[0];

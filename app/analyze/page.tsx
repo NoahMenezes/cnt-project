@@ -119,6 +119,7 @@ export default function AnalyzePage() {
     { title: "Hybrid Lab", href: "/hybrid-lab" },
     { title: "Visualizations", href: "/visualizations" },
     { title: "Reports", href: "/reports" },
+    { title: "Learn", href: "/learn" },
     { title: "Profile", href: "/profile" },
   ];
 

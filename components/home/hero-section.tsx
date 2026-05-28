@@ -30,17 +30,17 @@ function HeroSection() {
                   fontFamily="system-ui, sans-serif"
                   className="h-[12vw] min-h-[60px] md:min-h-[100px] w-full"
                 >
-                  Building bold brands
+                  CipherScope
                 </VideoText>
                 <VideoText
                   src="https://cdn.magicui.design/ocean-small.webm"
-                  fontSize="7.5vw"
+                  fontSize="4.5vw"
                   fontWeight="400"
                   fontStyle="italic"
                   fontFamily={instrumentSerif.style.fontFamily}
-                  className="h-[12vw] min-h-[60px] md:min-h-[100px] w-full"
+                  className="h-[8vw] min-h-[40px] md:min-h-[70px] w-full"
                 >
-                  with thoughtful design
+                  Crypto Forensics Lab
                 </VideoText>
               </motion.h1>
             </div>

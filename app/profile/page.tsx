@@ -16,7 +16,7 @@ const NAV = [
   { title: "Home", href: "/" }, { title: "Dashboard", href: "/dashboard" },
   { title: "Analyze", href: "/analyze" }, { title: "Hybrid Lab", href: "/hybrid-lab" },
   { title: "Visualizations", href: "/visualizations" }, { title: "Reports", href: "/reports" },
-  { title: "Profile", href: "/profile", isActive: true },
+  { title: "Learn", href: "/learn" }, { title: "Profile", href: "/profile", isActive: true },
 ];
 
 const ACT_ICONS: Record<string, React.ElementType> = {

@@ -9,28 +9,28 @@ import { ArrowUpRight, Users, Zap } from "lucide-react";
 
 const metrics = [
   {
-    label: "Activated teams",
-    value: "1.2k",
-    delta: "+18%",
-    description: "teams shipping faster",
+    label: "Analyses Performed",
+    value: "1.2k+",
+    delta: "Active",
+    description: "files securely analyzed for encryption configuration strengths",
   },
   {
-    label: "Daily automations",
-    value: "58",
-    delta: "+42%",
-    description: "manual tasks replaced",
+    label: "Weak Keys Flagged",
+    value: "142",
+    delta: "Critical",
+    description: "deprecated RSA moduli and ECB block ciphers identified",
   },
   {
-    label: "Customer NPS",
-    value: "71",
-    delta: "+9",
-    description: "in just three sprints",
+    label: "Average Security Score",
+    value: "71.4%",
+    delta: "Moderate",
+    description: "overall strength of Hybrid RSA-AES setups evaluated",
   },
   {
-    label: "Launch lead time",
-    value: "6d",
-    delta: "-3d",
-    description: "from concept to production",
+    label: "Analysis Processing Time",
+    value: "<1.2s",
+    delta: "Optimal",
+    description: "average duration to parse entropy and detect file patterns",
   },
 ];
 
@@ -60,14 +60,13 @@ export function GlassmorphismMinimalMetricsBlock() {
             className="mb-4 inline-flex items-center gap-2 rounded-full border-border/50 bg-background/55 px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-foreground/70 backdrop-blur"
           >
             <Zap className="h-3.5 w-3.5" />
-            realtime insights
+            cryptographic audit
           </Badge>
           <h2 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
-            A snapshot of momentum that refuses to clutter the dashboard
+            Real-time security analytics and forensic insights
           </h2>
           <p className="mt-5 text-base leading-relaxed text-foreground/70 md:text-lg">
-            Glassy panels surface just the signal, Highlighting the metrics that
-            matter while the rest stays gracefully out of the way.
+            Monitor file entropy, inspect RSA configurations, and analyze key derivation complexities on one unified interface.
           </p>
         </motion.div>
 
@@ -119,10 +118,10 @@ export function GlassmorphismMinimalMetricsBlock() {
             </div>
             <div>
               <p className="text-sm uppercase tracking-[0.25em] text-foreground/60">
-                concierge insight desk
+                forensic reporting engine
               </p>
               <p className="text-base text-foreground/80">
-                Curated weekly digests keep leaders aligned without dashboards.
+                Download and share detailed PDF and JSON reports for cryptographic research.
               </p>
             </div>
           </div>
@@ -130,8 +129,9 @@ export function GlassmorphismMinimalMetricsBlock() {
             size="lg"
             variant="ghost"
             className="h-11 rounded-full border border-border/40 bg-background/70 px-6 text-sm uppercase tracking-[0.2em] text-foreground/70 backdrop-blur hover:text-foreground"
+            onClick={() => window.location.href = "/analyze"}
           >
-            Request a sample
+            Run Analysis
           </Button>
         </motion.div>
       </div>

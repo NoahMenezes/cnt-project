@@ -277,7 +277,7 @@ const Header = ({ navigationData, className }: HeaderProps) => {
                       </div>
 
                       <p className="text-sm text-muted-foreground">
-                        © 2026 Shadcn Space
+                        © 2026 CipherScope
                       </p>
                     </div>
                   </div>
