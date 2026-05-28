@@ -837,11 +837,15 @@ export default function OperationPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Generate RSA Key Pair */}
               <Button 
+                disabled={!plaintext.trim()}
+                title={!plaintext.trim() ? "Add plaintext content first before generating keys" : undefined}
                 onClick={() => {
                   const pair = generateRSAPairSim(rsaBits);
                   setRsaKeys(pair);
 
                   const publicKeyId = `pub_${Date.now()}`;
+                  const privateKeyId = `priv_${Date.now() + 1}`;
+
                   const publicKey: CryptographicKey = {
                     id: publicKeyId,
                     keyType: "RSA_PUBLIC",
@@ -849,11 +853,16 @@ export default function OperationPage() {
                     keySize: rsaBits,
                     label: `RSA Public Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
-                    description: "RSA public key for encryption"
+                    description: "RSA public key for encryption",
+                    plaintextSnippet: plaintext.slice(0, 200),
+                    ciphertextPayload: ciphertext,
+                    encryptedSessionKey: encryptedSessionKey,
+                    aesIV: aesIV,
+                    aesMode: aesMode,
+                    pairedKeyId: privateKeyId,
                   };
                   saveKey(publicKey);
 
-                  const privateKeyId = `priv_${Date.now()}`;
                   const privateKey: CryptographicKey = {
                     id: privateKeyId,
                     keyType: "RSA_PRIVATE",
@@ -861,7 +870,8 @@ export default function OperationPage() {
                     keySize: rsaBits,
                     label: `RSA Private Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
-                    description: "RSA private key for decryption - KEEP SECURE"
+                    description: "RSA private key for decryption - KEEP SECURE",
+                    pairedKeyId: publicKeyId,
                   };
                   saveKey(privateKey);
 
@@ -881,13 +891,15 @@ export default function OperationPage() {
                   ]);
                   addLog(`Generated and saved RSA ${rsaBits}-bit Key Pair`, "success");
                 }}
-                className="bg-blue-500/80 hover:bg-blue-600 text-white font-semibold flex items-center justify-center gap-2 py-2.5 text-sm"
+                className="bg-blue-500/80 hover:bg-blue-600 text-white font-semibold flex items-center justify-center gap-2 py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Shield className="h-4 w-4" /> Generate RSA Key Pair
               </Button>
 
               {/* Generate AES Session Key */}
               <Button 
+                disabled={!plaintext.trim()}
+                title={!plaintext.trim() ? "Add plaintext content first before generating keys" : undefined}
                 onClick={() => {
                   const aesSessionKey = generateAESKeyHex(aesBits);
                   setAesKey(aesSessionKey);
@@ -900,7 +912,11 @@ export default function OperationPage() {
                     keySize: aesBits,
                     label: `AES Session Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
-                    description: "AES session key for symmetric encryption"
+                    description: "AES session key for symmetric encryption",
+                    plaintextSnippet: plaintext.slice(0, 200),
+                    ciphertextPayload: ciphertext,
+                    aesIV: aesIV,
+                    aesMode: aesMode,
                   };
                   saveKey(aesKeyObj);
 
@@ -915,7 +931,7 @@ export default function OperationPage() {
                   ]);
                   addLog(`Generated and saved AES ${aesBits}-bit Session Key`, "success");
                 }}
-                className="bg-emerald-500/80 hover:bg-emerald-600 text-white font-semibold flex items-center justify-center gap-2 py-2.5 text-sm"
+                className="bg-emerald-500/80 hover:bg-emerald-600 text-white font-semibold flex items-center justify-center gap-2 py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Zap className="h-4 w-4" /> Generate AES Session Key
               </Button>

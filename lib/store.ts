@@ -179,6 +179,13 @@ export interface CryptographicKey {
   label: string;
   generatedAt: string;
   description?: string;
+  // Encryption context — stored when a key is tied to an encrypted document
+  plaintextSnippet?: string;    // first 200 chars of original plaintext
+  ciphertextPayload?: string;   // full ciphertext (encrypted document body)
+  encryptedSessionKey?: string; // RSA-encrypted AES session key
+  aesIV?: string;               // AES initialization vector
+  aesMode?: string;             // AES mode used (GCM, CBC, ECB)
+  pairedKeyId?: string;         // id of the matching RSA key in the pair
 }
 
 let cachedKeys: CryptographicKey[] = [];
