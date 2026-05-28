@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -123,6 +124,7 @@ export default function AnalyzePage() {
     { title: "Profile", href: "/profile" },
   ];
 
+  const router = useRouter();
   const [inputMode, setInputMode] = useState<"file" | "text">("file");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [textInput, setTextInput] = useState("");
@@ -461,31 +463,25 @@ export default function AnalyzePage() {
   }, []);
 
   const saveReportToDatabase = useCallback(async () => {
-    if (!result || isSaving || isSaved) return;
+    if (!result || isSaving) return;
     setIsSaving(true);
     try {
       const res = await fetch("http://localhost:8000/save", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(result),
       });
-
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-
+      if (!res.ok) throw new Error(await res.text());
       saveReport(result);
-      setIsSaved(true);
-      setRecentList(getReports().slice(0, 5));
+      // Navigate straight to dashboard after saving
+      router.push("/dashboard");
     } catch (err) {
       console.error("Failed to save report:", err);
       alert("Failed to save report: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsSaving(false);
     }
-  }, [result, isSaving, isSaved]);
+  }, [result, isSaving, router]);
 
   const canAnalyze = (!!uploadedFile || textInput.trim().length > 0) && !isUploading && !isAnalyzing;
 
@@ -661,9 +657,8 @@ export default function AnalyzePage() {
                     <Zap className="h-4 w-4" />{isAnalyzing ? "Analyzing…" : "Analyze"}
                   </Button>
                   {analysisComplete && result && (
-                    <Button onClick={saveReportToDatabase} disabled={isSaving} className={`rounded-full gap-2 transition-all duration-200 ${isSaved ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20" : "bg-emerald-600 hover:bg-emerald-700 text-white border-none shadow-lg shadow-emerald-600/10"}`}>
-                      <CheckCircle className={`h-4 w-4 transition-transform ${isSaved ? "scale-100" : "scale-0 w-0"}`} />
-                      {isSaving ? "Saving…" : isSaved ? "Saved to Database" : "Save Analysis"}
+                    <Button onClick={saveReportToDatabase} disabled={isSaving} className="rounded-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white border-none shadow-lg shadow-emerald-600/10">
+                      {isSaving ? "Saving…" : "Save & Go to Dashboard"}
                     </Button>
                   )}
                   <Button onClick={clearAll} variant="outline" className="rounded-full">Clear</Button>
