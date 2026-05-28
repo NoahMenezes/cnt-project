@@ -7,15 +7,13 @@ import { GlassmorphismMinimalMetricsBlock } from "@/components/home/metrics-bloc
 
 export default function AgencyHeroSection() {
   const navigationData: NavigationSection[] = [
-    {
-      title: "Home",
-      href: "/",
-      isActive: true,
-    },
-    {
-      title: "Dashboard",
-      href: "/dashboard",
-    },
+    { title: "Home", href: "/", isActive: true },
+    { title: "Dashboard", href: "/dashboard" },
+    { title: "Analyze", href: "/analyze" },
+    { title: "Hybrid Lab", href: "/hybrid-lab" },
+    { title: "Visualizations", href: "/visualizations" },
+    { title: "Reports", href: "/reports" },
+    { title: "Profile", href: "/profile" },
   ];
 
   return (
