@@ -361,7 +361,10 @@ export default function OperationPage() {
         addLog("Real-time decryption is active. Ciphertext edits now update plaintext instantly.", "info");
         hasLoggedCipherRealtimeRef.current = true;
       }
-    } catch {
+    } catch (error) {
+      skipNextPlaintextEncryptionRef.current = true;
+      setPlaintext("");
+      setDecryptedText("");
       setIsDecrypted(false);
       addLog("Ciphertext edit could not be decrypted into plaintext.", "warn");
     }
