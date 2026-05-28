@@ -704,7 +704,7 @@ export default function OperationPage() {
           </div>
 
           
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
             <div className="rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-border/20 pb-3">
                 <div className="flex items-center gap-2">
@@ -724,33 +724,33 @@ export default function OperationPage() {
             </div>
 
             <div className="rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
-              <div className="flex flex-col items-end border-b border-border/20 pb-3 gap-2 text-right">
-                <div className="flex items-center justify-end gap-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center border-b border-border/20 pb-3 gap-2 sm:gap-3">
+                <div className="flex items-center justify-start gap-2">
                   <Lock className="h-4 w-4 text-orange-400" />
                   <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Encrypted Workspace (Ciphertext Notepad)</h3>
                 </div>
                 {ciphertext && (
-                  <div className="flex flex-wrap justify-end gap-2">
+                  <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <Button variant="outline" size="sm" onClick={() => {
                       navigator.clipboard.writeText(ciphertext);
                       addLog("Copied ciphertext payload to clipboard.", "success");
-                    }} className="border-border/40 hover:bg-foreground/[0.04] text-xs h-8">
+                    }} className="border-border/40 hover:bg-foreground/[0.04] text-xs h-8 flex-1 sm:flex-initial">
                       <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleTamper} className="border-orange-500/20 hover:bg-orange-500/10 text-orange-400 text-xs h-8">
+                    <Button variant="outline" size="sm" onClick={handleTamper} className="border-orange-500/20 hover:bg-orange-500/10 text-orange-400 text-xs h-8 flex-1 sm:flex-initial">
                       <AlertTriangle className="h-3.5 w-3.5 mr-1.5" /> Tamper
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => {
                       setCiphertext(originalCiphertext);
                       addLog("Restored original untampered ciphertext payload.", "info");
-                    }} className="border-border/40 hover:bg-foreground/[0.04] text-xs h-8">
+                    }} className="border-border/40 hover:bg-foreground/[0.04] text-xs h-8 flex-1 sm:flex-initial">
                       <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Reset
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => {
                       setCiphertext("");
                       setOriginalCiphertext("");
                       addLog("Cleared ciphertext workspace.", "info");
-                    }} className="border-red-500/20 hover:bg-red-500/10 text-red-400 text-xs h-8">
+                    }} className="border-red-500/20 hover:bg-red-500/10 text-red-400 text-xs h-8 flex-1 sm:flex-initial">
                       <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Clear
                     </Button>
                   </div>
@@ -760,8 +760,8 @@ export default function OperationPage() {
                 <textarea
                   value={ciphertext}
                   onChange={(e) => updatePlaintextFromCiphertext(e.target.value)}
-                  rows={14}
-                  className="w-full min-h-[360px] bg-orange-500/[0.02] border border-orange-500/10 rounded-xl p-4 font-mono text-orange-400/80 text-xs leading-relaxed focus:outline-none focus:border-orange-500/30 resize-y"
+                  rows={10}
+                  className="w-full min-h-[300px] sm:min-h-[360px] bg-orange-500/[0.02] border border-orange-500/10 rounded-xl p-4 font-mono text-orange-400/80 text-xs leading-relaxed focus:outline-none focus:border-orange-500/30 resize-y"
                   placeholder="Ciphertext payload will output here after running hybrid encryption."
                 />
                 <div className="absolute bottom-3 right-3 text-[10px] text-orange-400/40">
@@ -769,14 +769,14 @@ export default function OperationPage() {
                 </div>
               </div>
               {ciphertext && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-foreground/[0.02] rounded-xl p-4 border border-border/20 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-foreground/[0.02] rounded-xl p-4 border border-border/20 text-xs">
                   <div>
                     <p className="text-[10px] text-foreground/40 font-semibold uppercase tracking-wider">Wrapped AES Session Key (RSA Encrypted)</p>
-                    <p className="font-mono text-foreground/80 mt-1 truncate">{encryptedSessionKey}</p>
+                    <p className="font-mono text-foreground/80 mt-1 truncate text-[9px]">{encryptedSessionKey}</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-foreground/40 font-semibold uppercase tracking-wider">Initialization Vector (IV)</p>
-                    <p className="font-mono text-foreground/80 mt-1">{aesIV || "N/A"}</p>
+                    <p className="font-mono text-foreground/80 mt-1 text-[9px]">{aesIV || "N/A"}</p>
                   </div>
                 </div>
               )}
