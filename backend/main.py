@@ -387,7 +387,43 @@ def perform_cryptographic_analysis(file_name: str, content: str):
     except Exception as e:
         print(f"Failed to index document in ChromaDB: {e}")
 
+    # Store in Supabase database automatically
+    supabase_url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if supabase_url and service_key:
+        try:
+            print("Syncing report to Supabase table from Python backend...")
+            headers = {
+                "apikey": service_key,
+                "Authorization": f"Bearer {service_key}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates"
+            }
+            row = {
+                "id": report_id,
+                "file_name": file_name,
+                "type": report["type"],
+                "file_size": report["fileSize"],
+                "analysis_date": report["analysisDate"],
+                "security_score": overall_score,
+                "status": status,
+                "entropy": report["entropy"],
+                "rsa": report["rsa"],
+                "aes": report["aes"],
+                "patterns": report["patterns"],
+                "recommendations": report["recommendations"],
+                "findings": report["findings"]
+            }
+            res = requests.post(f"{supabase_url}/rest/v1/reports", json=row, headers=headers)
+            if res.status_code in [200, 201]:
+                print(f"Report {report_id} synced successfully to Supabase.")
+            else:
+                print(f"Failed to sync report to Supabase. Code: {res.status_code}, Body: {res.text}")
+        except Exception as e:
+            print(f"Error syncing report to Supabase: {e}")
+
     return report
+
 
 @app.post("/analyze/text")
 async def analyze_text(req: AnalysisRequest):
