@@ -1,4 +1,6 @@
 import os
+import sys
+sys.path.append("/home/noah/.local/lib/python3.14/site-packages")
 import math
 import uuid
 import datetime
@@ -172,6 +174,21 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
     except Exception as e:
         print(f"Failed to parse docx: {e}")
         return ""
+
+def extract_text_from_pdf(file_bytes: bytes) -> str:
+    try:
+        import pypdf
+        reader = pypdf.PdfReader(BytesIO(file_bytes))
+        pages_text = []
+        for page in reader.pages:
+            t = page.extract_text()
+            if t:
+                pages_text.append(t)
+        return "\n".join(pages_text)
+    except Exception as e:
+        print(f"Failed to parse pdf using pypdf: {e}")
+        return ""
+
 
 def get_unstructured_chunks(text: str):
     # Package the entire extracted text in exactly one row
@@ -603,6 +620,14 @@ async def analyze_file(file: UploadFile = File(...)):
     ext = file_name.split(".")[-1].lower() if "." in file_name else ""
     if ext == "docx":
         content = extract_text_from_docx(file_bytes)
+    elif ext == "pdf":
+        content = extract_text_from_pdf(file_bytes)
+    elif ext == "csv":
+        try:
+            content = file_bytes.decode("utf-8", errors="ignore")
+        except Exception as e:
+            print(f"Failed to decode csv: {e}")
+            content = ""
     else:
         try:
             content = file_bytes.decode("utf-8", errors="ignore")
