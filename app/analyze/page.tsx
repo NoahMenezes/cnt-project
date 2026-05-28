@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 import { getReports, saveReport, Report } from "@/lib/store";
 import Link from "next/link";
+import { EditorContent, useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Placeholder from "@tiptap/extension-placeholder";
 
 const SUPPORTED_FORMATS = [".txt", ".pdf", ".docx", ".json", ".csv"];
 
@@ -57,12 +60,12 @@ function modInverse(e: bigint, phi: bigint): bigint {
   let g = phi, x = BigInt(0), y = BigInt(1);
   let a = e, x0 = BigInt(1), y0 = BigInt(0);
   while (a !== BigInt(0)) {
-    let q = g / a;
-    let t = g % a;
+    const q = g / a;
+    const t = g % a;
     g = a;
     a = t;
-    let x1 = x - q * x0;
-    let y1 = y - q * y0;
+    const x1 = x - q * x0;
+    const y1 = y - q * y0;
     x = x0;
     y = y0;
     x0 = x1;
@@ -151,6 +154,91 @@ function aesDecryptSim(ciphertext: string, keyHex: string, mode: string): string
   }
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function textToEditorHtml(value: string) {
+  if (!value.trim()) return "";
+  return value
+    .split(/\n{2,}/)
+    .map((block) => `<p>${block.split("\n").map(escapeHtml).join("<br>")}</p>`)
+    .join("");
+}
+
+function editorPlainText(editor: NonNullable<ReturnType<typeof useEditor>>) {
+  return editor.state.doc.textBetween(0, editor.state.doc.content.size, "\n");
+}
+
+function PlaintextTipTapEditor({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit,
+      Placeholder.configure({
+        placeholder: "Upload a document above, or start typing your plaintext content here.",
+      }),
+    ],
+    content: textToEditorHtml(value),
+    editorProps: {
+      attributes: {
+        class:
+          "min-h-[320px] rounded-xl bg-foreground/[0.03] px-4 py-3 text-sm leading-relaxed text-foreground focus:outline-none [&_p]:my-2 [&_.is-editor-empty:first-child::before]:text-foreground/30 [&_.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.is-editor-empty:first-child::before]:float-left [&_.is-editor-empty:first-child::before]:h-0 [&_.is-editor-empty:first-child::before]:pointer-events-none",
+      },
+    },
+    onUpdate: ({ editor }) => {
+      onChange(editorPlainText(editor));
+    },
+  });
+
+  useEffect(() => {
+    if (!editor) return;
+    if (value !== editorPlainText(editor)) {
+      editor.commands.setContent(textToEditorHtml(value), { emitUpdate: false });
+    }
+  }, [editor, value]);
+
+  return (
+    <div className="rounded-xl border border-border/20 bg-background/30 overflow-hidden">
+      <div className="flex flex-wrap items-center gap-1 border-b border-border/20 bg-foreground/[0.02] px-3 py-2">
+        <button
+          type="button"
+          onClick={() => editor?.chain().focus().toggleBold().run()}
+          className={`h-7 min-w-7 rounded-md px-2 text-xs font-bold transition-colors ${editor?.isActive("bold") ? "bg-primary text-primary-foreground" : "text-foreground/55 hover:bg-foreground/10 hover:text-foreground"}`}
+        >
+          B
+        </button>
+        <button
+          type="button"
+          onClick={() => editor?.chain().focus().toggleItalic().run()}
+          className={`h-7 min-w-7 rounded-md px-2 text-xs italic transition-colors ${editor?.isActive("italic") ? "bg-primary text-primary-foreground" : "text-foreground/55 hover:bg-foreground/10 hover:text-foreground"}`}
+        >
+          I
+        </button>
+        <button
+          type="button"
+          onClick={() => editor?.chain().focus().toggleCode().run()}
+          className={`h-7 rounded-md px-2 font-mono text-xs transition-colors ${editor?.isActive("code") ? "bg-primary text-primary-foreground" : "text-foreground/55 hover:bg-foreground/10 hover:text-foreground"}`}
+        >
+          {"</>"}
+        </button>
+      </div>
+      <EditorContent editor={editor} />
+    </div>
+  );
+}
+
 export default function OperationPage() {
   const navData = [
     { title: "Home", href: "/" },
@@ -212,16 +300,26 @@ export default function OperationPage() {
     setLogs(l => [...l, { time, msg, type }]);
   }, []);
 
-  const handleGenerateRSA = () => {
+  const createRSAKeyPair = useCallback(() => {
     const pair = generateRSAPairSim(rsaBits);
     setRsaKeys(pair);
     addLog(`Generated RSA-${rsaBits} Keypair (p=${pair.p.substring(0, 5)}..., q=${pair.q.substring(0, 5)}..., N=${rsaBits} bits)`, "success");
-  };
+    return pair;
+  }, [addLog, rsaBits]);
 
-  const handleGenerateAES = () => {
+  const createAESKey = useCallback(() => {
     const key = generateAESKeyHex(aesBits);
     setAesKey(key);
     addLog(`Generated fresh random AES-${aesBits} Session Key: ${key.substring(0, 16)}...`, "success");
+    return key;
+  }, [addLog, aesBits]);
+
+  const handleGenerateRSA = () => {
+    createRSAKeyPair();
+  };
+
+  const handleGenerateAES = () => {
+    createAESKey();
   };
 
   const handleFile = useCallback(async (file: File) => {
@@ -289,34 +387,39 @@ export default function OperationPage() {
       addLog("Cannot encrypt empty plaintext document.", "error");
       return;
     }
-    if (!rsaKeys) {
-      addLog("RSA Public Key is required for key wrapping. Please generate keys first.", "error");
-      return;
-    }
-    if (!aesKey) {
-      addLog("AES symmetric key is required. Please generate a key first.", "error");
-      return;
-    }
 
+    const activeRsaKeys = rsaKeys ?? createRSAKeyPair();
+    const activeAesKey = aesKey || createAESKey();
+
+    setIsProcessing(true);
+    setIsDecrypted(false);
+    setDecryptedText("");
     addLog("Initiating Secure Hybrid RSA-AES Encryption Pipeline...", "info");
     
     setTimeout(() => {
-      // 1. Encrypt plaintext via AES
-      const encResult = aesEncryptSim(plaintext, aesKey, aesMode);
-      setCiphertext(encResult.ciphertext);
-      setOriginalCiphertext(encResult.ciphertext);
-      setAesIV(encResult.iv);
-      if (encResult.tag) setAesTag(encResult.tag);
+      try {
+        // 1. Encrypt plaintext via AES
+        const encResult = aesEncryptSim(plaintext, activeAesKey, aesMode);
+        setCiphertext(encResult.ciphertext);
+        setOriginalCiphertext(encResult.ciphertext);
+        setAesIV(encResult.iv);
+        setAesTag(encResult.tag ?? "");
 
-      // 2. Wrap/Encrypt AES Session Key using RSA Public Key
-      const e = BigInt(rsaKeys.e);
-      const n = BigInt(rsaKeys.n);
-      const wrappedKey = rsaEncryptString(aesKey, e, n);
-      setEncryptedSessionKey(wrappedKey);
+        // 2. Wrap/Encrypt AES Session Key using RSA Public Key
+        const e = BigInt(activeRsaKeys.e);
+        const n = BigInt(activeRsaKeys.n);
+        const wrappedKey = rsaEncryptString(activeAesKey, e, n);
+        setEncryptedSessionKey(wrappedKey);
 
-      addLog(`AES symmetric encryption completed using mode: ${aesMode}`, "success");
-      addLog(`RSA encrypted AES session key securely packaged via modulo exponentiation.`, "success");
-      addLog(`Ciphertext payload loaded successfully into the Encrypted Workspace. Ready for operations.`, "success");
+        addLog(`AES symmetric encryption completed using mode: ${aesMode}`, "success");
+        addLog(`RSA encrypted AES session key securely packaged via modulo exponentiation.`, "success");
+        addLog(`Ciphertext payload loaded successfully into the Encrypted Workspace. Ready for operations.`, "success");
+      } catch (error) {
+        console.error("Hybrid encryption failed:", error);
+        addLog("Hybrid encryption failed. Check plaintext and key settings, then try again.", "error");
+      } finally {
+        setIsProcessing(false);
+      }
     }, 600);
   };
 
@@ -358,7 +461,7 @@ export default function OperationPage() {
         setDecryptedText(decrypted);
         setIsDecrypted(true);
         addLog("Symmetric decryption complete. Plaintext successfully reconstructed!", "success");
-      } catch (e: any) {
+      } catch {
         addLog("Decryption failed. Bad session key, bad private exponent, or tampered ciphertext.", "error");
       }
     }, 600);
@@ -674,9 +777,15 @@ export default function OperationPage() {
                 <div className="flex flex-col gap-3">
                   <Button
                     onClick={handleEncrypt}
+                    disabled={isProcessing}
                     className="w-full bg-primary hover:bg-primary/95 text-primary-foreground font-semibold flex items-center justify-center gap-2"
                   >
-                    <Lock className="h-4 w-4" /> 1. Run Hybrid Encryption
+                    {isProcessing ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Lock className="h-4 w-4" />
+                    )}
+                    {isProcessing ? "Running Hybrid Encryption..." : "1. Run Hybrid Encryption"}
                   </Button>
 
                   <Button
@@ -699,6 +808,44 @@ export default function OperationPage() {
                     )}
                     Save Operation State &amp; Finish
                   </Button>
+                </div>
+              </div>
+
+              {/* Execution Log */}
+              <div className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur flex flex-col gap-3">
+                <div className="flex items-center justify-between border-b border-border/10 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4.5 w-4.5 text-primary" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Execution Log</h3>
+                  </div>
+                  {logs.length > 0 && (
+                    <button
+                      onClick={() => setLogs([])}
+                      className="text-[10px] uppercase tracking-wider text-foreground/40 hover:text-foreground"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-52 overflow-y-auto rounded-xl border border-border/20 bg-foreground/[0.02] p-3">
+                  {logs.length === 0 ? (
+                    <p className="text-xs text-foreground/35">Pipeline events will appear here.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {logs.slice(-8).map((entry, index) => {
+                        const color =
+                          entry.type === "success" ? "text-emerald-400" :
+                          entry.type === "warn" ? "text-yellow-400" :
+                          entry.type === "error" ? "text-red-400" :
+                          "text-foreground/60";
+                        return (
+                          <p key={`${entry.time}-${index}`} className={`font-mono text-[11px] leading-relaxed ${color}`}>
+                            <span className="text-foreground/30">[{entry.time}]</span> {entry.msg}
+                          </p>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
