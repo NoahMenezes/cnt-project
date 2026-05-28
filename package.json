@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently --kill-others \"next dev\" \"backend/venv/bin/uvicorn backend.main:app --port 8000 --reload\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -37,6 +37,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.5.0",
+    "concurrently": "^9.2.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "postcss": "^8.5.15",

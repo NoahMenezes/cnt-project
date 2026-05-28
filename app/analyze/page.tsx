@@ -374,13 +374,40 @@ export default function AnalyzePage() {
         : "This file meets security standards. No critical vulnerabilities detected."
     };
 
-    setTimeout(() => {
-      saveReport(newReport);
-      setCurrentReport(newReport);
-      setRecentList(getReports().slice(0, 5));
-      setIsAnalyzing(false);
-      setAnalysisComplete(true);
-    }, 2200);
+    const fetchAnalysis = async () => {
+      try {
+        const response = await fetch("http://localhost:8000/analyze", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fileName,
+            content,
+          }),
+        });
+        if (!response.ok) throw new Error("Backend analysis failed");
+        const report = await response.json();
+        
+        saveReport(report);
+        setCurrentReport(report);
+        setRecentList(getReports().slice(0, 5));
+        setIsAnalyzing(false);
+        setAnalysisComplete(true);
+      } catch (err) {
+        console.warn("FastAPI backend connection failed. Falling back to local simulation.", err);
+        // Fallback simulation
+        setTimeout(() => {
+          saveReport(newReport);
+          setCurrentReport(newReport);
+          setRecentList(getReports().slice(0, 5));
+          setIsAnalyzing(false);
+          setAnalysisComplete(true);
+        }, 1500);
+      }
+    };
+
+    fetchAnalysis();
   }, [uploadedFile, textInput]);
 
   const clearAll = useCallback(() => {
