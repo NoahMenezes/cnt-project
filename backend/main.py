@@ -156,12 +156,19 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
         with zipfile.ZipFile(BytesIO(file_bytes)) as docx:
             xml_content = docx.read('word/document.xml')
             root = ET.fromstring(xml_content)
-            texts = []
+            
+            # Group text nodes by paragraph elements (w:p) to preserve structure
+            paragraphs = []
             for elem in root.iter():
-                if elem.tag.endswith('}t'):
-                    if elem.text:
-                        texts.append(elem.text)
-            return " ".join(texts)
+                if elem.tag.endswith('}p'):
+                    p_text = []
+                    for child in elem.iter():
+                        if child.tag.endswith('}t') and child.text:
+                            p_text.append(child.text)
+                    if p_text:
+                        paragraphs.append("".join(p_text))
+                        
+            return "\n".join(paragraphs)
     except Exception as e:
         print(f"Failed to parse docx: {e}")
         return ""
