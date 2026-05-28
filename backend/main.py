@@ -257,7 +257,7 @@ def perform_cryptographic_analysis(file_name: str, content: str):
                 f'}}'
             )
             payload = {
-                "model": "llama-3.3-70b-specdec",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [
                     {
                         "role": "system", 
