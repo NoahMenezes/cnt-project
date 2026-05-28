@@ -540,6 +540,42 @@ async def save_report_endpoint(report: ReportModel):
             res = requests.post(f"{supabase_url}/rest/v1/reports", json=row, headers=headers)
             if res.status_code in [200, 201]:
                 print(f"Report {report.id} synced successfully to Supabase.")
+                
+                # Sync unstructured chunks to the dedicated public.unstructured_chunks table
+                unstructured_chunks = report.patterns.get("unstructuredChunks", [])
+                if unstructured_chunks:
+                    print(f"Syncing {len(unstructured_chunks)} raw paragraphs to public.unstructured_chunks table...")
+                    chunk_rows = []
+                    for chunk in unstructured_chunks:
+                        chunk_rows.append({
+                            "report_id": report.id,
+                            "chunk_id": chunk.get("id"),
+                            "text": chunk.get("text"),
+                            "type": chunk.get("type"),
+                            "length": chunk.get("length")
+                        })
+                    c_res = requests.post(f"{supabase_url}/rest/v1/unstructured_chunks", json=chunk_rows, headers=headers)
+                    if c_res.status_code not in [200, 201]:
+                        print(f"Warning: Failed to populate public.unstructured_chunks table. Code: {c_res.status_code}, Detail: {c_res.text}")
+
+                # Sync structured parameters to the dedicated public.structured_parameters table
+                structured_params = report.patterns.get("structuredParameters", [])
+                if structured_params:
+                    print(f"Syncing {len(structured_params)} structured parameters to public.structured_parameters table...")
+                    param_rows = []
+                    for param in structured_params:
+                        param_rows.append({
+                            "report_id": report.id,
+                            "category": param.get("category"),
+                            "element": param.get("element"),
+                            "value": param.get("value"),
+                            "classification": param.get("classification"),
+                            "status": param.get("status")
+                        })
+                    p_res = requests.post(f"{supabase_url}/rest/v1/structured_parameters", json=param_rows, headers=headers)
+                    if p_res.status_code not in [200, 201]:
+                        print(f"Warning: Failed to populate public.structured_parameters table. Code: {p_res.status_code}, Detail: {p_res.text}")
+                
                 return {"status": "success", "message": f"Report {report.id} saved to Supabase."}
             else:
                 raise HTTPException(status_code=res.status_code, detail=f"Failed to save to Supabase: {res.text}")
