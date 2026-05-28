@@ -41,3 +41,16 @@ yarn-error.log*
 next-env.d.ts
 
 /lib/generated/prisma
+
+# Python & virtual environment ignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+
+# Local database ignore
+backend/chroma_db/
+backend/__pycache__/
