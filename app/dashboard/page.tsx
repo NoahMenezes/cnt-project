@@ -486,6 +486,11 @@ function DashboardGrid() {
 
   useEffect(() => {
     setStats(getStats());
+    const handleUpdate = () => {
+      setStats(getStats());
+    };
+    window.addEventListener("cipher_scope_db_update", handleUpdate);
+    return () => window.removeEventListener("cipher_scope_db_update", handleUpdate);
   }, []);
 
   const totalFiles = stats ? stats.totalFiles.toString() : "0";

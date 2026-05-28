@@ -139,6 +139,11 @@ export default function AnalyzePage() {
 
   useEffect(() => {
     setRecentList(getReports().slice(0, 5));
+    const handleUpdate = () => {
+      setRecentList(getReports().slice(0, 5));
+    };
+    window.addEventListener("cipher_scope_db_update", handleUpdate);
+    return () => window.removeEventListener("cipher_scope_db_update", handleUpdate);
   }, []);
 
   const result = currentReport || getReports()[0];

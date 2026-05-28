@@ -64,6 +64,11 @@ export default function VisualizationsPage() {
 
   useEffect(() => {
     setReports(getReports());
+    const handleUpdate = () => {
+      setReports(getReports());
+    };
+    window.addEventListener("cipher_scope_db_update", handleUpdate);
+    return () => window.removeEventListener("cipher_scope_db_update", handleUpdate);
   }, []);
 
   const chartData = useMemo(() => {

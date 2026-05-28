@@ -109,21 +109,28 @@ export default function ProfilePage() {
   const [recentActivityList, setRecentActivityList] = useState<any[]>([]);
 
   useEffect(() => {
-    const s = getStats();
-    setProfileStats({
-      totalAnalyses: s.totalFiles,
-      averageScore: Math.round(s.avgSecurityScore),
-      reportsGenerated: s.totalFiles,
-      filesProcessed: s.totalFiles
-    });
+    const refreshData = () => {
+      const s = getStats();
+      setProfileStats({
+        totalAnalyses: s.totalFiles,
+        averageScore: Math.round(s.avgSecurityScore),
+        reportsGenerated: s.totalFiles,
+        filesProcessed: s.totalFiles
+      });
 
-    const reports = getReports().slice(0, 4);
-    setRecentActivityList(reports.map(r => ({
-      id: r.id,
-      type: "analysis",
-      description: `Analyzed file: ${r.fileName}`,
-      timestamp: r.analysisDate
-    })));
+      const reports = getReports().slice(0, 4);
+      setRecentActivityList(reports.map(r => ({
+        id: r.id,
+        type: "analysis",
+        description: `Analyzed file: ${r.fileName}`,
+        timestamp: r.analysisDate
+      })));
+    };
+
+    refreshData();
+
+    window.addEventListener("cipher_scope_db_update", refreshData);
+    return () => window.removeEventListener("cipher_scope_db_update", refreshData);
   }, []);
 
   const sessions = profileRaw.sessions;

@@ -1,5 +1,7 @@
 "use client";
 
+import { supabase } from "@/lib/supabase";
+
 export interface Report {
   id: string;
   fileName: string;
@@ -18,7 +20,7 @@ export interface Report {
   rsa: {
     keySize: number;
     exponent: number;
-    publicExponent: number; // dual support
+    publicExponent: number;
     riskLevel: string;
     vulnerabilities: string[];
     securityAssessment: string;
@@ -27,7 +29,7 @@ export interface Report {
   aes: {
     keyStrength: string;
     mode: string;
-    encryptionMode: string; // dual support
+    encryptionMode: string;
     passwordComplexity: string;
     securityRecommendations: string[];
   };
@@ -42,43 +44,128 @@ export interface Report {
 }
 
 const DEFAULT_REPORTS: Report[] = [];
+let cachedReports: Report[] = [];
+let isAuthInitialized = false;
 
-const STORAGE_KEY = "cipher_scope_reports_db";
-
-export function getReports(): Report[] {
-  if (typeof window === "undefined") return DEFAULT_REPORTS;
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (!data) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_REPORTS));
-      return DEFAULT_REPORTS;
-    }
-    return JSON.parse(data);
-  } catch (e) {
-    return DEFAULT_REPORTS;
+// Function to trigger update events to keep components reactive
+function notifyUpdate() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("cipher_scope_db_update"));
   }
 }
 
-export function saveReport(report: Report): void {
-  if (typeof window === "undefined") return;
+// Load initial guest/local storage fallback and listen for Supabase auth state changes
+if (typeof window !== "undefined" && !isAuthInitialized) {
+  isAuthInitialized = true;
+  
   try {
-    const reports = getReports();
-    // Prepend new report
-    const updated = [report, ...reports.filter((r) => r.id !== report.id)];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.error("Failed to save report to local storage", e);
+    const local = localStorage.getItem("cipher_scope_reports_db");
+    if (local) cachedReports = JSON.parse(local);
+  } catch (e) {}
+
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    if (session?.user) {
+      // Fetch authenticated user's reports from Supabase database
+      const { data, error } = await supabase
+        .from("reports")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (data) {
+        cachedReports = data.map((row: any) => ({
+          id: row.id,
+          fileName: row.file_name,
+          type: row.type,
+          fileSize: row.file_size,
+          analysisDate: row.analysis_date,
+          securityScore: row.security_score,
+          status: row.status,
+          entropy: row.entropy,
+          rsa: row.rsa,
+          aes: row.aes,
+          patterns: row.patterns,
+          recommendations: row.recommendations,
+          findings: row.findings,
+        }));
+        notifyUpdate();
+      }
+    } else {
+      // Fallback to local storage reports if logged out
+      try {
+        const local = localStorage.getItem("cipher_scope_reports_db");
+        cachedReports = local ? JSON.parse(local) : [];
+      } catch (e) {
+        cachedReports = [];
+      }
+      notifyUpdate();
+    }
+  });
+}
+
+export function getReports(): Report[] {
+  return cachedReports;
+}
+
+export function saveReport(report: Report): void {
+  // 1. Optimistic local cache save
+  cachedReports = [report, ...cachedReports.filter((r) => r.id !== report.id)];
+  notifyUpdate();
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("cipher_scope_reports_db", JSON.stringify(cachedReports));
+    } catch (e) {}
+
+    // 2. Async database sync
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        supabase
+          .from("reports")
+          .upsert({
+            id: report.id,
+            user_id: session.user.id,
+            file_name: report.fileName,
+            type: report.type,
+            file_size: report.fileSize,
+            analysis_date: report.analysisDate,
+            security_score: report.securityScore,
+            status: report.status,
+            entropy: report.entropy,
+            rsa: report.rsa,
+            aes: report.aes,
+            patterns: report.patterns,
+            recommendations: report.recommendations,
+            findings: report.findings,
+          })
+          .then(({ error }) => {
+            if (error) console.error("Failed to sync report to Supabase:", error);
+          });
+      }
+    });
   }
 }
 
 export function deleteReport(id: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    const reports = getReports();
-    const updated = reports.filter((r) => r.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.error("Failed to delete report", e);
+  // 1. Optimistic local cache delete
+  cachedReports = cachedReports.filter((r) => r.id !== id);
+  notifyUpdate();
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("cipher_scope_reports_db", JSON.stringify(cachedReports));
+    } catch (e) {}
+
+    // 2. Async database delete
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        supabase
+          .from("reports")
+          .delete()
+          .eq("id", id)
+          .then(({ error }) => {
+            if (error) console.error("Failed to delete report from Supabase:", error);
+          });
+      }
+    });
   }
 }
 

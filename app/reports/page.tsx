@@ -143,22 +143,6 @@ const PER_PAGE = 5;
 
 export default function ReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
-
-  useEffect(() => {
-    setReports(getReports());
-
-    // Auto-open detailed report if query param ?id=rpt-xxx is set
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const queryId = params.get("id");
-      if (queryId) {
-        const found = getReports().find((r) => r.id === queryId);
-        if (found) {
-          setSelectedReport(found);
-        }
-      }
-    }
-  }, []);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<"analysisDate" | "securityScore" | "fileName">("analysisDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -166,6 +150,33 @@ export default function ReportsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setReports(getReports());
+
+    const checkQueryParam = () => {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const queryId = params.get("id");
+        if (queryId) {
+          const found = getReports().find((r) => r.id === queryId);
+          if (found) {
+            setSelectedReport(found);
+          }
+        }
+      }
+    };
+
+    checkQueryParam();
+
+    const handleUpdate = () => {
+      setReports(getReports());
+      checkQueryParam();
+    };
+
+    window.addEventListener("cipher_scope_db_update", handleUpdate);
+    return () => window.removeEventListener("cipher_scope_db_update", handleUpdate);
+  }, []);
 
   const filtered = useMemo(() => {
     let r = [...reports];
