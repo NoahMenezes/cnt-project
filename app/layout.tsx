@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "shadcnspace block - hero-01",
-  description: "Beautiful dark theme hero section",
+  title: "CipherScope - Cryptographic Forensics Lab",
+  description: "Advanced cryptographic inspection, file entropy analysis, and hybrid simulation laboratory.",
 };
 
 export default function RootLayout({

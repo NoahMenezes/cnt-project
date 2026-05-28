@@ -11,6 +11,8 @@ import {
   Search, Layers, FileText, Activity, TrendingUp, Zap, BarChart3
 } from "lucide-react";
 import profileRaw from "./data/profileData";
+import { getReports, getStats } from "@/lib/store";
+import { useEffect } from "react";
 
 const NAV = [
   { title: "Home", href: "/" }, { title: "Dashboard", href: "/dashboard" },
@@ -97,9 +99,36 @@ export default function ProfilePage() {
   const [notifPrefs, setNotifPrefs] = useState({ emailOnAnalysis: true, weeklyReport: false, securityAlerts: true });
   const [secPrefs, setSecPrefs] = useState({ autoDelete: false, maxAge: 90, defaultKeySize: "2048", warnWeak: true });
 
+  const [profileStats, setProfileStats] = useState({
+    totalAnalyses: 0,
+    averageScore: 0,
+    reportsGenerated: 0,
+    filesProcessed: 0
+  });
+
+  const [recentActivityList, setRecentActivityList] = useState<any[]>([]);
+
+  useEffect(() => {
+    const s = getStats();
+    setProfileStats({
+      totalAnalyses: s.totalFiles,
+      averageScore: Math.round(s.avgSecurityScore),
+      reportsGenerated: s.totalFiles,
+      filesProcessed: s.totalFiles
+    });
+
+    const reports = getReports().slice(0, 4);
+    setRecentActivityList(reports.map(r => ({
+      id: r.id,
+      type: "analysis",
+      description: `Analyzed file: ${r.fileName}`,
+      timestamp: r.analysisDate
+    })));
+  }, []);
+
   const sessions = profileRaw.sessions;
-  const activity = profileRaw.recentActivity;
-  const stats = profileRaw.statistics;
+  const activity = recentActivityList;
+  const stats = profileStats;
 
   const startEditName = () => { setEditedName(userInfo.name); setIsEditingName(true); };
   const saveName = () => { if (editedName.trim()) setUserInfo(u => ({ ...u, name: editedName.trim() })); setIsEditingName(false); };

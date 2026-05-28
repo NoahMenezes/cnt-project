@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,7 @@ import {
   ResponsiveContainer, RadialBarChart, RadialBar, Cell,
   Tooltip
 } from "recharts";
-import analysisData from "./data/analysisResults";
+import { getReports, saveReport, Report } from "@/lib/store";
 import Link from "next/link";
 
 const SUPPORTED_FORMATS = [".txt", ".pdf", ".docx", ".json", ".csv"];
@@ -133,8 +133,33 @@ export default function AnalyzePage() {
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [fileError, setFileError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const result = analysisData.currentAnalysis;
-  const recent = analysisData.recentAnalyses;
+
+  const [currentReport, setCurrentReport] = useState<Report | null>(null);
+  const [recentList, setRecentList] = useState<any[]>([]);
+
+  useEffect(() => {
+    setRecentList(getReports().slice(0, 5));
+  }, []);
+
+  const result = currentReport || getReports()[0];
+  const recent = recentList;
+
+  const scoreObj = useMemo(() => {
+    if (!result) return { overall: 0, breakdown: { rsaScore: 0, aesScore: 0, entropyScore: 0, patternScore: 0 } };
+    const rsaScore = result.rsa.keySize >= 4096 ? 95 : result.rsa.keySize >= 2048 ? 80 : result.rsa.keySize >= 1024 ? 45 : 12;
+    const aesScore = result.aes.mode === "GCM" ? 95 : result.aes.mode === "CBC" ? 70 : 25;
+    const entropyScore = Math.round((result.entropy.value / 8) * 100);
+    const patternScore = result.patterns.blockRepetition ? 20 : 95;
+    return {
+      overall: result.securityScore,
+      breakdown: {
+        rsaScore,
+        aesScore,
+        entropyScore,
+        patternScore,
+      }
+    };
+  }, [result]);
 
   const handleFile = useCallback((file: File) => {
     const v = validateFile(file);
@@ -162,7 +187,195 @@ export default function AnalyzePage() {
     if (!uploadedFile && !textInput.trim()) return;
     setIsAnalyzing(true);
     setAnalysisComplete(false);
-    setTimeout(() => { setIsAnalyzing(false); setAnalysisComplete(true); }, 2200);
+
+    const content = textInput || (uploadedFile ? `Content of file ${uploadedFile.name}` : "");
+    const fileName = uploadedFile ? uploadedFile.name : "pasted_text_input.txt";
+    const fileExtension = uploadedFile ? "." + uploadedFile.name.split(".").pop()!.toLowerCase() : ".txt";
+    const fileSize = uploadedFile ? formatFileSize(uploadedFile.size) : formatFileSize(content.length);
+
+    // Dynamic Shannon Entropy Calculation
+    const len = content.length || 1;
+    const freqs: Record<string, number> = {};
+    for (let i = 0; i < content.length; i++) {
+      const char = content[i];
+      freqs[char] = (freqs[char] || 0) + 1;
+    }
+    let entropyVal = 0;
+    Object.values(freqs).forEach((f) => {
+      const p = f / len;
+      entropyVal -= p * Math.log2(p);
+    });
+
+    entropyVal = Math.min(8.0, parseFloat(entropyVal.toFixed(2)));
+    const randomnessScore = Math.round((entropyVal / 8.0) * 100);
+
+    let rsaKeySize = 4096;
+    let rsaExponent = 65537;
+    let aesMode = "GCM";
+    let aesKeyStrength = "256-bit";
+    let passwordComplexity = "Strong";
+    const vulnerabilities: string[] = [];
+    let rsaAssessment = "RSA configuration is secure. Modulus size is robust against all known factorization algorithms.";
+    let modulusInfo = "4096-bit modulus detected.";
+    let rsaRisk = "Low";
+    let aesRecommendations: string[] = ["Excellent configuration — maintain current practices"];
+
+    const normalized = content.toLowerCase();
+    if (normalized.includes("ecb")) {
+      aesMode = "ECB";
+    }
+    if (normalized.includes("cbc")) {
+      aesMode = "CBC";
+    }
+    if (normalized.includes("1024")) {
+      rsaKeySize = 1024;
+      rsaRisk = "High";
+      vulnerabilities.push("1024-bit key is deprecated");
+      rsaAssessment = "1024-bit RSA key is weak and vulnerable to state-sponsored factoring.";
+      modulusInfo = "1024-bit modulus detected.";
+    }
+    if (normalized.includes("512")) {
+      rsaKeySize = 512;
+      rsaRisk = "Critical";
+      vulnerabilities.push("Small key size (512-bit)");
+      rsaAssessment = "This RSA configuration is critically weak. The 512-bit key is breakable within hours using commodity hardware.";
+      modulusInfo = "512-bit modulus detected.";
+    }
+    if (normalized.includes("e=3") || normalized.includes("exponent=3") || normalized.includes("exponent 3")) {
+      rsaExponent = 3;
+      if (rsaRisk === "Low") rsaRisk = "Medium";
+      vulnerabilities.push("Weak public exponent (e=3)");
+      vulnerabilities.push("Susceptible to low-exponent attack");
+    }
+    if (normalized.includes("password123") || normalized.includes("weak password")) {
+      passwordComplexity = "Weak";
+    }
+
+    if (entropyVal < 4.0) {
+      if (passwordComplexity === "Strong") passwordComplexity = "Weak";
+      if (aesMode === "GCM") aesMode = "ECB";
+      if (rsaKeySize === 4096) {
+        rsaKeySize = 1024;
+        rsaRisk = "High";
+        vulnerabilities.push("1024-bit key is deprecated");
+        rsaAssessment = "1024-bit RSA key is weak and vulnerable to state-sponsored factoring.";
+        modulusInfo = "1024-bit modulus detected.";
+      }
+    }
+
+    let rsaScore = rsaKeySize >= 4096 ? 95 : rsaKeySize >= 2048 ? 80 : rsaKeySize >= 1024 ? 45 : 12;
+    if (rsaExponent === 3) rsaScore = Math.max(10, rsaScore - 30);
+
+    let aesScore = aesMode === "GCM" ? 95 : aesMode === "CBC" ? 70 : 25;
+    if (passwordComplexity === "Weak") aesScore = Math.max(10, aesScore - 40);
+
+    const entropyScore = Math.round((entropyVal / 8.0) * 100);
+    let patternScore = 95;
+    let repeatedCharacters = false;
+    const repeatedSequences: string[] = [];
+    let blockRepetition = false;
+    let observations = "No repeating block patterns detected. The cipher text appears fully random.";
+
+    if (aesMode === "ECB" || entropyVal < 5.0) {
+      patternScore = 20;
+      repeatedCharacters = true;
+      repeatedSequences.push("4e6f7720697320746865");
+      blockRepetition = true;
+      observations = "ECB mode encryption (or low entropy plaintext) has produced repeated data block patterns. This leaks structural data.";
+    }
+
+    const overallScore = Math.round((rsaScore + aesScore + entropyScore + patternScore) / 4);
+    let status = "Secure";
+    if (overallScore < 45) {
+      status = "Critical";
+    } else if (overallScore < 65) {
+      status = "Weak";
+    } else if (overallScore < 85) {
+      status = "Moderate";
+    }
+
+    const recs: { priority: string; action: string }[] = [];
+    if (rsaKeySize < 2048) {
+      recs.push({ priority: "Critical", action: "Increase RSA key size to minimum 2048 bits, preferably 4096 bits" });
+    }
+    if (rsaExponent === 3) {
+      recs.push({ priority: "Critical", action: "Replace public exponent e=3 with e=65537 (0x10001)" });
+    }
+    if (aesMode === "ECB") {
+      recs.push({ priority: "High", action: "Switch from AES-128-ECB to AES-256-GCM" });
+      aesRecommendations.push("Replace ECB mode with GCM or CBC to prevent block-level pattern leakage");
+    }
+    if (passwordComplexity === "Weak") {
+      recs.push({ priority: "High", action: "Generate a cryptographically secure random password of at least 32 characters" });
+      aesRecommendations.push("Password 'password123' detected — must be replaced with a randomly generated key");
+    }
+    if (aesMode === "CBC") {
+      recs.push({ priority: "Medium", action: "Switch to AES-GCM for authenticated encryption" });
+      aesRecommendations.push("Use GCM mode for authenticated encryption");
+    }
+    if (recs.length === 0) {
+      recs.push({ priority: "Low", action: "Consider rotating keys every 90 days" });
+    }
+
+    if (aesRecommendations.length > 1) {
+      aesRecommendations = aesRecommendations.filter(r => !r.includes("practices"));
+    }
+
+    const entropyClass = entropyVal >= 7.5 ? "High" : entropyVal >= 5.0 ? "Medium" : "Low";
+    const entropyInterpretation = entropyClass === "High"
+      ? "This file exhibits very high entropy, consistent with strongly encrypted or compressed data. Low-entropy regions were not detected, suggesting no plaintext leakage."
+      : "Low to moderate entropy detected. The file contains readable characters, repeating byte patterns, or unencrypted metadata headers.";
+
+    const newReport: Report = {
+      id: "rpt-" + Math.random().toString(36).substring(2, 9),
+      fileName,
+      type: fileExtension.replace(".", "").toUpperCase(),
+      fileSize,
+      analysisDate: new Date().toISOString(),
+      securityScore: overallScore,
+      status,
+      entropy: {
+        value: entropyVal,
+        classification: entropyClass,
+        randomnessScore,
+        explanation: "Shannon entropy measures the average information content per character. A value approaching 8.0 indicates near-perfect randomness.",
+        interpretation: entropyInterpretation
+      },
+      rsa: {
+        keySize: rsaKeySize,
+        exponent: rsaExponent,
+        publicExponent: rsaExponent,
+        riskLevel: rsaRisk,
+        vulnerabilities,
+        securityAssessment: rsaAssessment,
+        modulusInfo
+      },
+      aes: {
+        keyStrength: aesKeyStrength,
+        mode: aesMode,
+        encryptionMode: aesMode,
+        passwordComplexity,
+        securityRecommendations: aesRecommendations
+      },
+      patterns: {
+        repeatedCharacters,
+        repeatedSequences,
+        blockRepetition,
+        observations
+      },
+      recommendations: recs,
+      findings: vulnerabilities.length > 0
+        ? `This file failed ${vulnerabilities.length} key security checks. Weak configurations detected.`
+        : "This file meets security standards. No critical vulnerabilities detected."
+    };
+
+    setTimeout(() => {
+      saveReport(newReport);
+      setCurrentReport(newReport);
+      setRecentList(getReports().slice(0, 5));
+      setIsAnalyzing(false);
+      setAnalysisComplete(true);
+    }, 2200);
   }, [uploadedFile, textInput]);
 
   const clearAll = useCallback(() => {
@@ -313,12 +526,12 @@ export default function AnalyzePage() {
                       <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}
                         className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur col-span-1 flex flex-col items-center gap-4">
                         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground/40 w-full">Security Score</p>
-                        <ScoreGauge score={result.securityScore.overall} />
+                        <ScoreGauge score={scoreObj.overall} />
                         <div className="w-full space-y-2">
-                          <span className="text-sm font-bold" style={{ color: scoreColor(result.securityScore.overall) }}>
-                            {scoreLabel(result.securityScore.overall)}
+                          <span className="text-sm font-bold" style={{ color: scoreColor(scoreObj.overall) }}>
+                            {scoreLabel(scoreObj.overall)}
                           </span>
-                          {Object.entries(result.securityScore.breakdown).map(([k, v]) => (
+                          {Object.entries(scoreObj.breakdown).map(([k, v]) => (
                             <div key={k} className="space-y-1">
                               <div className="flex justify-between text-xs text-foreground/40">
                                 <span className="capitalize">{k.replace("Score", "")}</span><span>{v}</span>

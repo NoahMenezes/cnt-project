@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Header from "@/components/layout/header";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
@@ -12,7 +12,7 @@ import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   AreaChart, Area, ReferenceLine
 } from "recharts";
-import chartData from "./data/chartData";
+import { getReports, getStats, Report } from "@/lib/store";
 
 const NAV = [
   { title: "Home", href: "/" }, { title: "Dashboard", href: "/dashboard" },
@@ -60,6 +60,167 @@ function StatCard({ label, value, icon: Icon, sub }: { label: string; value: str
 
 export default function VisualizationsPage() {
   const [activeFilter, setActiveFilter] = useState<Filter>("weekly");
+  const [reports, setReports] = useState<Report[]>([]);
+
+  useEffect(() => {
+    setReports(getReports());
+  }, []);
+
+  const chartData = useMemo(() => {
+    const s = getStats();
+    
+    // 1. Security Trends (group by date)
+    const trendsMap: Record<string, { sum: number; count: number }> = {};
+    reports.forEach((r) => {
+      const dateStr = new Date(r.analysisDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      if (!trendsMap[dateStr]) trendsMap[dateStr] = { sum: 0, count: 0 };
+      trendsMap[dateStr].sum += r.securityScore;
+      trendsMap[dateStr].count += 1;
+    });
+    let securityTrends = Object.entries(trendsMap).map(([date, data]) => ({
+      date,
+      avgScore: Math.round(data.sum / data.count),
+    }));
+    if (securityTrends.length === 0) {
+      securityTrends = [
+        { date: "Jun 12", avgScore: 80 },
+        { date: "Jun 13", avgScore: 69 },
+        { date: "Jun 14", avgScore: 77 },
+      ];
+    }
+
+    // 2. RSA vs AES score categories count
+    let rsaCrit = 0, rsaWeak = 0, rsaMod = 0, rsaSec = 0;
+    let aesCrit = 0, aesWeak = 0, aesMod = 0, aesSec = 0;
+    reports.forEach((r) => {
+      if (r.rsa.keySize < 1024) rsaCrit++;
+      else if (r.rsa.keySize < 2048) rsaWeak++;
+      else if (r.rsa.keySize < 4096) rsaMod++;
+      else rsaSec++;
+
+      if (r.aes.mode === "ECB" && r.aes.passwordComplexity === "Weak") aesCrit++;
+      else if (r.aes.mode === "ECB" || r.aes.passwordComplexity === "Weak") aesWeak++;
+      else if (r.aes.mode === "CBC") aesMod++;
+      else aesSec++;
+    });
+
+    const rsaVsAES = [
+      { category: "Critical", rsa: rsaCrit, aes: aesCrit },
+      { category: "Weak", rsa: rsaWeak, aes: aesWeak },
+      { category: "Moderate", rsa: rsaMod, aes: aesMod },
+      { category: "Secure", rsa: rsaSec, aes: aesSec },
+    ];
+
+    // 3. Weakness distribution
+    let smallRsa = 0;
+    let weakExp = 0;
+    let ecbMode = 0;
+    let weakPass = 0;
+    reports.forEach((r) => {
+      if (r.rsa.keySize < 2048) smallRsa++;
+      if (r.rsa.exponent === 3) weakExp++;
+      if (r.aes.mode === "ECB") ecbMode++;
+      if (r.aes.passwordComplexity === "Weak") weakPass++;
+    });
+    const totalIssues = (smallRsa + weakExp + ecbMode + weakPass) || 1;
+    const weaknessDistribution = [
+      { name: "Small RSA Key", value: Math.round((smallRsa / totalIssues) * 100), count: smallRsa },
+      { name: "Weak Exponent", value: Math.round((weakExp / totalIssues) * 100), count: weakExp },
+      { name: "ECB Mode", value: Math.round((ecbMode / totalIssues) * 100), count: ecbMode },
+      { name: "Weak Password", value: Math.round((weakPass / totalIssues) * 100), count: weakPass },
+    ].filter(w => w.count > 0);
+
+    if (weaknessDistribution.length === 0) {
+      weaknessDistribution.push({ name: "No Issues", value: 100, count: 0 });
+    }
+
+    // 4. Entropy Distribution
+    let bucket1 = 0, bucket2 = 0, bucket3 = 0, bucket4 = 0, bucket5 = 0;
+    reports.forEach((r) => {
+      const e = r.entropy.value;
+      if (e < 2) bucket1++;
+      else if (e < 4) bucket2++;
+      else if (e < 6) bucket3++;
+      else if (e < 7.5) bucket4++;
+      else bucket5++;
+    });
+    const entropyDistribution = [
+      { range: "0–2", count: bucket1, classification: "Very Low" },
+      { range: "2–4", count: bucket2, classification: "Low" },
+      { range: "4–6", count: bucket3, classification: "Medium" },
+      { range: "6–7.5", count: bucket4, classification: "High" },
+      { range: "7.5–8", count: bucket5, classification: "Very High" },
+    ];
+
+    // 5. Hex/Random characters frequency
+    const characterFrequency = [
+      { char: "E", frequency: 182 },
+      { char: "A", frequency: 165 },
+      { char: "F", frequency: 148 },
+      { char: "0", frequency: 134 },
+      { char: "B", frequency: 129 },
+      { char: "C", frequency: 121 },
+      { char: "D", frequency: 118 },
+      { char: "1", frequency: 112 },
+      { char: "9", frequency: 104 },
+      { char: "3", frequency: 97 },
+    ];
+
+    // 6. Encryption time vs size
+    const encryptionTimeVsFileSize = reports.map((r) => {
+      let sizeKB = 10;
+      if (r.fileSize.includes("KB")) sizeKB = parseFloat(r.fileSize);
+      else if (r.fileSize.includes("MB")) sizeKB = parseFloat(r.fileSize) * 1024;
+      else sizeKB = parseFloat(r.fileSize) / 1024;
+
+      let baseTime = sizeKB * 1.5;
+      if (r.aes.mode === "CBC") baseTime *= 1.2;
+      if (r.rsa.keySize >= 4096) baseTime += 80;
+      else if (r.rsa.keySize >= 2048) baseTime += 30;
+
+      return {
+        fileSizeKB: Math.round(sizeKB),
+        timeMs: Math.round(baseTime),
+        fileName: r.fileName
+      };
+    });
+
+    // 7. Activity Trends
+    const actMap: Record<string, number> = {};
+    reports.forEach((r) => {
+      const dateStr = new Date(r.analysisDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      actMap[dateStr] = (actMap[dateStr] || 0) + 1;
+    });
+    let activityTrends = Object.entries(actMap).map(([date, count]) => ({
+      date,
+      analyses: count,
+    }));
+    if (activityTrends.length === 0) {
+      activityTrends = [
+        { date: "Jun 12", analyses: 15 },
+        { date: "Jun 13", analyses: 11 },
+        { date: "Jun 14", analyses: 4 },
+      ];
+    }
+
+    return {
+      securityTrends,
+      rsaVsAES,
+      weaknessDistribution,
+      entropyDistribution,
+      characterFrequency,
+      encryptionTimeVsFileSize,
+      activityTrends,
+      statistics: {
+        totalAnalyses: s.totalFiles,
+        averageScore: Math.round(s.avgSecurityScore),
+        weakFindings: s.vulnerabilitiesCount,
+        filesProcessed: s.totalFiles,
+        mostCommonIssue: smallRsa > ecbMode ? "Weak RSA Key Size" : "ECB Mode Encryption"
+      }
+    };
+  }, [reports]);
+
   const s = chartData.statistics;
 
   return (

@@ -60,7 +60,7 @@ export default function AuthPage() {
       <div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-2xl p-8 shadow-2xl">
         <div className="flex flex-col items-center mb-8">
           <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center font-bold text-xl mb-3">
-            sh
+            cs
           </div>
           <h2 className="text-2xl font-bold">
             {isSignUp ? "Create an account" : "Welcome back"}

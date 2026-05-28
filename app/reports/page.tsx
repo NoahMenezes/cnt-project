@@ -10,17 +10,20 @@ import {
   X, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, FileSearch,
   AlertCircle, Info, Shield
 } from "lucide-react";
-import reportsRaw from "./data/reportsData";
+import { getReports, deleteReport as deleteReportFromStore, Report } from "@/lib/store";
+import { useEffect } from "react";
 import Link from "next/link";
 
 const NAV = [
-  { title: "Home", href: "/" }, { title: "Dashboard", href: "/dashboard" },
-  { title: "Analyze", href: "/analyze" }, { title: "Hybrid Lab", href: "/hybrid-lab" },
-  { title: "Visualizations", href: "/visualizations" }, { title: "Reports", href: "/reports", isActive: true },
-  { title: "Learn", href: "/learn" }, { title: "Profile", href: "/profile" },
+  { title: "Home", href: "/" },
+  { title: "Dashboard", href: "/dashboard" },
+  { title: "Analyze", href: "/analyze" },
+  { title: "Hybrid Lab", href: "/hybrid-lab" },
+  { title: "Visualizations", href: "/visualizations" },
+  { title: "Reports", href: "/reports", isActive: true },
+  { title: "Learn", href: "/learn" },
+  { title: "Profile", href: "/profile" },
 ];
-
-type Report = typeof reportsRaw.reports[0];
 
 function scoreColor(s: number) {
   if (s >= 80) return "text-emerald-400"; if (s >= 60) return "text-yellow-400";
@@ -118,7 +121,8 @@ function DetailPanel({ report, onClose }: { report: Report; onClose: () => void 
         <div className="space-y-2">
           {report.recommendations.map((r, i) => (
             <div key={i} className="flex items-start gap-2 text-sm text-foreground/70">
-              <Info className="h-4 w-4 text-primary/60 shrink-0 mt-0.5" />{r}
+              <Info className="h-4 w-4 text-primary/60 shrink-0 mt-0.5" />
+              <span>{r.action}</span>
             </div>
           ))}
         </div>
@@ -138,7 +142,23 @@ function DetailPanel({ report, onClose }: { report: Report; onClose: () => void 
 const PER_PAGE = 5;
 
 export default function ReportsPage() {
-  const [reports, setReports] = useState<Report[]>(reportsRaw.reports);
+  const [reports, setReports] = useState<Report[]>([]);
+
+  useEffect(() => {
+    setReports(getReports());
+
+    // Auto-open detailed report if query param ?id=rpt-xxx is set
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const queryId = params.get("id");
+      if (queryId) {
+        const found = getReports().find((r) => r.id === queryId);
+        if (found) {
+          setSelectedReport(found);
+        }
+      }
+    }
+  }, []);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<"analysisDate" | "securityScore" | "fileName">("analysisDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -170,7 +190,8 @@ export default function ReportsPage() {
   }, [sortField]);
 
   const deleteReport = useCallback((id: string) => {
-    setReports(r => r.filter(x => x.id !== id));
+    deleteReportFromStore(id);
+    setReports(getReports());
     if (selectedReport?.id === id) setSelectedReport(null);
     setDeletingId(null);
   }, [selectedReport]);

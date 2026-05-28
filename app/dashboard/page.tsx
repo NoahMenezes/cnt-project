@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Header from "@/components/layout/header";
+import { getStats } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { motion, type Variants } from "framer-motion";
@@ -481,6 +482,30 @@ function DashboardHeader() {
 }
 
 function DashboardGrid() {
+  const [stats, setStats] = useState<any>(null);
+
+  useEffect(() => {
+    setStats(getStats());
+  }, []);
+
+  const totalFiles = stats ? stats.totalFiles.toString() : "0";
+  const avgScore = stats ? stats.avgSecurityScore + "%" : "0%";
+  const vuln = stats ? stats.vulnerabilitiesCount.toString() : "0";
+  
+  const fileCategories = stats ? stats.fileCategories : [
+    { label: "TXT Files", value: "0", subtitle: "plain text & key configs" },
+    { label: "PDF Documents", value: "0", subtitle: "signed contracts & docs" },
+    { label: "JSON Configurations", value: "0", subtitle: "key pairs & metadata" },
+  ];
+  const rsaDistribution = stats ? stats.rsaDistribution : [
+    { label: "4096-bit Keys", value: "0%", subtitle: "secure key size" },
+    { label: "2048-bit Keys", value: "0%", subtitle: "standard key size" },
+    { label: "1024-bit / Less", value: "0%", subtitle: "deprecated/weak size" },
+  ];
+  const recentEvents = stats ? stats.recentEvents : [
+    { label: "File Analyzed", value: "Now", subtitle: "No recent events" }
+  ];
+
   return (
     <motion.div
       variants={containerVariants}
@@ -497,14 +522,14 @@ function DashboardGrid() {
       >
         <MetricCard
           label="Total Files Analyzed"
-          value="63"
+          value={totalFiles}
           change="+12.5%"
           trend="up"
           icon={<FileText className="h-6 w-6 text-primary" aria-hidden="true" />}
         />
         <MetricCard
           label="Avg Security Score"
-          value="71.4%"
+          value={avgScore}
           change="+8.2%"
           trend="up"
           icon={<Shield className="h-6 w-6 text-primary" aria-hidden="true" />}
@@ -518,7 +543,7 @@ function DashboardGrid() {
         />
         <MetricCard
           label="Vulnerabilities Flagged"
-          value="12"
+          value={vuln}
           change="-4.3%"
           trend="down"
           icon={
@@ -555,27 +580,15 @@ function DashboardGrid() {
       >
         <DetailedCard
           title="Top File Categories"
-          items={[
-            { label: "TXT Files", value: "24", subtitle: "plain text & key configs" },
-            { label: "PDF Documents", value: "15", subtitle: "signed contracts & docs" },
-            { label: "JSON Configurations", value: "12", subtitle: "key pairs & metadata" },
-          ]}
+          items={fileCategories}
         />
         <DetailedCard
           title="RSA Modulus Distribution"
-          items={[
-            { label: "4096-bit Keys", value: "68%", subtitle: "secure key size" },
-            { label: "2048-bit Keys", value: "22%", subtitle: "standard key size" },
-            { label: "1024-bit / Less", value: "10%", subtitle: "deprecated/weak size" },
-          ]}
+          items={rsaDistribution}
         />
         <DetailedCard
           title="System Events"
-          items={[
-            { label: "File Analyzed", value: "Now", subtitle: "session_tokens.txt" },
-            { label: "RSA Weak Exponent Flagged", value: "2h ago", subtitle: "e=3 modulus" },
-            { label: "Hybrid Simulation Success", value: "5h ago", subtitle: "256-bit GCM mode" },
-          ]}
+          items={recentEvents}
         />
       </motion.div>
     </motion.div>
