@@ -242,7 +242,7 @@ export default function ProfilePage() {
                           </div>
                           <div className="text-right shrink-0">
                             <p className={`font-medium ${s.status === "Active" ? "text-emerald-400" : "text-foreground/30"}`}>{s.status}</p>
-                            <p className="text-foreground/30">{new Date(s.dateTime).toLocaleDateString()}</p>
+                            <p className="text-foreground/30">{new Date(s.dateTime).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
                           </div>
                         </div>
                       ))}

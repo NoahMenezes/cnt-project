@@ -159,7 +159,7 @@ export default function AnalyzePage() {
     return () => window.removeEventListener("cipher_scope_db_update", handleUpdate);
   }, []);
 
-  const result = currentReport || getReports()[0];
+  const result = currentReport || recentList[0] || null;
   const recent = recentList;
 
   const scoreObj = useMemo(() => {
@@ -411,7 +411,7 @@ export default function AnalyzePage() {
             }),
           });
         }
-        
+
         if (!response.ok) throw new Error("Backend analysis failed");
         const report = await response.json();
 
@@ -497,20 +497,17 @@ export default function AnalyzePage() {
     // Log 1 — extraction detail from the actual unstructured row
     if (isDocx) {
       logs.push(
-        `[${timeStr}] ● Document Text Extraction: The parser successfully opened the .docx file as a zip, extracted the text inside word/document.xml, and retrieved ${
-          textLen > 0 ? `${textLen.toLocaleString()} characters` : "content"
+        `[${timeStr}] ● Document Text Extraction: The parser successfully opened the .docx file as a zip, extracted the text inside word/document.xml, and retrieved ${textLen > 0 ? `${textLen.toLocaleString()} characters` : "content"
         } of full document text.`
       );
     } else if (isPdf) {
       logs.push(
-        `[${timeStr}] ● Document Text Extraction: Read PDF document (${
-          textLen > 0 ? `${textLen.toLocaleString()} characters` : result.fileSize
+        `[${timeStr}] ● Document Text Extraction: Read PDF document (${textLen > 0 ? `${textLen.toLocaleString()} characters` : result.fileSize
         }) and extracted text content.`
       );
     } else {
       logs.push(
-        `[${timeStr}] ● Document Text Extraction: Read plaintext input (${result.fileSize}, ${
-          textLen > 0 ? `${textLen.toLocaleString()} chars` : "content"
+        `[${timeStr}] ● Document Text Extraction: Read plaintext input (${result.fileSize}, ${textLen > 0 ? `${textLen.toLocaleString()} chars` : "content"
         }) successfully.`
       );
     }
@@ -518,8 +515,7 @@ export default function AnalyzePage() {
     // Log 2 — Groq result with dynamic finding count
     const recCount = aiContext?.recommendations?.length ?? result.recommendations?.length ?? 0;
     logs.push(
-      `[${timeStr}] ● Groq Cloud AI Analysis: The Groq Cloud AI Llama model (llama-3.3-70b-versatile) was reached successfully and returned ${
-        recCount > 0 ? `${recCount} cryptographic recommendation${recCount !== 1 ? "s" : ""}` : "detailed cryptographic recommendations"
+      `[${timeStr}] ● Groq Cloud AI Analysis: The Groq Cloud AI Llama model (llama-3.3-70b-versatile) was reached successfully and returned ${recCount > 0 ? `${recCount} cryptographic recommendation${recCount !== 1 ? "s" : ""}` : "detailed cryptographic recommendations"
       } based on the complete document text.`
     );
 
@@ -627,8 +623,8 @@ export default function AnalyzePage() {
                             {[
                               ["Category", getFileCategory("." + uploadedFile.name.split(".").pop()!.toLowerCase())],
                               ["Extension", "." + uploadedFile.name.split(".").pop()!.toLowerCase()],
-                              ["Upload Date", new Date().toLocaleDateString()],
-                              ["Upload Time", new Date().toLocaleTimeString()],
+                              ["Upload Date", new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })],
+                              ["Upload Time", new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })],
                             ].map(([k, v]) => (
                               <div key={k}>
                                 <p className="text-xs uppercase tracking-widest text-foreground/40">{k}</p>
@@ -697,7 +693,7 @@ export default function AnalyzePage() {
                         </div>
                         <Badge variant="outline" className="text-xs border-emerald-500/30 text-emerald-400 bg-emerald-500/10">Active Context</Badge>
                       </div>
-                      
+
                       <div className="grid gap-6 md:grid-cols-2">
                         {/* Left Column: AI Findings */}
                         <div className="space-y-2">
@@ -706,7 +702,7 @@ export default function AnalyzePage() {
                             {aiContext?.securityAssessment || result.findings || "No AI findings returned."}
                           </p>
                         </div>
-                        
+
                         {/* Right Column: Execution Log */}
                         <div className="space-y-2">
                           <h3 className="text-sm font-semibold text-foreground/80">Agent Execution Log</h3>
@@ -718,11 +714,11 @@ export default function AnalyzePage() {
                               const colonIndex = textStr.indexOf(":");
                               const title = colonIndex !== -1 ? textStr.substring(0, colonIndex + 1) : "";
                               const body = colonIndex !== -1 ? textStr.substring(colonIndex + 1) : textStr;
-                              
+
                               let colorClass = "text-blue-400";
                               if (log.includes("AI Analysis")) colorClass = "text-yellow-400";
                               if (log.includes("ChromaDB")) colorClass = "text-purple-400";
-                              
+
                               return (
                                 <div key={index}>
                                   <span className="text-foreground/30">{timeStr} </span>
@@ -787,7 +783,7 @@ export default function AnalyzePage() {
                           <div className="flex justify-between"><span className="text-foreground/40">Modulus</span><span className="text-foreground/70 truncate max-w-[120px]">{result.rsa.modulusInfo.slice(0, 30)}…</span></div>
                         </div>
                         <div className="space-y-1.5">
-                          {result.rsa.vulnerabilities.map((v, i) => (
+                          {result.rsa.vulnerabilities.map((v: string, i: number) => (
                             <div key={i} className="flex items-start gap-2 text-xs text-red-400">
                               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" /><span>{v}</span>
                             </div>
@@ -808,7 +804,7 @@ export default function AnalyzePage() {
                           ))}
                         </div>
                         <ul className="space-y-1.5">
-                          {result.aes.securityRecommendations.map((r, i) => (
+                          {result.aes.securityRecommendations.map((r: string, i: number) => (
                             <li key={i} className="flex items-start gap-2 text-xs text-foreground/60">
                               <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-yellow-400" /><span>{r}</span>
                             </li>
@@ -840,7 +836,7 @@ export default function AnalyzePage() {
                         className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-4">
                         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground/40">Recommendations</p>
                         <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                          {(aiContext?.recommendations ?? result.recommendations).map((r, i) => (
+                          {(aiContext?.recommendations ?? result.recommendations).map((r: any, i: number) => (
                             <div key={i} className={`flex items-start gap-3 rounded-lg border px-3 py-2 ${priorityColor(r.priority)}`}>
                               <span className="text-xs font-semibold shrink-0">{r.priority}</span>
                               <span className="text-xs leading-relaxed">{r.action}</span>
@@ -860,21 +856,19 @@ export default function AnalyzePage() {
                         <div className="flex rounded-lg bg-foreground/[0.04] p-1 self-start">
                           <button
                             onClick={() => setTableTab("unstructured")}
-                            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                              tableTab === "unstructured"
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${tableTab === "unstructured"
                                 ? "bg-background text-foreground shadow"
                                 : "text-foreground/50 hover:text-foreground"
-                            }`}
+                              }`}
                           >
                             Unstructured Raw Extraction
                           </button>
                           <button
                             onClick={() => setTableTab("structured")}
-                            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                              tableTab === "structured"
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${tableTab === "structured"
                                 ? "bg-background text-foreground shadow"
                                 : "text-foreground/50 hover:text-foreground"
-                            }`}
+                              }`}
                           >
                             AI Structured Table
                           </button>
@@ -902,15 +896,14 @@ export default function AnalyzePage() {
                                   <tr key={chunk.id} className="border-b border-border/10 hover:bg-foreground/[0.01] transition-all">
                                     <td className="p-3 font-mono text-foreground/40">{chunk.id}</td>
                                     <td className="p-3">
-                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                                        chunk.type === "Section Header"
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${chunk.type === "Section Header"
                                           ? "bg-blue-500/10 text-blue-400"
                                           : chunk.type === "Formula / Code"
-                                          ? "bg-purple-500/10 text-purple-400 font-mono"
-                                          : chunk.type === "List Item"
-                                          ? "bg-yellow-500/10 text-yellow-400"
-                                          : "bg-foreground/5 text-foreground/60"
-                                      }`}>
+                                            ? "bg-purple-500/10 text-purple-400 font-mono"
+                                            : chunk.type === "List Item"
+                                              ? "bg-yellow-500/10 text-yellow-400"
+                                              : "bg-foreground/5 text-foreground/60"
+                                        }`}>
                                         {chunk.type}
                                       </span>
                                     </td>
@@ -961,15 +954,14 @@ export default function AnalyzePage() {
                                     </td>
                                     <td className="p-3 text-foreground/60 leading-relaxed">{param.classification}</td>
                                     <td className="p-3 text-center">
-                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                        param.status === "Secure"
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${param.status === "Secure"
                                           ? "bg-emerald-500/10 text-emerald-400"
                                           : param.status === "Critical"
-                                          ? "bg-red-500/10 text-red-400"
-                                          : param.status === "High"
-                                          ? "bg-orange-500/10 text-orange-400"
-                                          : "bg-yellow-500/10 text-yellow-400"
-                                      }`}>
+                                            ? "bg-red-500/10 text-red-400"
+                                            : param.status === "High"
+                                              ? "bg-orange-500/10 text-orange-400"
+                                              : "bg-yellow-500/10 text-yellow-400"
+                                        }`}>
                                         {param.status}
                                       </span>
                                     </td>
@@ -1004,7 +996,7 @@ export default function AnalyzePage() {
                           <FileText className="h-4 w-4 text-foreground/40 shrink-0" />
                           <span className="text-sm text-foreground flex-1 truncate">{item.fileName}</span>
                           <span className="text-xs text-foreground/40">
-                            {new Date(item.analysisDate).toLocaleDateString()}
+                            {new Date(item.analysisDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                           </span>
                           <span className="text-sm font-bold" style={{ color: scoreColor(item.securityScore) }}>
                             {item.securityScore}

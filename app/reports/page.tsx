@@ -65,7 +65,7 @@ function DetailPanel({ report, onClose }: { report: Report; onClose: () => void 
             <h3 className="text-base font-semibold text-foreground">{report.fileName}</h3>
             <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle(report.status)}`}>{report.status}</span>
           </div>
-          <p className="text-xs text-foreground/40">{new Date(report.analysisDate).toLocaleString()}</p>
+          <p className="text-xs text-foreground/40">{new Date(report.analysisDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-center">

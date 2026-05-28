@@ -61,8 +61,10 @@ function StatCard({ label, value, icon: Icon, sub }: { label: string; value: str
 export default function VisualizationsPage() {
   const [activeFilter, setActiveFilter] = useState<Filter>("weekly");
   const [reports, setReports] = useState<Report[]>([]);
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
+    setHasMounted(true);
     setReports(getReports());
     const handleUpdate = () => {
       setReports(getReports());
@@ -226,7 +228,10 @@ export default function VisualizationsPage() {
     };
   }, [reports]);
 
-  const s = chartData.statistics;
+  // On server / before mount, use zero-state so SSR HTML matches client initial render
+  const s = hasMounted ? chartData.statistics : {
+    totalAnalyses: 0, averageScore: 0, weakFindings: 0, filesProcessed: 0, mostCommonIssue: "—"
+  };
 
   return (
     <div className="relative min-h-screen bg-background">
