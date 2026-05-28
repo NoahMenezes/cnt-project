@@ -171,6 +171,114 @@ export function deleteReport(id: string): void {
   }
 }
 
+// ─── Key Management ──────────────────────────────────────────
+export interface CryptographicKey {
+  id: string;
+  keyType: "RSA_PUBLIC" | "RSA_PRIVATE" | "AES_SESSION";
+  keyValue: string;
+  keySize: number;
+  label: string;
+  generatedAt: string;
+  description?: string;
+}
+
+let cachedKeys: CryptographicKey[] = [];
+
+// Initialize key loading
+if (typeof window !== "undefined") {
+  try {
+    const localKeys = localStorage.getItem("cipher_scope_keys_db");
+    if (localKeys) cachedKeys = JSON.parse(localKeys);
+  } catch (e) {}
+
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    if (session?.user) {
+      const { data, error } = await supabase
+        .from("cryptographic_keys")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (data) {
+        cachedKeys = data.map((row: any) => ({
+          id: row.id,
+          keyType: row.key_type,
+          keyValue: row.key_value,
+          keySize: row.key_size,
+          label: row.label,
+          generatedAt: row.generated_at,
+          description: row.description,
+        }));
+        notifyUpdate();
+      }
+    } else {
+      try {
+        const localKeys = localStorage.getItem("cipher_scope_keys_db");
+        cachedKeys = localKeys ? JSON.parse(localKeys) : [];
+      } catch (e) {
+        cachedKeys = [];
+      }
+      notifyUpdate();
+    }
+  });
+}
+
+export function getKeys(): CryptographicKey[] {
+  return cachedKeys;
+}
+
+export function saveKey(key: CryptographicKey): void {
+  cachedKeys = [key, ...cachedKeys.filter((k) => k.id !== key.id)];
+  notifyUpdate();
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
+    } catch (e) {}
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        supabase
+          .from("cryptographic_keys")
+          .upsert({
+            id: key.id,
+            user_id: session.user.id,
+            key_type: key.keyType,
+            key_value: key.keyValue,
+            key_size: key.keySize,
+            label: key.label,
+            generated_at: key.generatedAt,
+            description: key.description,
+          })
+          .then(({ error }) => {
+            if (error) console.error("Failed to sync key to Supabase:", error);
+          });
+      }
+    });
+  }
+}
+
+export function deleteKey(id: string): void {
+  cachedKeys = cachedKeys.filter((k) => k.id !== id);
+  notifyUpdate();
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
+    } catch (e) {}
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        supabase
+          .from("cryptographic_keys")
+          .delete()
+          .eq("id", id)
+          .then(({ error }) => {
+            if (error) console.error("Failed to delete key from Supabase:", error);
+          });
+      }
+    });
+  }
+}
+
 export function getStats() {
   const reports = getReports();
   const totalFiles = reports.length;

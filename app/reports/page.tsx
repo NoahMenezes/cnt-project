@@ -8,9 +8,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText, Search, ChevronUp, ChevronDown, Eye, Download, Trash2,
   X, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, FileSearch,
-  AlertCircle, Info, Shield
+  AlertCircle, Info, Shield, Key, Copy, Lock
 } from "lucide-react";
-import { getReports, deleteReport as deleteReportFromStore, Report } from "@/lib/store";
+import { getReports, deleteReport as deleteReportFromStore, Report, getKeys, deleteKey as deleteKeyFromStore, CryptographicKey } from "@/lib/store";
 import { useEffect } from "react";
 import Link from "next/link";
 
@@ -141,6 +141,7 @@ const PER_PAGE = 5;
 
 export default function ReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
+  const [keys, setKeys] = useState<CryptographicKey[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<"analysisDate" | "securityScore" | "fileName">("analysisDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -151,6 +152,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setReports(getReports());
+    setKeys(getKeys());
 
     const checkQueryParam = () => {
       if (typeof window !== "undefined") {
@@ -169,6 +171,7 @@ export default function ReportsPage() {
 
     const handleUpdate = () => {
       setReports(getReports());
+      setKeys(getKeys());
       checkQueryParam();
     };
 
@@ -370,6 +373,65 @@ export default function ReportsPage() {
                   <DetailPanel report={selectedReport} onClose={() => setSelectedReport(null)} />
                 )}
               </AnimatePresence>
+
+              {/* Cryptographic Keys Section */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
+                className="rounded-2xl border border-primary/30 bg-primary/[0.03] backdrop-blur p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Key className="h-5 w-5 text-primary" />
+                  <h2 className="text-xl font-semibold text-foreground">Stored Cryptographic Keys</h2>
+                </div>
+                <p className="text-sm text-foreground/60 mb-4">
+                  All generated cryptographic keys are stored securely in your Supabase database. Manage your RSA and AES keys here.
+                </p>
+                
+                {getKeys().length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 py-10">
+                    <Key className="h-10 w-10 text-foreground/20" />
+                    <p className="text-sm text-foreground/40">No keys generated yet. Go to Analyze to generate your first keys.</p>
+                    <Link href="/analyze"><Button size="sm" variant="outline" className="rounded-full">Go to Analyze</Button></Link>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {getKeys().map((key) => (
+                      <div key={key.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl border border-border/20 bg-foreground/[0.02] hover:bg-foreground/[0.04] transition-colors">
+                        <div className="flex items-start gap-3 flex-1">
+                          {key.keyType === "RSA_PUBLIC" && <Shield className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />}
+                          {key.keyType === "RSA_PRIVATE" && <Lock className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />}
+                          {key.keyType === "AES_SESSION" && <Key className="h-4 w-4 text-emerald-400 mt-0.5 flex-shrink-0" />}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-foreground">{key.label}</p>
+                            <div className="flex flex-wrap gap-2 items-center mt-1">
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-mono ${
+                                key.keyType === "RSA_PUBLIC" ? "bg-blue-500/20 text-blue-300" :
+                                key.keyType === "RSA_PRIVATE" ? "bg-red-500/20 text-red-300" :
+                                "bg-emerald-500/20 text-emerald-300"
+                              }`}>
+                                {key.keyType === "RSA_PUBLIC" ? "RSA Public" : key.keyType === "RSA_PRIVATE" ? "RSA Private" : "AES Session"}
+                              </span>
+                              <span className="text-xs text-foreground/50">{key.keySize} bits</span>
+                              <span className="text-xs text-foreground/40">{new Date(key.generatedAt).toLocaleDateString()}</span>
+                            </div>
+                            {key.description && <p className="text-xs text-foreground/40 mt-1">{key.description}</p>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <button onClick={() => {
+                            navigator.clipboard.writeText(key.keyValue);
+                          }} className="flex-1 sm:flex-initial p-2 rounded-lg text-foreground/40 hover:text-foreground/70 hover:bg-foreground/5 transition-colors">
+                            <Copy className="h-4 w-4" />
+                          </button>
+                          <button onClick={() => {
+                            deleteKeyFromStore(key.id);
+                          }} className="flex-1 sm:flex-initial p-2 rounded-lg text-foreground/40 hover:text-red-400 hover:bg-red-400/10 transition-colors">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
 
             </div>
           </div>

@@ -12,7 +12,7 @@ import {
   Eye, Download, Save, RefreshCw, Trash2, Key, HelpCircle,
   Bold, Italic, Code2
 } from "lucide-react";
-import { getReports, saveReport, Report } from "@/lib/store";
+import { getReports, saveReport, Report, getKeys, saveKey, CryptographicKey } from "@/lib/store";
 import Link from "next/link";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -660,6 +660,103 @@ export default function OperationPage() {
                 <Trash2 className="h-4 w-4 mr-2" /> Clear All
               </Button>
             </div>
+          </div>
+
+          {/* Key Generation & Management Section */}
+          <div className="rounded-2xl border border-primary/30 bg-primary/[0.03] p-6 backdrop-blur">
+            <div className="flex items-center gap-3 mb-4">
+              <Key className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-bold text-foreground">Generate & Store Cryptographic Keys</h2>
+            </div>
+            <p className="text-sm text-foreground/60 mb-4">
+              Generate the three essential keys needed for RSA+AES hybrid encryption: RSA Public Key, RSA Private Key, and AES Session Key. All keys will be securely stored in your Supabase database.
+            </p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Generate RSA Public Key */}
+              <Button 
+                onClick={() => {
+                  const pair = generateRSAPairSim(2048);
+                  const publicKeyId = `pub_${Date.now()}`;
+                  const publicKey: CryptographicKey = {
+                    id: publicKeyId,
+                    keyType: "RSA_PUBLIC",
+                    keyValue: pair.publicKey,
+                    keySize: 2048,
+                    label: `RSA Public Key (${new Date().toLocaleDateString()})`,
+                    generatedAt: new Date().toISOString(),
+                    description: "RSA 2048-bit public key for encryption"
+                  };
+                  saveKey(publicKey);
+                  addLog(`Generated and saved RSA 2048-bit Public Key (${publicKeyId})`, "success");
+                }}
+                className="bg-blue-500/80 hover:bg-blue-600 text-white font-semibold flex items-center justify-center gap-2 py-2"
+              >
+                <Key className="h-4 w-4" /> Generate RSA Public Key
+              </Button>
+
+              {/* Generate RSA Private Key */}
+              <Button 
+                onClick={() => {
+                  const pair = generateRSAPairSim(2048);
+                  const privateKeyId = `priv_${Date.now()}`;
+                  const privateKey: CryptographicKey = {
+                    id: privateKeyId,
+                    keyType: "RSA_PRIVATE",
+                    keyValue: pair.privateKey,
+                    keySize: 2048,
+                    label: `RSA Private Key (${new Date().toLocaleDateString()})`,
+                    generatedAt: new Date().toISOString(),
+                    description: "RSA 2048-bit private key for decryption - KEEP SECURE"
+                  };
+                  saveKey(privateKey);
+                  addLog(`Generated and saved RSA 2048-bit Private Key (${privateKeyId}) - KEEP SECURE`, "success");
+                }}
+                className="bg-red-500/80 hover:bg-red-600 text-white font-semibold flex items-center justify-center gap-2 py-2"
+              >
+                <Shield className="h-4 w-4" /> Generate RSA Private Key
+              </Button>
+
+              {/* Generate AES Session Key */}
+              <Button 
+                onClick={() => {
+                  const aesSessionKey = generateAESKeyHex(256);
+                  const aesKeyId = `aes_${Date.now()}`;
+                  const aesKey: CryptographicKey = {
+                    id: aesKeyId,
+                    keyType: "AES_SESSION",
+                    keyValue: aesSessionKey,
+                    keySize: 256,
+                    label: `AES Session Key (${new Date().toLocaleDateString()})`,
+                    generatedAt: new Date().toISOString(),
+                    description: "AES 256-bit session key for symmetric encryption"
+                  };
+                  saveKey(aesKey);
+                  addLog(`Generated and saved AES 256-bit Session Key (${aesKeyId})`, "success");
+                }}
+                className="bg-emerald-500/80 hover:bg-emerald-600 text-white font-semibold flex items-center justify-center gap-2 py-2"
+              >
+                <Zap className="h-4 w-4" /> Generate AES Session Key
+              </Button>
+            </div>
+          </div>
+
+          {/* Encryption & Decryption Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button 
+              onClick={handleEncrypt} 
+              disabled={isProcessing}
+              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 text-base"
+            >
+              <Lock className="h-5 w-5 mr-2" /> Run Hybrid Encryption
+            </Button>
+            <Button 
+              onClick={handleDecrypt} 
+              disabled={isProcessing || !ciphertext}
+              className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 text-base"
+            >
+              <UnlockIcon className="h-5 w-5 mr-2" /> Decrypt Payload
+            </Button>
           </div>
 
           <div
