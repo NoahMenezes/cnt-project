@@ -900,7 +900,21 @@ export default function AnalyzePage() {
                                   <tr key={idx} className="border-b border-border/10 hover:bg-foreground/[0.01] transition-all">
                                     <td className="p-3 font-semibold text-foreground/75">{param.category}</td>
                                     <td className="p-3 font-mono text-foreground">{param.element}</td>
-                                    <td className="p-3 text-foreground/80 font-mono">{param.value}</td>
+                                    <td className="p-3 text-foreground/80 font-mono whitespace-pre-wrap max-w-xl">
+                                      {param.value && (param.value.startsWith("{") || param.value.startsWith("[")) ? (
+                                        <pre className="text-[10px] bg-foreground/[0.01] p-3 rounded-lg border border-border/10 max-h-96 overflow-y-auto font-mono text-emerald-400">
+                                          {(() => {
+                                            try {
+                                              return JSON.stringify(JSON.parse(param.value), null, 2);
+                                            } catch (e) {
+                                              return param.value;
+                                            }
+                                          })()}
+                                        </pre>
+                                      ) : (
+                                        param.value
+                                      )}
+                                    </td>
                                     <td className="p-3 text-foreground/60 leading-relaxed">{param.classification}</td>
                                     <td className="p-3 text-center">
                                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${

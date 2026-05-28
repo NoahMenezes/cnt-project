@@ -174,25 +174,15 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
         return ""
 
 def get_unstructured_chunks(text: str):
-    paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
-    chunks = []
-    for i, p in enumerate(paragraphs):
-        p_type = "Text Paragraph"
-        p_clean = p.lower()
-        if len(p) < 65 and (p.endswith(":") or p.isupper() or p.startswith("LAB") or p.startswith("Expt") or p.startswith("Session")):
-            p_type = "Section Header"
-        elif p.startswith("-") or p.startswith("*") or (p.strip() and p.strip()[0].isdigit() and len(p.strip()) > 2 and p.strip()[1] == "."):
-            p_type = "List Item"
-        elif "def " in p_clean or "import " in p_clean or "{" in p_clean or "=" in p_clean and len(p) > 80:
-            p_type = "Formula / Code"
-            
-        chunks.append({
-            "id": i + 1,
-            "text": p,
-            "length": len(p),
-            "type": p_type
-        })
-    return chunks
+    # Package the entire extracted text in exactly one row
+    return [
+        {
+            "id": 1,
+            "text": text,
+            "length": len(text),
+            "type": "Full Document Text"
+        }
+    ]
 
 def perform_cryptographic_analysis(file_name: str, content: str):
     # Calculate exact Shannon Entropy
@@ -270,27 +260,18 @@ def perform_cryptographic_analysis(file_name: str, content: str):
                 "Content-Type": "application/json"
             }
             prompt = (
-                f"Analyze the following cryptographic configuration parameters from the file '{file_name}':\n"
+                f"You are a professional cryptographic security analysis assistant. Analyze the entire text of the document '{file_name}':\n"
                 f"1. Entropy: {entropy_val}/8.0\n"
                 f"2. RSA Parameters: Key size {rsa_info['keySize']}, exponent e={rsa_info['exponent']}\n"
                 f"3. AES Parameters: Mode {aes_info['mode']}, Key strength {aes_info['keyStrength']}\n"
-                f"4. Source excerpt: {content[:1500]}\n\n"
-                f"Provide a brief assessment summary and specific recommendations, and extract a list of all cryptographic, randomness, or mathematical algorithms/parameters mentioned in the excerpt to organize them into a structured table schema.\n"
+                f"4. Document Full Text Content:\n{content}\n\n"
+                f"Provide a brief assessment summary and specific recommendations.\n"
                 f"You MUST return a JSON object exactly formatted as:\n"
                 f'{{\n'
-                f'  "securityAssessment": "Detailed analysis of the configuration vulnerabilities found.",\n'
+                f'  "securityAssessment": "Detailed analysis of the configuration vulnerabilities found in the entire document.",\n'
                 f'  "findings": "A summary sentence of the overall file security status.",\n'
                 f'  "recommendations": [\n'
                 f'    {{"priority": "Critical"|"High"|"Medium"|"Low", "action": "Specific recommendation description"}}\n'
-                f'  ],\n'
-                f'  "structuredParameters": [\n'
-                f'    {{\n'
-                f'      "category": "Algorithm"|"Entropy"|"RSA Parameter"|"AES Parameter"|"Vulnerability",\n'
-                f'      "element": "Name of the element, e.g. LCG, BBS, Key size, public exponent etc.",\n'
-                f'      "value": "The value or details discovered from the document, e.g. X0 seed, 2048-bit, GCM, etc.",\n'
-                f'      "classification": "Brief description of its role or classification.",\n'
-                f'      "status": "Critical"|"High"|"Medium"|"Low"|"Secure"\n'
-                f'    }}\n'
                 f'  ]\n'
                 f'}}'
             )
@@ -312,7 +293,7 @@ def perform_cryptographic_analysis(file_name: str, content: str):
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=8.0
+                timeout=12.0
             )
             if response.status_code == 200:
                 res_data = response.json()
@@ -325,8 +306,6 @@ def perform_cryptographic_analysis(file_name: str, content: str):
                     findings = ai_data["findings"]
                 if "recommendations" in ai_data and isinstance(ai_data["recommendations"], list):
                     recommendations_list = ai_data["recommendations"]
-                if "structuredParameters" in ai_data and isinstance(ai_data["structuredParameters"], list):
-                    structured_parameters_list = ai_data["structuredParameters"]
                 ai_success = True
                 print("Groq analysis succeeded!")
         except Exception as e:
@@ -343,23 +322,20 @@ def perform_cryptographic_analysis(file_name: str, content: str):
                 f"Entropy value: {entropy_val}/8.0\n"
                 f"Detected RSA: Key size {rsa_info['keySize']}, exponent e={rsa_info['exponent']}\n"
                 f"Detected AES: Mode {aes_info['mode']}, Key strength {aes_info['keyStrength']}\n"
-                f"Content excerpt: {content[:1000]}\n\n"
+                f"Content text:\n{content}\n\n"
                 f"Provide a brief assessment summary and specific recommendations. Return response as JSON only, matching format:\n"
                 f'{{\n'
                 f'  "securityAssessment": "...",\n'
                 f'  "findings": "...",\n'
                 f'  "recommendations": [\n'
                 f'    {{"priority": "...", "action": "..."}}\n'
-                f'  ],\n'
-                f'  "structuredParameters": [\n'
-                f'    {{"category": "...", "element": "...", "value": "...", "classification": "...", "status": "..."}}\n'
                 f'  ]\n'
                 f'}}'
             )
             response = requests.post(
                 ollama_url,
                 json={"model": "llama3", "prompt": prompt, "format": "json", "stream": False},
-                timeout=5.0
+                timeout=8.0
             )
             if response.status_code == 200:
                 res_json = response.json()
@@ -371,8 +347,6 @@ def perform_cryptographic_analysis(file_name: str, content: str):
                     findings = ai_data["findings"]
                 if "recommendations" in ai_data and isinstance(ai_data["recommendations"], list):
                     recommendations_list = ai_data["recommendations"]
-                if "structuredParameters" in ai_data and isinstance(ai_data["structuredParameters"], list):
-                    structured_parameters_list = ai_data["structuredParameters"]
                 ai_success = True
                 print("Ollama analysis succeeded!")
         except Exception as e:
@@ -381,57 +355,23 @@ def perform_cryptographic_analysis(file_name: str, content: str):
     # Build unstructured chunks
     unstructured_chunks_list = get_unstructured_chunks(content)
 
-    # Build structured parameters if not populated by AI
-    if not structured_parameters_list:
-        structured_parameters_list = [
-            {
-                "category": "AES Parameter",
-                "element": "Encryption Mode",
-                "value": aes_info["mode"],
-                "classification": "Symmetric Block Cipher Mode",
-                "status": "Secure" if aes_info["mode"] == "GCM" else "High"
-            },
-            {
-                "category": "RSA Parameter",
-                "element": "Key Size",
-                "value": f"{rsa_info['keySize']}-bit",
-                "classification": "Asymmetric Key Strength",
-                "status": "Secure" if rsa_info["keySize"] >= 3072 else "Low"
-            },
-            {
-                "category": "RSA Parameter",
-                "element": "Public Exponent",
-                "value": f"e={rsa_info['exponent']}",
-                "classification": "Asymmetric Public Exponent",
-                "status": "Secure" if rsa_info["exponent"] == 65537 else "Critical"
-            },
-            {
-                "category": "Entropy",
-                "element": "Shannon Entropy",
-                "value": f"{entropy_val} / 8.0",
-                "classification": "Information Density Randomness",
-                "status": "Secure" if entropy_val >= 7.5 else "Low"
-            }
-        ]
-        
-        # Heuristically add LCG / BBS if present in text
-        t_lower = content.lower()
-        if "lcg" in t_lower or "linear congruential" in t_lower:
-            structured_parameters_list.append({
-                "category": "Algorithm",
-                "element": "Linear Congruential Generator (LCG)",
-                "value": "Modulus m, Multiplier a, Increment c",
-                "classification": "Mathematical PRNG algorithm",
-                "status": "Critical"
-            })
-        if "bbs" in t_lower or "blum blum shub" in t_lower:
-            structured_parameters_list.append({
-                "category": "Algorithm",
-                "element": "Blum Blum Shub (BBS)",
-                "value": "p, q primes, seed s",
-                "classification": "Cryptographically Secure PRNG",
-                "status": "Secure"
-            })
+    # Package the AI structured results into exactly one row containing JSON format
+    import json
+    ai_json_str = json.dumps({
+        "securityAssessment": security_assessment,
+        "findings": findings,
+        "recommendations": recommendations_list
+    }, indent=2)
+
+    structured_parameters_list = [
+        {
+            "category": "AI Forensics",
+            "element": "Structured JSON Result",
+            "value": ai_json_str,
+            "classification": "Entire Cryptographic Analysis JSON payload",
+            "status": "Secure" if overall_score >= 75 else "Low"
+        }
+    ]
 
     # Pack both tables into patterns dict
     pattern_info["unstructuredChunks"] = unstructured_chunks_list
