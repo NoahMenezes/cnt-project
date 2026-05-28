@@ -53,6 +53,57 @@ function generateAESKeyHex(size: number): string {
   return Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
+function modInverse(e: bigint, phi: bigint): bigint {
+  let g = phi, x = BigInt(0), y = BigInt(1);
+  let a = e, x0 = BigInt(1), y0 = BigInt(0);
+  while (a !== BigInt(0)) {
+    let q = g / a;
+    let t = g % a;
+    g = a;
+    a = t;
+    let x1 = x - q * x0;
+    let y1 = y - q * y0;
+    x = x0;
+    y = y0;
+    x0 = x1;
+    y0 = y1;
+  }
+  return (x < BigInt(0)) ? x + phi : x;
+}
+
+function modPow(base: bigint, exp: bigint, mod: bigint): bigint {
+  let res = BigInt(1);
+  base = base % mod;
+  while (exp > BigInt(0)) {
+    if (exp % BigInt(2) === BigInt(1)) res = (res * base) % mod;
+    base = (base * base) % mod;
+    exp = exp / BigInt(2);
+  }
+  return res;
+}
+
+function rsaEncryptString(text: string, e: bigint, n: bigint): string {
+  const encryptedChunks = [];
+  for (let i = 0; i < text.length; i++) {
+    const charCode = BigInt(text.charCodeAt(i));
+    const cipherCode = modPow(charCode, e, n);
+    encryptedChunks.push(cipherCode.toString());
+  }
+  return encryptedChunks.join("-");
+}
+
+function rsaDecryptString(cipherText: string, d: bigint, n: bigint): string {
+  const chunks = cipherText.split("-");
+  let decrypted = "";
+  for (let i = 0; i < chunks.length; i++) {
+    if (!chunks[i]) continue;
+    const cipherCode = BigInt(chunks[i]);
+    const charCode = modPow(cipherCode, d, n);
+    decrypted += String.fromCharCode(Number(charCode));
+  }
+  return decrypted;
+}
+
 function generateRSAPairSim(bits: number) {
   // Generates highly realistic RSA Key structures for educational and operational use
   const p = bits === 512 ? 65537 : bits === 1024 ? 104729 : bits === 2048 ? 15485863 : 32452843;
@@ -60,7 +111,8 @@ function generateRSAPairSim(bits: number) {
   const n = BigInt(p) * BigInt(q);
   const phi = (BigInt(p) - BigInt(1)) * (BigInt(q) - BigInt(1));
   const e = BigInt(65537);
-  
+  const d = modInverse(e, phi);
+
   // Custom PEM builders
   const pubPem = `-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA${btoa(n.toString()).substring(0, 60)}\n${btoa(e.toString())}IDAQAB\n-----END PUBLIC KEY-----`;
   const privPem = `-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA${btoa(n.toString()).substring(0, 50)}\n${btoa(phi.toString()).substring(0, 50)}\n-----END RSA PRIVATE KEY-----`;
@@ -70,7 +122,7 @@ function generateRSAPairSim(bits: number) {
     q: q.toString(),
     n: n.toString(),
     e: e.toString(),
-    d: "",
+    d: d.toString(),
     publicKey: pubPem,
     privateKey: privPem,
     bits
@@ -241,6 +293,10 @@ export default function OperationPage() {
       addLog("RSA Public Key is required for key wrapping. Please generate keys first.", "error");
       return;
     }
+    if (!aesKey) {
+      addLog("AES symmetric key is required. Please generate a key first.", "error");
+      return;
+    }
 
     addLog("Initiating Secure Hybrid RSA-AES Encryption Pipeline...", "info");
     
@@ -253,12 +309,13 @@ export default function OperationPage() {
       if (encResult.tag) setAesTag(encResult.tag);
 
       // 2. Wrap/Encrypt AES Session Key using RSA Public Key
-      const keyBytes = btoa(aesKey);
-      const wrappedKey = `RSA-ENC-KEY-[${keyBytes.substring(0, 24)}]`;
+      const e = BigInt(rsaKeys.e);
+      const n = BigInt(rsaKeys.n);
+      const wrappedKey = rsaEncryptString(aesKey, e, n);
       setEncryptedSessionKey(wrappedKey);
 
       addLog(`AES symmetric encryption completed using mode: ${aesMode}`, "success");
-      addLog(`RSA encrypted AES session key securely packaged: ${wrappedKey}`, "success");
+      addLog(`RSA encrypted AES session key securely packaged via modulo exponentiation.`, "success");
       addLog(`Ciphertext payload loaded successfully into the Encrypted Workspace. Ready for operations.`, "success");
     }, 600);
   };
@@ -281,7 +338,7 @@ export default function OperationPage() {
       addLog("No ciphertext package found to decrypt.", "error");
       return;
     }
-    if (!rsaKeys) {
+    if (!rsaKeys || !rsaKeys.d) {
       addLog("RSA Private Key is required to decrypt the session key.", "error");
       return;
     }
@@ -290,16 +347,19 @@ export default function OperationPage() {
 
     setTimeout(() => {
       try {
-        // 1. Decrypt AES key using RSA Private Key (Simulation verify)
-        addLog("Decrypted AES Session key using RSA Private key successfully.", "success");
+        // 1. Decrypt AES key using RSA Private Key
+        const d = BigInt(rsaKeys.d);
+        const n = BigInt(rsaKeys.n);
+        const decryptedKey = rsaDecryptString(encryptedSessionKey, d, n);
+        addLog(`Decrypted AES Session key using RSA Private key: ${decryptedKey}`, "success");
         
         // 2. Decrypt Ciphertext with Session Key
-        const decrypted = aesDecryptSim(ciphertext, aesKey, aesMode);
+        const decrypted = aesDecryptSim(ciphertext, decryptedKey, aesMode);
         setDecryptedText(decrypted);
         setIsDecrypted(true);
         addLog("Symmetric decryption complete. Plaintext successfully reconstructed!", "success");
       } catch (e: any) {
-        addLog(e.message || "Decryption failed.", "error");
+        addLog("Decryption failed. Bad session key, bad private exponent, or tampered ciphertext.", "error");
       }
     }, 600);
   };
