@@ -7,6 +7,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import chromadb
+from dotenv import load_dotenv
+
+# Load root .env configuration
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+load_dotenv(dotenv_path=dotenv_path)
 
 app = FastAPI(title="CipherScope AI Analysis Agent Backend")
 
@@ -208,37 +213,109 @@ async def analyze_document(req: AnalysisRequest):
         
     security_assessment = f"RSA config risk is {rsa_info['riskLevel']}. AES mode is {aes_info['mode']} with {aes_info['passwordComplexity']} password rating."
 
-    # Try querying local Ollama instance for AI enrichment
-    try:
-        ollama_url = "http://localhost:11434/api/generate"
-        prompt = (
-            f"You are an expert cryptographic security analysis agent. Analyze the following document:\n"
-            f"File name: {file_name}\n"
-            f"Entropy value: {entropy_val}/8.0\n"
-            f"Detected RSA: Key size {rsa_info['keySize']}, exponent e={rsa_info['exponent']}\n"
-            f"Detected AES: Mode {aes_info['mode']}, Key strength {aes_info['keyStrength']}\n"
-            f"Content excerpt: {content[:1000]}\n\n"
-            f"Provide a brief assessment summary and specific recommendations. Return response as JSON only, matching format:\n"
-            f'{{"securityAssessment": "...", "findings": "...", "recommendations": [{{"priority": "...", "action": "..."}}]}}'
-        )
-        response = requests.post(
-            ollama_url,
-            json={"model": "llama3", "prompt": prompt, "format": "json", "stream": False},
-            timeout=5.0
-        )
-        if response.status_code == 200:
-            res_json = response.json()
-            # If Ollama responded, extract dynamic assessments
-            import json
-            ai_data = json.loads(res_json.get("response", "{}"))
-            if "securityAssessment" in ai_data:
-                security_assessment = ai_data["securityAssessment"]
-            if "findings" in ai_data:
-                findings = ai_data["findings"]
-            if "recommendations" in ai_data and isinstance(ai_data["recommendations"], list):
-                recommendations_list = ai_data["recommendations"]
-    except Exception as e:
-        print(f"Ollama AI query skipped or failed (falling back to rule-based analysis). Error: {e}")
+    ai_success = False
+    
+    # 1. Try Groq Cloud (Llama 3.3)
+    groq_api_key = os.environ.get("GROQ_API_KEY")
+    if groq_api_key:
+        try:
+            print("Attempting analysis using Groq Cloud (Llama 3)...")
+            headers = {
+                "Authorization": f"Bearer {groq_api_key}",
+                "Content-Type": "application/json"
+            }
+            prompt = (
+                f"Analyze the following cryptographic configuration parameters from the file '{file_name}':\n"
+                f"1. Entropy: {entropy_val}/8.0\n"
+                f"2. RSA Parameters: Key size {rsa_info['keySize']}, exponent e={rsa_info['exponent']}\n"
+                f"3. AES Parameters: Mode {aes_info['mode']}, Key strength {aes_info['keyStrength']}\n"
+                f"4. Source excerpt: {content[:1500]}\n\n"
+                f"Provide a brief assessment summary and specific recommendations.\n"
+                f"You MUST return a JSON object exactly formatted as:\n"
+                f'{{\n'
+                f'  "securityAssessment": "Detailed analysis of the configuration vulnerabilities found.",\n'
+                f'  "findings": "A summary sentence of the overall file security status.",\n'
+                f'  "recommendations": [\n'
+                f'    {{"priority": "Critical"|"High"|"Medium"|"Low", "action": "Specific recommendation description"}}\n'
+                f'  ]\n'
+                f'}}'
+            )
+            payload = {
+                "model": "llama-3.3-70b-specdec",
+                "messages": [
+                    {
+                        "role": "system", 
+                        "content": "You are a professional cryptographic security analysis assistant. You must return only a raw, valid JSON object matching the requested schema. Do not return markdown, do not return any conversational text outside the JSON."
+                    },
+                    {
+                        "role": "user", 
+                        "content": prompt
+                    }
+                ],
+                "response_format": {"type": "json_object"}
+            }
+            response = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=8.0
+            )
+            if response.status_code == 200:
+                res_data = response.json()
+                content_str = res_data["choices"][0]["message"]["content"]
+                import json
+                ai_data = json.loads(content_str)
+                if "securityAssessment" in ai_data:
+                    security_assessment = ai_data["securityAssessment"]
+                if "findings" in ai_data:
+                    findings = ai_data["findings"]
+                if "recommendations" in ai_data and isinstance(ai_data["recommendations"], list):
+                    recommendations_list = ai_data["recommendations"]
+                ai_success = True
+                print("Groq analysis succeeded!")
+        except Exception as e:
+            print(f"Groq Cloud analysis failed: {e}. Falling back to Ollama...")
+
+    # 2. Try Ollama (Local Llama 3)
+    if not ai_success:
+        try:
+            print("Attempting analysis using local Ollama...")
+            ollama_url = "http://localhost:11434/api/generate"
+            prompt = (
+                f"You are an expert cryptographic security analysis agent. Analyze the following document:\n"
+                f"File name: {file_name}\n"
+                f"Entropy value: {entropy_val}/8.0\n"
+                f"Detected RSA: Key size {rsa_info['keySize']}, exponent e={rsa_info['exponent']}\n"
+                f"Detected AES: Mode {aes_info['mode']}, Key strength {aes_info['keyStrength']}\n"
+                f"Content excerpt: {content[:1000]}\n\n"
+                f"Provide a brief assessment summary and specific recommendations. Return response as JSON only, matching format:\n"
+                f'{{\n'
+                f'  "securityAssessment": "...",\n'
+                f'  "findings": "...",\n'
+                f'  "recommendations": [\n'
+                f'    {{"priority": "...", "action": "..."}}\n'
+                f'  ]\n'
+                f'}}'
+            )
+            response = requests.post(
+                ollama_url,
+                json={"model": "llama3", "prompt": prompt, "format": "json", "stream": False},
+                timeout=5.0
+            )
+            if response.status_code == 200:
+                res_json = response.json()
+                import json
+                ai_data = json.loads(res_json.get("response", "{}"))
+                if "securityAssessment" in ai_data:
+                    security_assessment = ai_data["securityAssessment"]
+                if "findings" in ai_data:
+                    findings = ai_data["findings"]
+                if "recommendations" in ai_data and isinstance(ai_data["recommendations"], list):
+                    recommendations_list = ai_data["recommendations"]
+                ai_success = True
+                print("Ollama analysis succeeded!")
+        except Exception as e:
+            print(f"Ollama local query skipped or failed. Error: {e}")
 
     # Build the final Report structure
     report_id = f"rpt-{str(uuid.uuid4())[:8]}"
