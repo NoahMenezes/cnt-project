@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload, FileText, X, AlertTriangle, CheckCircle, Shield,
-  Clock, ChevronRight, Copy, BarChart2, Lock, Zap, Search,
-  Eye, Download, Save, RefreshCw, Trash2, Key, HelpCircle
+  ChevronRight, Copy, BarChart2, Lock, Zap, Search,
+  Eye, Download, Save, RefreshCw, Trash2, Key, HelpCircle,
+  Bold, Italic, Code2
 } from "lucide-react";
 import { getReports, saveReport, Report } from "@/lib/store";
 import Link from "next/link";
@@ -215,23 +216,29 @@ function PlaintextTipTapEditor({
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleBold().run()}
-          className={`h-7 min-w-7 rounded-md px-2 text-xs font-bold transition-colors ${editor?.isActive("bold") ? "bg-primary text-primary-foreground" : "text-foreground/55 hover:bg-foreground/10 hover:text-foreground"}`}
+          title="Bold"
+          aria-label="Bold"
+          className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${editor?.isActive("bold") ? "bg-primary text-primary-foreground" : "text-foreground/55 hover:bg-foreground/10 hover:text-foreground"}`}
         >
-          B
+          <Bold className="h-3.5 w-3.5" />
         </button>
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleItalic().run()}
-          className={`h-7 min-w-7 rounded-md px-2 text-xs italic transition-colors ${editor?.isActive("italic") ? "bg-primary text-primary-foreground" : "text-foreground/55 hover:bg-foreground/10 hover:text-foreground"}`}
+          title="Italic"
+          aria-label="Italic"
+          className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${editor?.isActive("italic") ? "bg-primary text-primary-foreground" : "text-foreground/55 hover:bg-foreground/10 hover:text-foreground"}`}
         >
-          I
+          <Italic className="h-3.5 w-3.5" />
         </button>
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleCode().run()}
-          className={`h-7 rounded-md px-2 font-mono text-xs transition-colors ${editor?.isActive("code") ? "bg-primary text-primary-foreground" : "text-foreground/55 hover:bg-foreground/10 hover:text-foreground"}`}
+          title="Code"
+          aria-label="Code"
+          className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${editor?.isActive("code") ? "bg-primary text-primary-foreground" : "text-foreground/55 hover:bg-foreground/10 hover:text-foreground"}`}
         >
-          {"</>"}
+          <Code2 className="h-3.5 w-3.5" />
         </button>
       </div>
       <EditorContent editor={editor} />
@@ -284,6 +291,9 @@ export default function OperationPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [recentList, setRecentList] = useState<Report[]>([]);
   const [hasMounted, setHasMounted] = useState(false);
+  const hasLoggedRealtimeRef = useRef(false);
+  const hasLoggedCipherRealtimeRef = useRef(false);
+  const skipNextPlaintextEncryptionRef = useRef(false);
 
   useEffect(() => {
     setHasMounted(true);
@@ -321,6 +331,41 @@ export default function OperationPage() {
   const handleGenerateAES = () => {
     createAESKey();
   };
+
+  const handlePlaintextChange = useCallback((nextPlaintext: string) => {
+    setPlaintext(nextPlaintext);
+  }, []);
+
+  const updatePlaintextFromCiphertext = useCallback((nextCiphertext: string) => {
+    setCiphertext(nextCiphertext);
+
+    if (!nextCiphertext.trim()) {
+      skipNextPlaintextEncryptionRef.current = true;
+      setPlaintext("");
+      setDecryptedText("");
+      setIsDecrypted(false);
+      return;
+    }
+
+    try {
+      const sessionKey = encryptedSessionKey && rsaKeys
+        ? rsaDecryptString(encryptedSessionKey, BigInt(rsaKeys.d), BigInt(rsaKeys.n))
+        : aesKey;
+      const decrypted = aesDecryptSim(nextCiphertext, sessionKey, aesMode);
+      skipNextPlaintextEncryptionRef.current = true;
+      setPlaintext(decrypted);
+      setDecryptedText(decrypted);
+      setIsDecrypted(true);
+
+      if (!hasLoggedCipherRealtimeRef.current) {
+        addLog("Real-time decryption is active. Ciphertext edits now update plaintext instantly.", "info");
+        hasLoggedCipherRealtimeRef.current = true;
+      }
+    } catch {
+      setIsDecrypted(false);
+      addLog("Ciphertext edit could not be decrypted into plaintext.", "warn");
+    }
+  }, [addLog, aesKey, aesMode, encryptedSessionKey, rsaKeys]);
 
   const handleFile = useCallback(async (file: File) => {
     const v = validateFile(file);
@@ -381,45 +426,72 @@ export default function OperationPage() {
     if (file) handleFile(file);
   }, [handleFile]);
 
-  // ─── Cryptographic Action: Encrypt ───
-  const handleEncrypt = () => {
+  const runHybridEncryption = useCallback((options?: { visiblePipeline?: boolean }) => {
     if (!plaintext.trim()) {
-      addLog("Cannot encrypt empty plaintext document.", "error");
-      return;
+      setCiphertext("");
+      setOriginalCiphertext("");
+      setEncryptedSessionKey("");
+      setAesIV("");
+      setAesTag("");
+      if (options?.visiblePipeline) {
+        addLog("Cannot encrypt empty plaintext document.", "error");
+      }
+      return false;
     }
 
     const activeRsaKeys = rsaKeys ?? createRSAKeyPair();
     const activeAesKey = aesKey || createAESKey();
 
-    setIsProcessing(true);
     setIsDecrypted(false);
     setDecryptedText("");
+    try {
+      const encResult = aesEncryptSim(plaintext, activeAesKey, aesMode);
+      setCiphertext(encResult.ciphertext);
+      setOriginalCiphertext(encResult.ciphertext);
+      setAesIV(encResult.iv);
+      setAesTag(encResult.tag ?? "");
+
+      const e = BigInt(activeRsaKeys.e);
+      const n = BigInt(activeRsaKeys.n);
+      const wrappedKey = rsaEncryptString(activeAesKey, e, n);
+      setEncryptedSessionKey(wrappedKey);
+
+      if (!options?.visiblePipeline && !hasLoggedRealtimeRef.current) {
+        addLog("Real-time encryption is active. Plaintext edits now update ciphertext instantly.", "info");
+        hasLoggedRealtimeRef.current = true;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Hybrid encryption failed:", error);
+      if (options?.visiblePipeline) {
+        addLog("Hybrid encryption failed. Check plaintext and key settings, then try again.", "error");
+      }
+      return false;
+    }
+  }, [addLog, aesKey, aesMode, createAESKey, createRSAKeyPair, plaintext, rsaKeys]);
+
+  useEffect(() => {
+    if (skipNextPlaintextEncryptionRef.current) {
+      skipNextPlaintextEncryptionRef.current = false;
+      return;
+    }
+    runHybridEncryption();
+  }, [runHybridEncryption]);
+
+  // ─── Cryptographic Action: Encrypt ───
+  const handleEncrypt = () => {
+    setIsProcessing(true);
     addLog("Initiating Secure Hybrid RSA-AES Encryption Pipeline...", "info");
-    
+
     setTimeout(() => {
-      try {
-        // 1. Encrypt plaintext via AES
-        const encResult = aesEncryptSim(plaintext, activeAesKey, aesMode);
-        setCiphertext(encResult.ciphertext);
-        setOriginalCiphertext(encResult.ciphertext);
-        setAesIV(encResult.iv);
-        setAesTag(encResult.tag ?? "");
-
-        // 2. Wrap/Encrypt AES Session Key using RSA Public Key
-        const e = BigInt(activeRsaKeys.e);
-        const n = BigInt(activeRsaKeys.n);
-        const wrappedKey = rsaEncryptString(activeAesKey, e, n);
-        setEncryptedSessionKey(wrappedKey);
-
+      const encrypted = runHybridEncryption({ visiblePipeline: true });
+      if (encrypted) {
         addLog(`AES symmetric encryption completed using mode: ${aesMode}`, "success");
         addLog(`RSA encrypted AES session key securely packaged via modulo exponentiation.`, "success");
         addLog(`Ciphertext payload loaded successfully into the Encrypted Workspace. Ready for operations.`, "success");
-      } catch (error) {
-        console.error("Hybrid encryption failed:", error);
-        addLog("Hybrid encryption failed. Check plaintext and key settings, then try again.", "error");
-      } finally {
-        setIsProcessing(false);
       }
+      setIsProcessing(false);
     }, 600);
   };
 
@@ -587,252 +659,176 @@ export default function OperationPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {/* LEFT COLUMN: Input/Plaintext Notepad (Span 7) */}
-            <div className="lg:col-span-7 flex flex-col gap-6">
-              
-              {/* File Uploader */}
-              <div
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`group relative rounded-2xl border-2 border-dashed p-6 text-center cursor-pointer transition-all duration-300 ${
-                  isDragging
-                    ? "border-primary bg-primary/[0.04]"
-                    : "border-border/40 bg-background/40 hover:border-border/80 hover:bg-foreground/[0.02]"
-                }`}
-              >
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFile(file);
-                  }}
-                  className="hidden"
-                  accept=".txt,.pdf,.docx,.json,.csv"
-                />
-                
-                {isUploading ? (
-                  <div className="space-y-3">
-                    <RefreshCw className="h-8 w-8 mx-auto text-primary animate-spin" />
-                    <p className="text-sm font-semibold text-foreground">Processing Document...</p>
-                    <div className="h-1.5 w-48 bg-foreground/10 rounded-full mx-auto overflow-hidden">
-                      <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-foreground/[0.04] text-foreground/50 group-hover:scale-105 transition-transform">
-                      <Upload className="h-5 w-5" />
-                    </div>
-                    <p className="text-sm font-semibold text-foreground">
-                      Drag &amp; drop document, or <span className="text-primary hover:underline">browse files</span>
-                    </p>
-                    <p className="text-xs text-foreground/40">
-                      Supports PDF, DOCX, CSV, TXT, JSON (Max 10MB)
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Plaintext Notepad / Code Editor */}
-              <div className="rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
-                <div className="flex items-center justify-between border-b border-border/20 pb-3">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-foreground">Plaintext Document Notepad</span>
-                  </div>
-                  {uploadedFile && (
-                    <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary">
-                      {uploadedFile.name} ({formatFileSize(uploadedFile.size)})
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="relative font-mono text-sm leading-relaxed">
-                  <textarea
-                    value={plaintext}
-                    onChange={(e) => setPlaintext(e.target.value)}
-                    rows={12}
-                    className="w-full bg-foreground/[0.03] border border-border/20 rounded-xl p-4 font-mono text-foreground text-xs leading-relaxed focus:outline-none focus:border-primary/50 resize-y"
-                    placeholder="Upload a document above — or start typing your own content here.&#10;&#10;Supported formats: PDF, DOCX, CSV, TXT, JSON"
-                  />
-                  <div className="absolute bottom-3 right-3 text-[10px] text-foreground/30">
-                    Characters: {plaintext.length} | Lines: {plaintext.split("\n").length}
-                  </div>
+          <div
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`group relative mx-auto w-full max-w-3xl rounded-2xl border-2 border-dashed p-6 text-center cursor-pointer transition-all duration-300 ${
+              isDragging
+                ? "border-primary bg-primary/[0.04]"
+                : "border-border/40 bg-background/40 hover:border-border/80 hover:bg-foreground/[0.02]"
+            }`}
+          >
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFile(file);
+              }}
+              className="hidden"
+              accept=".txt,.pdf,.docx,.json,.csv"
+            />
+            {isUploading ? (
+              <div className="space-y-3">
+                <RefreshCw className="h-8 w-8 mx-auto text-primary animate-spin" />
+                <p className="text-sm font-semibold text-foreground">Processing Document...</p>
+                <div className="h-1.5 w-48 bg-foreground/10 rounded-full mx-auto overflow-hidden">
+                  <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
                 </div>
               </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-foreground/[0.04] text-foreground/50 group-hover:scale-105 transition-transform">
+                  <Upload className="h-5 w-5" />
+                </div>
+                <p className="text-sm font-semibold text-foreground">
+                  Drag &amp; drop document, or <span className="text-primary hover:underline">browse files</span>
+                </p>
+                <p className="text-xs text-foreground/40">
+                  Supports PDF, DOCX, CSV, TXT, JSON (Max 10MB)
+                </p>
+              </div>
+            )}
+          </div>
 
-            </div>
-
-            {/* RIGHT COLUMN: Operations Board & Lab Controls (Span 5) */}
-            <div className="lg:col-span-5 flex flex-col gap-6">
-              
-              {/* RSA Control Block */}
-              <div className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur flex flex-col gap-4">
-                <div className="flex items-center gap-2 border-b border-border/10 pb-3">
+          <div className="mx-auto w-full max-w-5xl rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur">
+            <div className="grid gap-5 lg:grid-cols-3">
+              <div className="space-y-3">
+                <div className="flex items-center justify-center gap-2 border-b border-border/10 pb-3">
                   <Key className="h-4.5 w-4.5 text-primary" />
                   <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">RSA Public-Key Configurations</h3>
                 </div>
-
-                <div className="flex flex-col gap-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-foreground/50">RSA Key Modulus Bits</span>
-                    <select
-                      value={rsaBits}
-                      onChange={(e) => setRsaBits(Number(e.target.value))}
-                      className="bg-background border border-border/40 rounded-lg px-2.5 py-1 text-foreground focus:outline-none"
-                    >
-                      <option value={512}>512-bit (Weak)</option>
-                      <option value={1024}>1024-bit (Deprecated)</option>
-                      <option value={2048}>2048-bit (Secure)</option>
-                      <option value={4096}>4096-bit (Highly Secure)</option>
-                    </select>
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <span className="text-foreground/50">RSA Key Modulus Bits</span>
+                  <select
+                    value={rsaBits}
+                    onChange={(e) => setRsaBits(Number(e.target.value))}
+                    className="bg-background border border-border/40 rounded-lg px-2.5 py-1 text-foreground focus:outline-none"
+                  >
+                    <option value={512}>512-bit (Weak)</option>
+                    <option value={1024}>1024-bit (Deprecated)</option>
+                    <option value={2048}>2048-bit (Secure)</option>
+                    <option value={4096}>4096-bit (Highly Secure)</option>
+                  </select>
+                </div>
+                <Button size="sm" onClick={handleGenerateRSA} className="w-full bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all font-semibold">
+                  <RefreshCw className="h-3.5 w-3.5 mr-2" /> Generate RSA Key Pair
+                </Button>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-[10px] font-semibold text-foreground/40 uppercase tracking-wider">PEM Public Key</p>
+                    <pre className="text-[9px] bg-foreground/[0.03] p-2 rounded-lg border border-border/15 font-mono text-foreground/60 overflow-x-auto whitespace-pre leading-normal mt-1 max-h-24 overflow-y-auto">
+                      {rsaKeys?.publicKey || "Generate an RSA key pair to display the public key."}
+                    </pre>
                   </div>
-
-                  <Button size="sm" onClick={handleGenerateRSA} className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all font-semibold mt-1">
-                    <RefreshCw className="h-3.5 w-3.5 mr-2 animate-spin-slow" /> Generate RSA Key Pair
-                  </Button>
-
-                  {rsaKeys && (
-                    <div className="space-y-2 mt-2">
-                      <div>
-                        <p className="text-[10px] font-semibold text-foreground/40 uppercase tracking-wider">PEM Public Key</p>
-                        <pre className="text-[9px] bg-foreground/[0.03] p-2 rounded-lg border border-border/15 font-mono text-foreground/60 overflow-x-auto whitespace-pre leading-normal mt-1 max-h-24 overflow-y-auto">
-                          {rsaKeys.publicKey}
-                        </pre>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-semibold text-foreground/40 uppercase tracking-wider">PEM Private Key</p>
-                        <pre className="text-[9px] bg-foreground/[0.03] p-2 rounded-lg border border-border/15 font-mono text-foreground/60 overflow-x-auto whitespace-pre leading-normal mt-1 max-h-24 overflow-y-auto">
-                          {rsaKeys.privateKey}
-                        </pre>
-                      </div>
-                    </div>
-                  )}
+                  <div>
+                    <p className="text-[10px] font-semibold text-foreground/40 uppercase tracking-wider">PEM Private Key</p>
+                    <pre className="text-[9px] bg-foreground/[0.03] p-2 rounded-lg border border-border/15 font-mono text-foreground/60 overflow-x-auto whitespace-pre leading-normal mt-1 max-h-24 overflow-y-auto">
+                      {rsaKeys?.privateKey || "Generate an RSA key pair to display the private key."}
+                    </pre>
+                  </div>
                 </div>
               </div>
 
-              {/* AES Control Block */}
-              <div className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur flex flex-col gap-4">
-                <div className="flex items-center gap-2 border-b border-border/10 pb-3">
+              <div className="space-y-3">
+                <div className="flex items-center justify-center gap-2 border-b border-border/10 pb-3">
                   <Shield className="h-4.5 w-4.5 text-emerald-400" />
                   <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">AES Symmetric Configurations</h3>
                 </div>
-
-                <div className="flex flex-col gap-3 text-xs">
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <span className="text-foreground/50">AES Key Size</span>
+                  <select
+                    value={aesBits}
+                    onChange={(e) => setAesBits(Number(e.target.value))}
+                    className="bg-background border border-border/40 rounded-lg px-2.5 py-1 text-foreground focus:outline-none"
+                  >
+                    <option value={128}>128-bit</option>
+                    <option value={256}>256-bit</option>
+                  </select>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <span className="text-foreground/50">Block Cipher Mode</span>
+                  <select
+                    value={aesMode}
+                    onChange={(e) => setAesMode(e.target.value)}
+                    className="bg-background border border-border/40 rounded-lg px-2.5 py-1 text-foreground focus:outline-none"
+                  >
+                    <option value="ECB">ECB</option>
+                    <option value="CBC">CBC</option>
+                    <option value="GCM">GCM</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-foreground/50">AES Key Size</span>
-                    <select
-                      value={aesBits}
-                      onChange={(e) => setAesBits(Number(e.target.value))}
-                      className="bg-background border border-border/40 rounded-lg px-2.5 py-1 text-foreground focus:outline-none"
-                    >
-                      <option value={128}>128-bit</option>
-                      <option value={256}>256-bit</option>
-                    </select>
+                    <span className="text-xs text-foreground/50">AES Key (Hex)</span>
+                    <button onClick={handleGenerateAES} className="text-primary hover:underline text-[10px]">
+                      Regenerate Key
+                    </button>
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-foreground/50">Block Cipher Mode</span>
-                    <select
-                      value={aesMode}
-                      onChange={(e) => setAesMode(e.target.value)}
-                      className="bg-background border border-border/40 rounded-lg px-2.5 py-1 text-foreground focus:outline-none"
-                    >
-                      <option value="ECB">ECB (Electronic Codebook)</option>
-                      <option value="CBC">CBC (Cipher Block Chaining)</option>
-                      <option value="GCM">GCM (Galois/Counter Mode)</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5 mt-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-foreground/50">AES Key (Hex)</span>
-                      <button onClick={handleGenerateAES} className="text-primary hover:underline text-[10px]">
-                        Regenerate Key
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      value={aesKey}
-                      onChange={(e) => setAesKey(e.target.value)}
-                      className="w-full bg-background border border-border/30 rounded-lg px-3 py-1.5 font-mono text-foreground focus:outline-none focus:border-primary/50 text-xs"
-                      placeholder="Click 'Regenerate Key' to generate a secure random AES key..."
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={aesKey}
+                    onChange={(e) => setAesKey(e.target.value)}
+                    className="w-full bg-background border border-border/30 rounded-lg px-3 py-1.5 font-mono text-foreground focus:outline-none focus:border-primary/50 text-xs"
+                    placeholder="Click regenerate to create a secure key..."
+                  />
                 </div>
               </div>
 
-              {/* Action Pipeline Control Center */}
-              <div className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur flex flex-col gap-3">
-                <div className="flex items-center gap-2 border-b border-border/10 pb-3">
+              <div className="space-y-3">
+                <div className="flex items-center justify-center gap-2 border-b border-border/10 pb-3">
                   <Zap className="h-4.5 w-4.5 text-yellow-400" />
                   <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Operational Execution Panel</h3>
                 </div>
-
-                <div className="flex flex-col gap-3">
-                  <Button
-                    onClick={handleEncrypt}
-                    disabled={isProcessing}
-                    className="w-full bg-primary hover:bg-primary/95 text-primary-foreground font-semibold flex items-center justify-center gap-2"
-                  >
-                    {isProcessing ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Lock className="h-4 w-4" />
+                <Button
+                  onClick={handleEncrypt}
+                  disabled={isProcessing}
+                  className="w-full bg-primary hover:bg-primary/95 text-primary-foreground font-semibold flex items-center justify-center gap-2"
+                >
+                  {isProcessing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+                  {isProcessing ? "Running Hybrid Encryption..." : "Run Hybrid Encryption"}
+                </Button>
+                <Button
+                  onClick={handleDecrypt}
+                  disabled={!ciphertext}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white font-semibold flex items-center justify-center gap-2"
+                >
+                  <UnlockIcon className="h-4 w-4" /> Run Hybrid Decryption
+                </Button>
+                <Button
+                  onClick={handleSaveReport}
+                  disabled={isSaving || !ciphertext}
+                  className="w-full bg-foreground hover:bg-foreground/90 disabled:opacity-40 text-background font-semibold flex items-center justify-center gap-2"
+                >
+                  {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save Operation State
+                </Button>
+                <div className="rounded-xl border border-border/20 bg-foreground/[0.02] p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/50">Execution Log</p>
+                    {logs.length > 0 && (
+                      <button onClick={() => setLogs([])} className="text-[10px] uppercase tracking-wider text-foreground/40 hover:text-foreground">
+                        Clear
+                      </button>
                     )}
-                    {isProcessing ? "Running Hybrid Encryption..." : "1. Run Hybrid Encryption"}
-                  </Button>
-
-                  <Button
-                    onClick={handleDecrypt}
-                    disabled={!ciphertext}
-                    className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white font-semibold flex items-center justify-center gap-2"
-                  >
-                    <UnlockIcon className="h-4 w-4" /> 2. Run Hybrid Decryption
-                  </Button>
-
-                  <Button
-                    onClick={handleSaveReport}
-                    disabled={isSaving || !ciphertext}
-                    className="w-full bg-foreground hover:bg-foreground/90 disabled:opacity-40 text-background font-semibold flex items-center justify-center gap-2 mt-1"
-                  >
-                    {isSaving ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4" />
-                    )}
-                    Save Operation State &amp; Finish
-                  </Button>
-                </div>
-              </div>
-
-              {/* Execution Log */}
-              <div className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur flex flex-col gap-3">
-                <div className="flex items-center justify-between border-b border-border/10 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4.5 w-4.5 text-primary" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Execution Log</h3>
                   </div>
-                  {logs.length > 0 && (
-                    <button
-                      onClick={() => setLogs([])}
-                      className="text-[10px] uppercase tracking-wider text-foreground/40 hover:text-foreground"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <div className="max-h-52 overflow-y-auto rounded-xl border border-border/20 bg-foreground/[0.02] p-3">
-                  {logs.length === 0 ? (
-                    <p className="text-xs text-foreground/35">Pipeline events will appear here.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {logs.slice(-8).map((entry, index) => {
+                  <div className="max-h-36 overflow-y-auto space-y-2">
+                    {logs.length === 0 ? (
+                      <p className="text-xs text-foreground/35">Pipeline events will appear here.</p>
+                    ) : (
+                      logs.slice(-8).map((entry, index) => {
                         const color =
                           entry.type === "success" ? "text-emerald-400" :
                           entry.type === "warn" ? "text-yellow-400" :
@@ -843,99 +839,91 @@ export default function OperationPage() {
                             <span className="text-foreground/30">[{entry.time}]</span> {entry.msg}
                           </p>
                         );
-                      })}
-                    </div>
-                  )}
+                      })
+                    )}
+                  </div>
                 </div>
               </div>
-
             </div>
-
           </div>
 
-          {/* Ciphertext / Encrypted Notepad Workspace (Full Width) */}
-          <div className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-border/20 pb-4 gap-3">
-              <div className="flex items-center gap-2">
-                <Lock className="h-5 w-5 text-orange-400" />
-                <h3 className="text-base font-bold text-foreground">Encrypted Workspace (Ciphertext Notepad)</h3>
-              </div>
-              
-              <div className="flex flex-wrap items-center gap-2.5">
-                {ciphertext && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(ciphertext);
-                        addLog("Copied ciphertext payload to clipboard.", "success");
-                      }}
-                      className="border-border/40 hover:bg-foreground/[0.04] text-xs h-8"
-                    >
-                      <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy Ciphertext
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleTamper}
-                      className="border-orange-500/20 hover:bg-orange-500/10 text-orange-400 text-xs h-8"
-                    >
-                      <AlertTriangle className="h-3.5 w-3.5 mr-1.5" /> Tamper Payload (Simulate Intercept)
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setCiphertext(originalCiphertext);
-                        addLog("Restored original untampered ciphertext payload.", "info");
-                      }}
-                      className="border-border/40 hover:bg-foreground/[0.04] text-xs h-8"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Reset Original
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setCiphertext("");
-                        setOriginalCiphertext("");
-                        addLog("Cleared ciphertext workspace.", "info");
-                      }}
-                      className="border-red-500/20 hover:bg-red-500/10 text-red-400 text-xs h-8"
-                    >
-                      <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Clear Cipher
-                    </Button>
-                  </>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
+              <div className="flex items-center justify-between border-b border-border/20 pb-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-foreground">Plaintext Document Notepad</span>
+                </div>
+                {uploadedFile && (
+                  <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary">
+                    {uploadedFile.name} ({formatFileSize(uploadedFile.size)})
+                  </Badge>
                 )}
               </div>
-            </div>
-
-            <div className="relative font-mono text-sm leading-relaxed">
-              <textarea
-                value={ciphertext}
-                onChange={(e) => setCiphertext(e.target.value)}
-                rows={12}
-                className="w-full bg-orange-500/[0.02] border border-orange-500/10 rounded-xl p-4 font-mono text-orange-400/80 text-xs leading-relaxed focus:outline-none focus:border-orange-500/30 resize-y"
-                placeholder="Ciphertext payload will output here after running hybrid encryption. You can edit this field to test decryption behavior under payload corruption!"
-              />
-              <div className="absolute bottom-3 right-3 text-[10px] text-orange-400/40">
-                Characters: {ciphertext.length}
+              <PlaintextTipTapEditor value={plaintext} onChange={handlePlaintextChange} />
+              <div className="text-right text-[10px] text-foreground/30">
+                Characters: {plaintext.length} | Lines: {plaintext.split("\n").length}
               </div>
             </div>
 
-            {ciphertext && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-foreground/[0.02] rounded-xl p-4 border border-border/20 text-xs mt-1">
-                <div>
-                  <p className="text-[10px] text-foreground/40 font-semibold uppercase tracking-wider">Wrapped AES Session Key (RSA Encrypted)</p>
-                  <p className="font-mono text-foreground/80 mt-1 truncate">{encryptedSessionKey}</p>
+            <div className="rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
+              <div className="flex flex-col items-end border-b border-border/20 pb-3 gap-2 text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <Lock className="h-4 w-4 text-orange-400" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Encrypted Workspace (Ciphertext Notepad)</h3>
                 </div>
-                <div>
-                  <p className="text-[10px] text-foreground/40 font-semibold uppercase tracking-wider">Initialization Vector (IV)</p>
-                  <p className="font-mono text-foreground/80 mt-1">{aesIV || "N/A"}</p>
+                {ciphertext && (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => {
+                      navigator.clipboard.writeText(ciphertext);
+                      addLog("Copied ciphertext payload to clipboard.", "success");
+                    }} className="border-border/40 hover:bg-foreground/[0.04] text-xs h-8">
+                      <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleTamper} className="border-orange-500/20 hover:bg-orange-500/10 text-orange-400 text-xs h-8">
+                      <AlertTriangle className="h-3.5 w-3.5 mr-1.5" /> Tamper
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => {
+                      setCiphertext(originalCiphertext);
+                      addLog("Restored original untampered ciphertext payload.", "info");
+                    }} className="border-border/40 hover:bg-foreground/[0.04] text-xs h-8">
+                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Reset
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => {
+                      setCiphertext("");
+                      setOriginalCiphertext("");
+                      addLog("Cleared ciphertext workspace.", "info");
+                    }} className="border-red-500/20 hover:bg-red-500/10 text-red-400 text-xs h-8">
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Clear
+                    </Button>
+                  </div>
+                )}
+              </div>
+              <div className="relative font-mono text-sm leading-relaxed">
+                <textarea
+                  value={ciphertext}
+                  onChange={(e) => updatePlaintextFromCiphertext(e.target.value)}
+                  rows={14}
+                  className="w-full min-h-[360px] bg-orange-500/[0.02] border border-orange-500/10 rounded-xl p-4 font-mono text-orange-400/80 text-xs leading-relaxed focus:outline-none focus:border-orange-500/30 resize-y"
+                  placeholder="Ciphertext payload will output here after running hybrid encryption."
+                />
+                <div className="absolute bottom-3 right-3 text-[10px] text-orange-400/40">
+                  Characters: {ciphertext.length}
                 </div>
               </div>
-            )}
+              {ciphertext && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-foreground/[0.02] rounded-xl p-4 border border-border/20 text-xs">
+                  <div>
+                    <p className="text-[10px] text-foreground/40 font-semibold uppercase tracking-wider">Wrapped AES Session Key (RSA Encrypted)</p>
+                    <p className="font-mono text-foreground/80 mt-1 truncate">{encryptedSessionKey}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-foreground/40 font-semibold uppercase tracking-wider">Initialization Vector (IV)</p>
+                    <p className="font-mono text-foreground/80 mt-1">{aesIV || "N/A"}</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Decrypted Output / Document Restore Notepad (Full Width) */}
