@@ -137,6 +137,8 @@ export default function AnalyzePage() {
   const [currentReport, setCurrentReport] = useState<Report | null>(null);
   const [recentList, setRecentList] = useState<any[]>([]);
   const [hasMounted, setHasMounted] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
     setHasMounted(true);
@@ -194,6 +196,8 @@ export default function AnalyzePage() {
     if (!uploadedFile && !textInput.trim()) return;
     setIsAnalyzing(true);
     setAnalysisComplete(false);
+    setIsSaved(false);
+    setIsSaving(false);
 
     const content = textInput || (uploadedFile ? `Content of file ${uploadedFile.name}` : "");
     const fileName = uploadedFile ? uploadedFile.name : "pasted_text_input.txt";
@@ -402,18 +406,14 @@ export default function AnalyzePage() {
         if (!response.ok) throw new Error("Backend analysis failed");
         const report = await response.json();
         
-        saveReport(report);
         setCurrentReport(report);
-        setRecentList(getReports().slice(0, 5));
         setIsAnalyzing(false);
         setAnalysisComplete(true);
       } catch (err) {
         console.warn("FastAPI backend connection failed. Falling back to local simulation.", err);
         // Fallback simulation
         setTimeout(() => {
-          saveReport(newReport);
           setCurrentReport(newReport);
-          setRecentList(getReports().slice(0, 5));
           setIsAnalyzing(false);
           setAnalysisComplete(true);
         }, 1500);
@@ -426,7 +426,35 @@ export default function AnalyzePage() {
   const clearAll = useCallback(() => {
     setUploadedFile(null); setTextInput(""); setUploadProgress(0);
     setAnalysisComplete(false); setIsAnalyzing(false); setFileError("");
+    setIsSaved(false); setIsSaving(false);
   }, []);
+
+  const saveReportToDatabase = useCallback(async () => {
+    if (!result || isSaving || isSaved) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch("http://localhost:8000/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(result),
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      saveReport(result);
+      setIsSaved(true);
+      setRecentList(getReports().slice(0, 5));
+    } catch (err) {
+      console.error("Failed to save report:", err);
+      alert("Failed to save report: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsSaving(false);
+    }
+  }, [result, isSaving, isSaved]);
 
   const canAnalyze = (!!uploadedFile || textInput.trim().length > 0) && !isUploading && !isAnalyzing;
 
@@ -582,6 +610,12 @@ export default function AnalyzePage() {
                   <Button onClick={runAnalysis} disabled={!canAnalyze} className="rounded-full gap-2">
                     <Zap className="h-4 w-4" />{isAnalyzing ? "Analyzing…" : "Analyze"}
                   </Button>
+                  {analysisComplete && result && (
+                    <Button onClick={saveReportToDatabase} disabled={isSaving} className={`rounded-full gap-2 transition-all duration-200 ${isSaved ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20" : "bg-emerald-600 hover:bg-emerald-700 text-white border-none shadow-lg shadow-emerald-600/10"}`}>
+                      <CheckCircle className={`h-4 w-4 transition-transform ${isSaved ? "scale-100" : "scale-0 w-0"}`} />
+                      {isSaving ? "Saving…" : isSaved ? "Saved to Database" : "Save Analysis"}
+                    </Button>
+                  )}
                   <Button onClick={clearAll} variant="outline" className="rounded-full">Clear</Button>
                 </div>
               </motion.div>

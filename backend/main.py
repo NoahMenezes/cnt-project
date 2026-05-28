@@ -387,12 +387,31 @@ def perform_cryptographic_analysis(file_name: str, content: str):
     except Exception as e:
         print(f"Failed to index document in ChromaDB: {e}")
 
-    # Store in Supabase database automatically
+    return report
+
+
+class ReportModel(BaseModel):
+    id: str
+    fileName: str
+    type: str
+    fileSize: str
+    analysisDate: str
+    securityScore: int
+    status: str
+    entropy: dict
+    rsa: dict
+    aes: dict
+    patterns: dict
+    recommendations: list
+    findings: str
+
+@app.post("/save")
+async def save_report_endpoint(report: ReportModel):
     supabase_url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
     service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     if supabase_url and service_key:
         try:
-            print("Syncing report to Supabase table from Python backend...")
+            print(f"Syncing report {report.id} to Supabase table from Python backend...")
             headers = {
                 "apikey": service_key,
                 "Authorization": f"Bearer {service_key}",
@@ -400,29 +419,30 @@ def perform_cryptographic_analysis(file_name: str, content: str):
                 "Prefer": "resolution=merge-duplicates"
             }
             row = {
-                "id": report_id,
-                "file_name": file_name,
-                "type": report["type"],
-                "file_size": report["fileSize"],
-                "analysis_date": report["analysisDate"],
-                "security_score": overall_score,
-                "status": status,
-                "entropy": report["entropy"],
-                "rsa": report["rsa"],
-                "aes": report["aes"],
-                "patterns": report["patterns"],
-                "recommendations": report["recommendations"],
-                "findings": report["findings"]
+                "id": report.id,
+                "file_name": report.fileName,
+                "type": report.type,
+                "file_size": report.fileSize,
+                "analysis_date": report.analysisDate,
+                "security_score": report.securityScore,
+                "status": report.status,
+                "entropy": report.entropy,
+                "rsa": report.rsa,
+                "aes": report.aes,
+                "patterns": report.patterns,
+                "recommendations": report.recommendations,
+                "findings": report.findings
             }
             res = requests.post(f"{supabase_url}/rest/v1/reports", json=row, headers=headers)
             if res.status_code in [200, 201]:
-                print(f"Report {report_id} synced successfully to Supabase.")
+                print(f"Report {report.id} synced successfully to Supabase.")
+                return {"status": "success", "message": f"Report {report.id} saved to Supabase."}
             else:
-                print(f"Failed to sync report to Supabase. Code: {res.status_code}, Body: {res.text}")
+                raise HTTPException(status_code=res.status_code, detail=f"Failed to save to Supabase: {res.text}")
         except Exception as e:
-            print(f"Error syncing report to Supabase: {e}")
-
-    return report
+            raise HTTPException(status_code=500, detail=str(e))
+    else:
+        raise HTTPException(status_code=500, detail="Supabase environment variables not configured.")
 
 
 @app.post("/analyze/text")
