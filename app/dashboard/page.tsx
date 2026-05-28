@@ -2,15 +2,14 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Header from "@/components/layout/header";
-import { getReports, getStats, Report } from "@/lib/store";
+import { getReports, Report } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { motion, type Variants } from "framer-motion";
 import Link from "next/link";
 import {
   Activity, BarChart3, ChevronRight, Clock, Download,
-  Settings, TrendingDown, TrendingUp, Zap, Shield,
-  FileText, AlertTriangle, Lock, Brain, Menu, FileSearch,
+  Zap, Shield, FileText, AlertTriangle, Lock, Brain, Menu, FileSearch,
 } from "lucide-react";
 import {
   CartesianGrid, Line, LineChart, ResponsiveContainer,
@@ -281,15 +280,15 @@ function VisualizationsSection({ reports, hasMounted }: { reports: Report[]; has
                 <PieChart>
                   <Pie data={chartData.weaknessDistribution} dataKey="value" nameKey="name"
                     cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}>
-                    {chartData.weaknessDistribution.map((_: any, i: number) => (
+                    {chartData.weaknessDistribution.map((_: unknown, i: number) => (
                       <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: any, n: any) => [`${v}%`, n]} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: unknown, n: unknown) => [`${v}%`, n as string]} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="space-y-2 flex-1">
-                {chartData.weaknessDistribution.map((d: any, i: number) => (
+                {chartData.weaknessDistribution.map((d: { name: string; value: number }, i: number) => (
                   <div key={d.name} className="flex items-center gap-2 text-xs">
                     <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: DONUT_COLORS[i] }} />
                     <span className="text-foreground/60 flex-1">{d.name}</span>
@@ -306,9 +305,9 @@ function VisualizationsSection({ reports, hasMounted }: { reports: Report[]; has
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
                 <XAxis dataKey="range" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
                 <YAxis stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={25} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: any) => [v, "Files"]} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: unknown) => [v as string | number, "Files"]} />
                 <Bar dataKey="count" name="Files" radius={[4, 4, 0, 0]}>
-                  {chartData.entropyDistribution.map((_: any, i: number) => (
+                  {chartData.entropyDistribution.map((_: unknown, i: number) => (
                     <Cell key={i} fill={ENTROPY_COLORS[i % ENTROPY_COLORS.length]} />
                   ))}
                 </Bar>
@@ -322,7 +321,7 @@ function VisualizationsSection({ reports, hasMounted }: { reports: Report[]; has
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} horizontal={false} />
                 <XAxis type="number" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="char" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={20} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: any) => [v, "Occurrences"]} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: unknown) => [v as string | number, "Occurrences"]} />
                 <Bar dataKey="frequency" fill="var(--primary)" radius={[0, 4, 4, 0]} opacity={0.8} />
               </BarChart>
             </ResponsiveContainer>
@@ -334,7 +333,7 @@ function VisualizationsSection({ reports, hasMounted }: { reports: Report[]; has
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
                 <XAxis dataKey="fileSizeKB" name="File Size" unit=" KB" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
                 <YAxis dataKey="timeMs" name="Time" unit=" ms" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={45} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: any, n: any) => [v, n === "fileSizeKB" ? "KB" : "ms"]} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: unknown, n: unknown) => [v as string | number, n === "fileSizeKB" ? "KB" : "ms"]} />
                 <Scatter data={chartData.encryptionTimeVsFileSize.length ? chartData.encryptionTimeVsFileSize : [{ fileSizeKB: 0, timeMs: 0 }]} fill="#6366f1" />
               </ScatterChart>
             </ResponsiveContainer>
@@ -354,7 +353,7 @@ function VisualizationsSection({ reports, hasMounted }: { reports: Report[]; has
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
                   <YAxis stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={25} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: any) => [v, "Analyses"]} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: unknown) => [v as string | number, "Analyses"]} />
                   <Area type="natural" dataKey="analyses" stroke="var(--primary)" strokeWidth={2.5} fill="url(#actGrad)" dot={false} activeDot={{ r: 5 }} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -374,19 +373,24 @@ export default function Dashboard() {
     { title: "Analyze", href: "/analyze" },
     { title: "Hybrid Lab", href: "/hybrid-lab" },
     { title: "Reports", href: "/reports" },
+    { title: "Key Vault", href: "/vault" },
     { title: "Profile", href: "/profile" },
   ];
 
   const [hasMounted, setHasMounted] = useState(false);
-  const [reports, setReports] = useState<Report[]>([]);
+  const [reports, setReports] = useState<Report[]>(() => getReports());
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    setHasMounted(true);
-    setReports(getReports());
+    const t = setTimeout(() => {
+      setHasMounted(true);
+    }, 0);
     const handler = () => setReports(getReports());
     window.addEventListener("cipher_scope_db_update", handler);
-    return () => window.removeEventListener("cipher_scope_db_update", handler);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("cipher_scope_db_update", handler);
+    };
   }, []);
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -478,7 +482,12 @@ export default function Dashboard() {
                 <Menu className="h-5 w-5" />
               </button>
               <div className="hidden md:flex gap-1">
-                {[["Overview", Shield], ["Entropy", Activity], ["Algorithms", Zap], ["History", Clock]].map(([label, Icon]: any) => (
+                {([
+                  ["Overview", Shield],
+                  ["Entropy", Activity],
+                  ["Algorithms", Zap],
+                  ["History", Clock]
+                ] as const).map(([label, Icon]) => (
                   <Button key={label} variant="ghost" size="sm" className="gap-2 text-foreground/60 hover:text-foreground text-xs uppercase tracking-[0.1em]">
                     <Icon className="h-3.5 w-3.5" />{label}
                   </Button>
@@ -524,7 +533,7 @@ export default function Dashboard() {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/40 bg-background/40 py-24 text-center gap-4">
                   <Shield className="h-12 w-12 text-foreground/20" />
                   <p className="text-lg font-semibold text-foreground/40">No analyses yet</p>
-                  <p className="text-sm text-foreground/30 max-w-xs">Upload a document on the Analyze page and click "Save & Go to Dashboard" to see live forensic data here.</p>
+                  <p className="text-sm text-foreground/30 max-w-xs">Upload a document on the Analyze page and click &quot;Save &amp; Go to Dashboard&quot; to see live forensic data here.</p>
                   <Link href="/analyze"><Button className="mt-2 rounded-full gap-2"><Zap className="h-4 w-4" />Start Analyzing</Button></Link>
                 </motion.div>
               ) : (
@@ -577,7 +586,7 @@ export default function Dashboard() {
                               <AlertTriangle className="h-3.5 w-3.5 text-orange-400" /> AI Recommendations
                             </p>
                             <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-                              {(latestAiJson?.recommendations ?? latest.recommendations ?? []).map((r: any, i: number) => {
+                              {(latestAiJson?.recommendations ?? latest.recommendations ?? []).map((r: { priority: string; action: string }, i: number) => {
                                 const colors: Record<string, string> = {
                                   Critical: "text-red-400 border-red-500/20 bg-red-500/10",
                                   High: "text-orange-400 border-orange-500/20 bg-orange-500/10",
@@ -631,7 +640,7 @@ export default function Dashboard() {
                             <YAxis domain={[0, 100]} stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} width={30} />
                             <Tooltip
                               contentStyle={{ backgroundColor: "var(--background)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
-                              formatter={(v: any, _: any, p: any) => [`${v}/100 (${p.payload.file})`, "Score"]}
+                             formatter={(v: unknown, _: unknown, p: { payload?: { file?: string } }) => [`${v}/100 (${p.payload?.file || ""})`, "Score"]}
                             />
                             <Line type="natural" dataKey="score" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: "#6366f1" }} activeDot={{ r: 6 }} />
                           </LineChart>
@@ -697,7 +706,7 @@ export default function Dashboard() {
                     <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
                       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-4">Recent Analyses</p>
                       <div className="space-y-2">
-                        {reports.slice(0, 5).map((r, i) => (
+                        {reports.slice(0, 5).map((r) => (
                           <div key={r.id} className="flex items-center justify-between rounded-xl border border-border/15 bg-background/40 px-3 py-2.5 gap-2">
                             <div className="min-w-0 flex-1">
                               <p className="text-xs font-medium text-foreground truncate">{r.fileName}</p>

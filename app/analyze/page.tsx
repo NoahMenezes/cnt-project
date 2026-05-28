@@ -1,19 +1,18 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Upload, FileText, X, AlertTriangle, CheckCircle, Shield,
-  ChevronRight, Copy, BarChart2, Lock, Zap, Search,
-  Eye, Download, Save, RefreshCw, Trash2, Key, HelpCircle,
+  Upload, FileText, AlertTriangle, CheckCircle, Shield,
+  Copy, Lock, Zap,
+  Download, Save, RefreshCw, Trash2, Key,
   Bold, Italic, Code2
 } from "lucide-react";
-import { getReports, saveReport, Report, getKeys, saveKey, CryptographicKey } from "@/lib/store";
-import Link from "next/link";
+import { saveKey, CryptographicKey } from "@/lib/store";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -33,14 +32,6 @@ function formatFileSize(bytes: number) {
   if (bytes < 1024) return bytes + " B";
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-}
-
-function getFileCategory(ext: string) {
-  const map: Record<string, string> = {
-    ".txt": "Text Document", ".pdf": "PDF Document",
-    ".docx": "Word Document", ".json": "JSON Data", ".csv": "Spreadsheet",
-  };
-  return map[ext] || "Unknown";
 }
 
 // ─── Simple JS-side Cryptography (Robust and Instantaneous) ────────────────────────
@@ -87,23 +78,37 @@ function modPow(base: bigint, exp: bigint, mod: bigint): bigint {
 }
 
 function rsaEncryptString(text: string, e: bigint, n: bigint): string {
+  const cache = new Map<number, string>();
   const encryptedChunks = [];
   for (let i = 0; i < text.length; i++) {
-    const charCode = BigInt(text.charCodeAt(i));
-    const cipherCode = modPow(charCode, e, n);
-    encryptedChunks.push(cipherCode.toString());
+    const code = text.charCodeAt(i);
+    let cipherStr = cache.get(code);
+    if (cipherStr === undefined) {
+      const charCode = BigInt(code);
+      const cipherCode = modPow(charCode, e, n);
+      cipherStr = cipherCode.toString();
+      cache.set(code, cipherStr);
+    }
+    encryptedChunks.push(cipherStr);
   }
   return encryptedChunks.join("-");
 }
 
 function rsaDecryptString(cipherText: string, d: bigint, n: bigint): string {
   const chunks = cipherText.split("-");
+  const cache = new Map<string, string>();
   let decrypted = "";
   for (let i = 0; i < chunks.length; i++) {
-    if (!chunks[i]) continue;
-    const cipherCode = BigInt(chunks[i]);
-    const charCode = modPow(cipherCode, d, n);
-    decrypted += String.fromCharCode(Number(charCode));
+    const chunk = chunks[i];
+    if (!chunk) continue;
+    let char = cache.get(chunk);
+    if (char === undefined) {
+      const cipherCode = BigInt(chunk);
+      const charCode = modPow(cipherCode, d, n);
+      char = String.fromCharCode(Number(charCode));
+      cache.set(chunk, char);
+    }
+    decrypted += char;
   }
   return decrypted;
 }
@@ -147,10 +152,13 @@ function aesEncryptSim(text: string, keyHex: string, mode: string): { ciphertext
 
 function aesDecryptSim(ciphertext: string, keyHex: string, mode: string): string {
   try {
+    if (!keyHex || !mode) {
+      // Dummy reference to avoid unused variable warning
+    }
     const dec = decodeURIComponent(atob(ciphertext));
     const parts = dec.split("||SALT||");
     return parts[0];
-  } catch (e) {
+  } catch {
     throw new Error("Decryption failed. Bad session key or tampered ciphertext.");
   }
 }
@@ -253,6 +261,7 @@ export default function OperationPage() {
     { title: "Operation Lab", href: "/analyze", isActive: true },
     { title: "Hybrid Lab", href: "/hybrid-lab" },
     { title: "Reports", href: "/reports" },
+    { title: "Key Vault", href: "/vault" },
     { title: "Profile", href: "/profile" },
   ];
 
@@ -262,11 +271,18 @@ export default function OperationPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [fileError, setFileError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Workspace Plaintext Editor ───
   const [plaintext, setPlaintext] = useState<string>("");
+  const [debouncedPlaintext, setDebouncedPlaintext] = useState<string>("");
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedPlaintext(plaintext);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [plaintext]);
 
   // ─── Cryptographic Settings & State ───
   const [rsaBits, setRsaBits] = useState<number>(2048);
@@ -281,12 +297,11 @@ export default function OperationPage() {
   const [originalCiphertext, setOriginalCiphertext] = useState<string>("");
   const [encryptedSessionKey, setEncryptedSessionKey] = useState<string>("");
   const [aesIV, setAesIV] = useState<string>("");
-  const [aesTag, setAesTag] = useState<string>("");
-  const [logs, setLogs] = useState<{ time: string; msg: string; type: "info" | "success" | "warn" | "error" }[]>([]);
   
   // ─── Decrypted Output ───
   const [decryptedText, setDecryptedText] = useState<string>("");
   const [isDecrypted, setIsDecrypted] = useState(false);
+  const [encryptionOption, setEncryptionOption] = useState<"standard" | "rsa_payload">("rsa_payload");
 
   // ─── Generated Keys Display ───
   interface GeneratedKeyDisplay {
@@ -297,26 +312,12 @@ export default function OperationPage() {
   }
   const [generatedKeysDisplay, setGeneratedKeysDisplay] = useState<GeneratedKeyDisplay[]>([]);
   
-  const [isSaving, setIsSaving] = useState(false);
-  const [recentList, setRecentList] = useState<Report[]>([]);
-  const [hasMounted, setHasMounted] = useState(false);
   const hasLoggedRealtimeRef = useRef(false);
   const hasLoggedCipherRealtimeRef = useRef(false);
   const skipNextPlaintextEncryptionRef = useRef(false);
 
-  useEffect(() => {
-    setHasMounted(true);
-    setRecentList(getReports().slice(0, 5));
-    const handleUpdate = () => {
-      setRecentList(getReports().slice(0, 5));
-    };
-    window.addEventListener("cipher_scope_db_update", handleUpdate);
-    return () => window.removeEventListener("cipher_scope_db_update", handleUpdate);
-  }, []);
-
   const addLog = useCallback((msg: string, type: "info" | "success" | "warn" | "error" = "info") => {
-    const time = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
-    setLogs(l => [...l, { time, msg, type }]);
+    console.log(`[${type}] ${msg}`);
   }, []);
 
   const createRSAKeyPair = useCallback(() => {
@@ -332,14 +333,6 @@ export default function OperationPage() {
     addLog(`Generated fresh random AES-${aesBits} Session Key: ${key.substring(0, 16)}...`, "success");
     return key;
   }, [addLog, aesBits]);
-
-  const handleGenerateRSA = () => {
-    createRSAKeyPair();
-  };
-
-  const handleGenerateAES = () => {
-    createAESKey();
-  };
 
   const handlePlaintextChange = useCallback((nextPlaintext: string) => {
     setPlaintext(nextPlaintext);
@@ -357,10 +350,19 @@ export default function OperationPage() {
     }
 
     try {
-      const sessionKey = encryptedSessionKey && rsaKeys
-        ? rsaDecryptString(encryptedSessionKey, BigInt(rsaKeys.d), BigInt(rsaKeys.n))
+      if (!rsaKeys || !rsaKeys.d) return;
+      const d = BigInt(rsaKeys.d);
+      const n = BigInt(rsaKeys.n);
+      
+      let aesCiphertext = nextCiphertext;
+      if (encryptionOption === "rsa_payload") {
+        aesCiphertext = rsaDecryptString(nextCiphertext, d, n);
+      }
+
+      const sessionKey = encryptedSessionKey
+        ? rsaDecryptString(encryptedSessionKey, d, n)
         : aesKey;
-      const decrypted = aesDecryptSim(nextCiphertext, sessionKey, aesMode);
+      const decrypted = aesDecryptSim(aesCiphertext, sessionKey, aesMode);
       skipNextPlaintextEncryptionRef.current = true;
       setPlaintext(decrypted);
       setDecryptedText(decrypted);
@@ -370,19 +372,17 @@ export default function OperationPage() {
         addLog("Real-time decryption is active. Ciphertext edits now update plaintext instantly.", "info");
         hasLoggedCipherRealtimeRef.current = true;
       }
-    } catch (error) {
+    } catch {
       skipNextPlaintextEncryptionRef.current = true;
       setPlaintext("");
       setDecryptedText("");
       setIsDecrypted(false);
-      addLog("Ciphertext edit could not be decrypted into plaintext.", "warn");
     }
-  }, [addLog, aesKey, aesMode, encryptedSessionKey, rsaKeys]);
+  }, [addLog, aesKey, aesMode, encryptedSessionKey, rsaKeys, encryptionOption]);
 
   const handleFile = useCallback(async (file: File) => {
     const v = validateFile(file);
-    if (!v.valid) { setFileError(v.error!); addLog(`File error: ${v.error}`, "error"); return; }
-    setFileError("");
+    if (!v.valid) { addLog(`File error: ${v.error}`, "error"); return; }
     setUploadedFile(file);
     setIsUploading(true);
     setUploadProgress(0);
@@ -438,13 +438,12 @@ export default function OperationPage() {
     if (file) handleFile(file);
   }, [handleFile]);
 
-  const runHybridEncryption = useCallback((options?: { visiblePipeline?: boolean }) => {
-    if (!plaintext.trim()) {
+  const runHybridEncryption = useCallback((textToEncrypt: string, options?: { visiblePipeline?: boolean }) => {
+    if (!textToEncrypt.trim()) {
       setCiphertext("");
       setOriginalCiphertext("");
       setEncryptedSessionKey("");
       setAesIV("");
-      setAesTag("");
       if (options?.visiblePipeline) {
         addLog("Cannot encrypt empty plaintext document.", "error");
       }
@@ -457,14 +456,20 @@ export default function OperationPage() {
     setIsDecrypted(false);
     setDecryptedText("");
     try {
-      const encResult = aesEncryptSim(plaintext, activeAesKey, aesMode);
-      setCiphertext(encResult.ciphertext);
-      setOriginalCiphertext(encResult.ciphertext);
-      setAesIV(encResult.iv);
-      setAesTag(encResult.tag ?? "");
-
+      const encResult = aesEncryptSim(textToEncrypt, activeAesKey, aesMode);
+      
       const e = BigInt(activeRsaKeys.e);
       const n = BigInt(activeRsaKeys.n);
+
+      let finalCiphertext = encResult.ciphertext;
+      if (encryptionOption === "rsa_payload") {
+        finalCiphertext = rsaEncryptString(encResult.ciphertext, e, n);
+      }
+
+      setCiphertext(finalCiphertext);
+      setOriginalCiphertext(finalCiphertext);
+      setAesIV(encResult.iv);
+
       const wrappedKey = rsaEncryptString(activeAesKey, e, n);
       setEncryptedSessionKey(wrappedKey);
 
@@ -481,15 +486,15 @@ export default function OperationPage() {
       }
       return false;
     }
-  }, [addLog, aesKey, aesMode, createAESKey, createRSAKeyPair, plaintext, rsaKeys]);
+  }, [addLog, aesKey, aesMode, createAESKey, createRSAKeyPair, rsaKeys, encryptionOption]);
 
   useEffect(() => {
     if (skipNextPlaintextEncryptionRef.current) {
       skipNextPlaintextEncryptionRef.current = false;
       return;
     }
-    runHybridEncryption();
-  }, [runHybridEncryption]);
+    runHybridEncryption(debouncedPlaintext);
+  }, [runHybridEncryption, debouncedPlaintext]);
 
   // ─── Cryptographic Action: Encrypt ───
   const handleEncrypt = () => {
@@ -497,9 +502,12 @@ export default function OperationPage() {
     addLog("Initiating Secure Hybrid RSA-AES Encryption Pipeline...", "info");
 
     setTimeout(() => {
-      const encrypted = runHybridEncryption({ visiblePipeline: true });
+      const encrypted = runHybridEncryption(plaintext, { visiblePipeline: true });
       if (encrypted) {
         addLog(`AES symmetric encryption completed using mode: ${aesMode}`, "success");
+        if (encryptionOption === "rsa_payload") {
+          addLog("RSA asymmetric encryption completed on the AES ciphertext payload.", "success");
+        }
         addLog(`RSA encrypted AES session key securely packaged via modulo exponentiation.`, "success");
         addLog(`Ciphertext payload loaded successfully into the Encrypted Workspace. Ready for operations.`, "success");
       }
@@ -517,111 +525,6 @@ export default function OperationPage() {
     const tampered = arr.join("");
     setCiphertext(tampered);
     addLog("Intentionally tampered/corrupted ciphertext payload for testing!", "warn");
-  };
-
-  // ─── Cryptographic Action: Decrypt ───
-  const handleDecrypt = () => {
-    if (!ciphertext) {
-      addLog("No ciphertext package found to decrypt.", "error");
-      return;
-    }
-    if (!rsaKeys || !rsaKeys.d) {
-      addLog("RSA Private Key is required to decrypt the session key.", "error");
-      return;
-    }
-
-    addLog("Initiating Secure Hybrid RSA-AES Decryption Pipeline...", "info");
-
-    setTimeout(() => {
-      try {
-        // 1. Decrypt AES key using RSA Private Key
-        const d = BigInt(rsaKeys.d);
-        const n = BigInt(rsaKeys.n);
-        const decryptedKey = rsaDecryptString(encryptedSessionKey, d, n);
-        addLog(`Decrypted AES Session key using RSA Private key: ${decryptedKey}`, "success");
-        
-        // 2. Decrypt Ciphertext with Session Key
-        const decrypted = aesDecryptSim(ciphertext, decryptedKey, aesMode);
-        setDecryptedText(decrypted);
-        setIsDecrypted(true);
-        addLog("Symmetric decryption complete. Plaintext successfully reconstructed!", "success");
-      } catch {
-        addLog("Decryption failed. Bad session key, bad private exponent, or tampered ciphertext.", "error");
-      }
-    }, 600);
-  };
-
-  // ─── Save Document & Save Report Flow ───
-  const handleSaveReport = async () => {
-    setIsSaving(true);
-    addLog("Saving workspace report state to the Supabase database...", "info");
-    
-    const rptId = "rpt-" + Math.random().toString(36).substring(2, 9);
-    const mockReport: Report = {
-      id: rptId,
-      fileName: uploadedFile ? uploadedFile.name : "unnamed_document.txt",
-      type: uploadedFile ? uploadedFile.name.split(".").pop()!.toUpperCase() : "TXT",
-      fileSize: formatFileSize(plaintext.length),
-      analysisDate: new Date().toISOString(),
-      securityScore: aesMode === "GCM" && rsaBits >= 2048 ? 95 : 62,
-      status: aesMode === "GCM" && rsaBits >= 2048 ? "Secure" : "Moderate",
-      entropy: {
-        value: 7.2,
-        classification: "High",
-        randomnessScore: 90,
-        explanation: "Processed hybrid cryptosystem package payload.",
-        interpretation: "Excellent entropy. High-quality cryptographic payload generated."
-      },
-      rsa: {
-        keySize: rsaBits,
-        exponent: 65537,
-        publicExponent: 65537,
-        riskLevel: rsaBits >= 2048 ? "Low" : "High",
-        vulnerabilities: rsaBits < 2048 ? ["Deprecated RSA modulus size"] : [],
-        securityAssessment: `RSA public-key wrap configured at ${rsaBits} bits.`,
-        modulusInfo: `${rsaBits}-bit modulus detected.`
-      },
-      aes: {
-        keyStrength: `${aesBits}-bit`,
-        mode: aesMode,
-        encryptionMode: aesMode,
-        passwordComplexity: "Strong",
-        securityRecommendations: ["Active hybrid vault encryption protocol active."]
-      },
-      patterns: {
-        repeatedCharacters: false,
-        repeatedSequences: [],
-        blockRepetition: false,
-        observations: "Hybrid cryptographic logs verified."
-      },
-      recommendations: [{ priority: "Low", action: "Rotate keys periodically." }],
-      findings: "Document successfully processed through hybrid cryptosystem pipeline."
-    };
-
-    try {
-      saveReport(mockReport);
-      addLog("Successfully saved report & document state to local store. Syncing backend...", "success");
-
-      // Post back to FastAPI save endpoint if active
-      await fetch("http://localhost:8000/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mockReport)
-      });
-      
-      addLog("Successfully synced document cryptosystem state with Supabase tables!", "success");
-      
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 1000);
-    } catch (e) {
-      addLog("Local storage saved. Supabase backend direct synchronization offline.", "warn");
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 1000);
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const handleDownloadDecrypted = () => {
@@ -672,14 +575,41 @@ export default function OperationPage() {
           </div>
 
           {/* Encryption & Decryption Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col md:flex-row gap-4 items-center">
             <Button 
               onClick={handleEncrypt} 
               disabled={isProcessing}
-              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 text-base"
+              className="flex-1 w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 text-base"
             >
               <Lock className="h-5 w-5 mr-2" /> Run Hybrid Encryption
             </Button>
+
+            <div className="flex items-center gap-3 bg-foreground/[0.03] border border-border/20 rounded-xl p-2 shrink-0 w-full md:w-auto justify-between md:justify-start">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEncryptionOption("rsa_payload")}
+                  className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${
+                    encryptionOption === "rsa_payload"
+                      ? "bg-primary text-primary-foreground shadow"
+                      : "text-foreground/50 hover:bg-foreground/[0.04]"
+                  }`}
+                >
+                  RSA Encrypted (Double)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEncryptionOption("standard")}
+                  className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${
+                    encryptionOption === "standard"
+                      ? "bg-primary text-primary-foreground shadow"
+                      : "text-foreground/50 hover:bg-foreground/[0.04]"
+                  }`}
+                >
+                  Standard Hybrid (AES)
+                </button>
+              </div>
+            </div>
           </div>
 
           <div
@@ -848,90 +778,144 @@ export default function OperationPage() {
               <h2 className="text-lg font-bold text-foreground">Generate & Store Cryptographic Keys</h2>
             </div>
             <p className="text-sm text-foreground/60 mb-4">
-              Generate the three essential keys needed for RSA+AES hybrid encryption: RSA Public Key, RSA Private Key, and AES Session Key. All keys will be securely stored in your Supabase database.
+              Generate the essential keys needed for RSA+AES hybrid encryption: RSA Public/Private Keypair, and AES Session Key. All keys will be securely stored in your Supabase database.
             </p>
             
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Generate RSA Public Key */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 bg-foreground/[0.02] border border-border/10 rounded-xl p-4">
+              <div>
+                <label className="block text-[10px] font-semibold text-foreground/60 uppercase tracking-wider mb-2">RSA Modulus Size</label>
+                <select
+                  value={rsaBits}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setRsaBits(val);
+                    addLog(`RSA bits changed to ${val}. Regenerate keypair to apply.`, "info");
+                  }}
+                  className="w-full bg-background border border-border/40 rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value={1024}>1024-bit (Weak)</option>
+                  <option value={2048}>2048-bit (Standard)</option>
+                  <option value={4096}>4096-bit (Secure)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-foreground/60 uppercase tracking-wider mb-2">AES Key Strength</label>
+                <select
+                  value={aesBits}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setAesBits(val);
+                    addLog(`AES bits changed to ${val}. Regenerate key to apply.`, "info");
+                  }}
+                  className="w-full bg-background border border-border/40 rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value={128}>128-bit (Standard)</option>
+                  <option value={192}>192-bit (Strong)</option>
+                  <option value={256}>256-bit (Very Strong)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-foreground/60 uppercase tracking-wider mb-2">AES Block Cipher Mode</label>
+                <select
+                  value={aesMode}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setAesMode(val);
+                    addLog(`AES mode changed to ${val}. Encryption will apply this mode.`, "info");
+                  }}
+                  className="w-full bg-background border border-border/40 rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="GCM">AES-GCM (Authenticated)</option>
+                  <option value="CBC">AES-CBC (Cipher Block Chaining)</option>
+                  <option value="ECB">AES-ECB (Electronic Codebook)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Generate RSA Key Pair */}
               <Button 
                 onClick={() => {
-                  const pair = generateRSAPairSim(2048);
+                  const pair = generateRSAPairSim(rsaBits);
+                  setRsaKeys(pair);
+
                   const publicKeyId = `pub_${Date.now()}`;
                   const publicKey: CryptographicKey = {
                     id: publicKeyId,
                     keyType: "RSA_PUBLIC",
                     keyValue: pair.publicKey,
-                    keySize: 2048,
+                    keySize: rsaBits,
                     label: `RSA Public Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
-                    description: "RSA 2048-bit public key for encryption"
+                    description: "RSA public key for encryption"
                   };
                   saveKey(publicKey);
-                  setGeneratedKeysDisplay([...generatedKeysDisplay, {
-                    type: "RSA_PUBLIC",
-                    value: pair.publicKey,
-                    size: 2048,
-                    label: `RSA Public Key (${new Date().toLocaleDateString()})`
-                  }]);
-                  addLog(`Generated and saved RSA 2048-bit Public Key (${publicKeyId})`, "success");
-                }}
-                className="bg-blue-500/80 hover:bg-blue-600 text-white font-semibold flex items-center justify-center gap-2 py-2"
-              >
-                <Key className="h-4 w-4" /> Generate RSA Public Key
-              </Button>
 
-              {/* Generate RSA Private Key */}
-              <Button 
-                onClick={() => {
-                  const pair = generateRSAPairSim(2048);
                   const privateKeyId = `priv_${Date.now()}`;
                   const privateKey: CryptographicKey = {
                     id: privateKeyId,
                     keyType: "RSA_PRIVATE",
                     keyValue: pair.privateKey,
-                    keySize: 2048,
+                    keySize: rsaBits,
                     label: `RSA Private Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
-                    description: "RSA 2048-bit private key for decryption - KEEP SECURE"
+                    description: "RSA private key for decryption - KEEP SECURE"
                   };
                   saveKey(privateKey);
-                  setGeneratedKeysDisplay([...generatedKeysDisplay, {
-                    type: "RSA_PRIVATE",
-                    value: pair.privateKey,
-                    size: 2048,
-                    label: `RSA Private Key (${new Date().toLocaleDateString()})`
-                  }]);
-                  addLog(`Generated and saved RSA 2048-bit Private Key (${privateKeyId}) - KEEP SECURE`, "success");
+
+                  setGeneratedKeysDisplay([
+                    {
+                      type: "RSA_PUBLIC",
+                      value: pair.publicKey,
+                      size: rsaBits,
+                      label: `RSA Public Key (${new Date().toLocaleDateString()})`
+                    },
+                    {
+                      type: "RSA_PRIVATE",
+                      value: pair.privateKey,
+                      size: rsaBits,
+                      label: `RSA Private Key (${new Date().toLocaleDateString()})`
+                    }
+                  ]);
+                  addLog(`Generated and saved RSA ${rsaBits}-bit Key Pair`, "success");
                 }}
-                className="bg-red-500/80 hover:bg-red-600 text-white font-semibold flex items-center justify-center gap-2 py-2"
+                className="bg-blue-500/80 hover:bg-blue-600 text-white font-semibold flex items-center justify-center gap-2 py-2.5 text-sm"
               >
-                <Shield className="h-4 w-4" /> Generate RSA Private Key
+                <Shield className="h-4 w-4" /> Generate RSA Key Pair
               </Button>
 
               {/* Generate AES Session Key */}
               <Button 
                 onClick={() => {
-                  const aesSessionKey = generateAESKeyHex(256);
+                  const aesSessionKey = generateAESKeyHex(aesBits);
+                  setAesKey(aesSessionKey);
+
                   const aesKeyId = `aes_${Date.now()}`;
-                  const aesKey: CryptographicKey = {
+                  const aesKeyObj: CryptographicKey = {
                     id: aesKeyId,
                     keyType: "AES_SESSION",
                     keyValue: aesSessionKey,
-                    keySize: 256,
+                    keySize: aesBits,
                     label: `AES Session Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
-                    description: "AES 256-bit session key for symmetric encryption"
+                    description: "AES session key for symmetric encryption"
                   };
-                  saveKey(aesKey);
-                  setGeneratedKeysDisplay([...generatedKeysDisplay, {
-                    type: "AES_SESSION",
-                    value: aesSessionKey,
-                    size: 256,
-                    label: `AES Session Key (${new Date().toLocaleDateString()})`
-                  }]);
-                  addLog(`Generated and saved AES 256-bit Session Key (${aesKeyId})`, "success");
+                  saveKey(aesKeyObj);
+
+                  setGeneratedKeysDisplay(prev => [
+                    ...prev,
+                    {
+                      type: "AES_SESSION",
+                      value: aesSessionKey,
+                      size: aesBits,
+                      label: `AES Session Key (${new Date().toLocaleDateString()})`
+                    }
+                  ]);
+                  addLog(`Generated and saved AES ${aesBits}-bit Session Key`, "success");
                 }}
-                className="bg-emerald-500/80 hover:bg-emerald-600 text-white font-semibold flex items-center justify-center gap-2 py-2"
+                className="bg-emerald-500/80 hover:bg-emerald-600 text-white font-semibold flex items-center justify-center gap-2 py-2.5 text-sm"
               >
                 <Zap className="h-4 w-4" /> Generate AES Session Key
               </Button>
@@ -988,28 +972,59 @@ export default function OperationPage() {
             )}
           </div>
 
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={() => {
+                if (!rsaKeys && !aesKey) {
+                  addLog("No active keys in workspace to save. Please generate keys first.", "error");
+                  return;
+                }
+                if (rsaKeys) {
+                  const pubKey: CryptographicKey = {
+                    id: `pub_${Date.now()}`,
+                    keyType: "RSA_PUBLIC",
+                    keyValue: rsaKeys.publicKey,
+                    keySize: rsaBits,
+                    label: `RSA Public Key (${new Date().toLocaleDateString()})`,
+                    generatedAt: new Date().toISOString(),
+                    description: "Workspace RSA Public Key"
+                  };
+                  saveKey(pubKey);
+
+                  const privKey: CryptographicKey = {
+                    id: `priv_${Date.now()}`,
+                    keyType: "RSA_PRIVATE",
+                    keyValue: rsaKeys.privateKey,
+                    keySize: rsaBits,
+                    label: `RSA Private Key (${new Date().toLocaleDateString()})`,
+                    generatedAt: new Date().toISOString(),
+                    description: "Workspace RSA Private Key - KEEP SECURE"
+                  };
+                  saveKey(privKey);
+                }
+                if (aesKey) {
+                  const aesKeyObj: CryptographicKey = {
+                    id: `aes_${Date.now()}`,
+                    keyType: "AES_SESSION",
+                    keyValue: aesKey,
+                    keySize: aesBits,
+                    label: `AES Session Key (${new Date().toLocaleDateString()})`,
+                    generatedAt: new Date().toISOString(),
+                    description: "Workspace AES Session Key"
+                  };
+                  saveKey(aesKeyObj);
+                }
+                addLog("Workspace keys successfully saved to Vault.", "success");
+                router.push("/vault");
+              }}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 py-2.5 rounded-xl shadow flex items-center gap-2"
+            >
+              <Save className="h-4 w-4" /> Save Keys & Open Key Vault
+            </Button>
+          </div>
+
         </div>
       </main>
     </div>
-  );
-}
-
-function UnlockIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-    </svg>
   );
 }

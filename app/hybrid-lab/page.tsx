@@ -6,15 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Key, Lock, Layers, Play, RefreshCw, Copy, Eye, EyeOff,
+  Key, Lock, Layers, Play, Copy, Eye, EyeOff,
   AlertTriangle, CheckCircle, Clock, Zap, Terminal, ChevronDown, ChevronUp
 } from "lucide-react";
 import sampleData from "./data/sampleMessages";
 
 const NAV = [
-  { title: "Home", href: "/" }, { title: "Dashboard", href: "/dashboard" },
-  { title: "Analyze", href: "/analyze" }, { title: "Hybrid Lab", href: "/hybrid-lab", isActive: true },
+  { title: "Home", href: "/" },
+  { title: "Dashboard", href: "/dashboard" },
+  { title: "Analyze", href: "/analyze" },
+  { title: "Hybrid Lab", href: "/hybrid-lab", isActive: true },
   { title: "Reports", href: "/reports" },
+  { title: "Key Vault", href: "/vault" },
   { title: "Profile", href: "/profile" },
 ];
 
@@ -53,7 +56,6 @@ function LogLine({ entry }: { entry: LogEntry }) {
 }
 
 function StepCard({ step, status }: { step: typeof STEPS[0]; status: "pending" | "processing" | "done" }) {
-  const Icon = step.icon;
   return (
     <div className={`flex items-start gap-3 rounded-xl border px-4 py-3 transition-all duration-300 ${
       status === "done" ? "border-emerald-500/30 bg-emerald-500/5" :
@@ -218,7 +220,7 @@ export default function HybridLabPage() {
                     {simMode === "weak" && (
                       <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
                         <AlertTriangle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-                        <p className="text-xs text-red-400">Weak mode uses RSA-512 + AES-128-ECB + password "password123". Educational use only.</p>
+                        <p className="text-xs text-red-400">Weak mode uses RSA-512 + AES-128-ECB + password &quot;password123&quot;. Educational use only.</p>
                       </div>
                     )}
                     <button onClick={() => setShowCustom(s => !s)} className="flex items-center gap-1 text-xs text-foreground/40 hover:text-foreground/70 transition-colors">

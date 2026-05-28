@@ -8,16 +8,19 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Mail, Calendar, Camera, Pencil, Check, X,
   Eye, EyeOff, Lock, Bell, Shield, Monitor, Clock,
-  Search, Layers, FileText, Activity, TrendingUp, Zap, BarChart3
+  Search, Layers, FileText, Activity, TrendingUp, Zap
 } from "lucide-react";
 import profileRaw from "./data/profileData";
 import { getReports, getStats } from "@/lib/store";
 import { useEffect } from "react";
 
 const NAV = [
-  { title: "Home", href: "/" }, { title: "Dashboard", href: "/dashboard" },
-  { title: "Analyze", href: "/analyze" }, { title: "Hybrid Lab", href: "/hybrid-lab" },
+  { title: "Home", href: "/" },
+  { title: "Dashboard", href: "/dashboard" },
+  { title: "Analyze", href: "/analyze" },
+  { title: "Hybrid Lab", href: "/hybrid-lab" },
   { title: "Reports", href: "/reports" },
+  { title: "Key Vault", href: "/vault" },
   { title: "Profile", href: "/profile", isActive: true },
 ];
 
@@ -91,8 +94,8 @@ export default function ProfilePage() {
   });
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
-  const [passwordForm, setPasswordForm] = useState({ current: "", newPass: "", confirm: "" });
-  const [showPass, setShowPass] = useState({ current: false, newPass: false, confirm: false });
+  const [passwordForm, setPasswordForm] = useState({ currentPass: "", newPass: "", confirm: "" });
+  const [showPass, setShowPass] = useState({ currentPass: false, newPass: false, confirm: false });
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({});
@@ -106,7 +109,12 @@ export default function ProfilePage() {
     filesProcessed: 0
   });
 
-  const [recentActivityList, setRecentActivityList] = useState<any[]>([]);
+  const [recentActivityList, setRecentActivityList] = useState<{
+    id: string;
+    type: string;
+    description: string;
+    timestamp: string;
+  }[]>([]);
 
   useEffect(() => {
     const refreshData = () => {
@@ -142,7 +150,7 @@ export default function ProfilePage() {
 
   const validatePassword = useCallback(() => {
     const errs: Record<string, string> = {};
-    if (!passwordForm.current) errs.current = "Required";
+    if (!passwordForm.currentPass) errs.currentPass = "Required";
     if (passwordForm.newPass.length < 12) errs.newPass = "Must be at least 12 characters";
     if (passwordForm.newPass !== passwordForm.confirm) errs.confirm = "Passwords do not match";
     setPasswordErrors(errs);
@@ -155,7 +163,7 @@ export default function ProfilePage() {
     await new Promise(r => setTimeout(r, 1500));
     setIsUpdatingPassword(false);
     setPasswordSuccess(true);
-    setPasswordForm({ current: "", newPass: "", confirm: "" });
+    setPasswordForm({ currentPass: "", newPass: "", confirm: "" });
     setTimeout(() => setPasswordSuccess(false), 3000);
   }, [validatePassword]);
 
@@ -268,8 +276,8 @@ export default function ProfilePage() {
                       )}
                     </AnimatePresence>
                     <div className="space-y-3">
-                      {(["current", "newPass", "confirm"] as const).map(field => {
-                        const labels = { current: "Current Password", newPass: "New Password", confirm: "Confirm New Password" };
+                      {(["currentPass", "newPass", "confirm"] as const).map(field => {
+                        const labels = { currentPass: "Current Password", newPass: "New Password", confirm: "Confirm New Password" };
                         return (
                           <div key={field}>
                             <label className="text-xs text-foreground/40 block mb-1">{labels[field]}</label>

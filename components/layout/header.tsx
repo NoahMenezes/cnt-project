@@ -107,9 +107,9 @@ const Header = ({ navigationData, className }: HeaderProps) => {
       >
         {/* Logo */}
         <div>
-          <a href="#">
+          <Link href="/">
             <Logo className="gap-3" />
-          </a>
+          </Link>
         </div>
 
         {/* Desktop Navigation */}
@@ -179,9 +179,9 @@ const Header = ({ navigationData, className }: HeaderProps) => {
                 className="w-full sm:w-96 p-0 border-l-0"
               >
                 <div className="flex items-center justify-between p-6">
-                  <a href="#">
+                  <Link href="/" onClick={() => setIsOpen(false)}>
                     <Logo className="gap-2" />
-                  </a>
+                  </Link>
                   <SheetClose id="mobile-menu-close">
                     <span className="rounded-full border border-border p-2.5 block">
                       <X width={16} height={16} />

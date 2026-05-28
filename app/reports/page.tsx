@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText, Search, ChevronUp, ChevronDown, Eye, Download, Trash2,
-  X, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, FileSearch,
-  AlertCircle, Info, Shield, Key, Copy, Lock
+  X, ChevronLeft, ChevronRight, AlertTriangle, FileSearch,
+  Info, Shield, Key, Copy, Lock
 } from "lucide-react";
 import { getReports, deleteReport as deleteReportFromStore, Report, getKeys, deleteKey as deleteKeyFromStore, CryptographicKey } from "@/lib/store";
 import { useEffect } from "react";
@@ -20,6 +20,7 @@ const NAV = [
   { title: "Analyze", href: "/analyze" },
   { title: "Hybrid Lab", href: "/hybrid-lab" },
   { title: "Reports", href: "/reports", isActive: true },
+  { title: "Key Vault", href: "/vault" },
   { title: "Profile", href: "/profile" },
 ];
 
@@ -37,8 +38,12 @@ function statusStyle(st: string) {
   if (st === "Weak") return "bg-orange-500/20 text-orange-400";
   return "bg-red-500/20 text-red-400";
 }
+
 function typeStyle(t: string) {
-  return "bg-foreground/10 text-foreground/60 border border-border/30";
+  if (t === "PDF") return "bg-red-500/10 text-red-400 border border-red-500/20";
+  if (t === "TXT") return "bg-blue-500/10 text-blue-400 border border-blue-500/20";
+  if (t === "JSON") return "bg-purple-500/10 text-purple-400 border border-purple-500/20";
+  return "bg-foreground/5 text-foreground/60 border border-foreground/10";
 }
 
 function ScoreMiniBar({ score }: { score: number }) {
@@ -140,8 +145,8 @@ function DetailPanel({ report, onClose }: { report: Report; onClose: () => void 
 const PER_PAGE = 5;
 
 export default function ReportsPage() {
-  const [reports, setReports] = useState<Report[]>([]);
-  const [keys, setKeys] = useState<CryptographicKey[]>([]);
+  const [reports, setReports] = useState<Report[]>(() => getReports());
+  const [keys, setKeys] = useState<CryptographicKey[]>(() => getKeys());
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<"analysisDate" | "securityScore" | "fileName">("analysisDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -151,9 +156,6 @@ export default function ReportsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    setReports(getReports());
-    setKeys(getKeys());
-
     const checkQueryParam = () => {
       if (typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search);
@@ -385,7 +387,7 @@ export default function ReportsPage() {
                   All generated cryptographic keys are stored securely in your Supabase database. Manage your RSA and AES keys here.
                 </p>
                 
-                {getKeys().length === 0 ? (
+                {keys.length === 0 ? (
                   <div className="flex flex-col items-center gap-3 py-10">
                     <Key className="h-10 w-10 text-foreground/20" />
                     <p className="text-sm text-foreground/40">No keys generated yet. Go to Analyze to generate your first keys.</p>
@@ -393,7 +395,7 @@ export default function ReportsPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {getKeys().map((key) => (
+                    {keys.map((key) => (
                       <div key={key.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl border border-border/20 bg-foreground/[0.02] hover:bg-foreground/[0.04] transition-colors">
                         <div className="flex items-start gap-3 flex-1">
                           {key.keyType === "RSA_PUBLIC" && <Shield className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />}

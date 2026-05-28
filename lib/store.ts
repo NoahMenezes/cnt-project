@@ -45,7 +45,6 @@ export interface Report {
   findings: string;
 }
 
-const DEFAULT_REPORTS: Report[] = [];
 let cachedReports: Report[] = [];
 let isAuthInitialized = false;
 
@@ -63,30 +62,30 @@ if (typeof window !== "undefined" && !isAuthInitialized) {
   try {
     const local = localStorage.getItem("cipher_scope_reports_db");
     if (local) cachedReports = JSON.parse(local);
-  } catch (e) {}
+  } catch {}
 
   supabase.auth.onAuthStateChange(async (event, session) => {
     if (session?.user) {
       // Fetch authenticated user's reports from Supabase database
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("reports")
         .select("*")
         .order("created_at", { ascending: false });
       if (data) {
-        cachedReports = data.map((row: any) => ({
-          id: row.id,
-          fileName: row.file_name,
-          type: row.type,
-          fileSize: row.file_size,
-          analysisDate: row.analysis_date,
-          securityScore: row.security_score,
-          status: row.status,
-          entropy: row.entropy,
-          rsa: row.rsa,
-          aes: row.aes,
-          patterns: row.patterns,
-          recommendations: row.recommendations,
-          findings: row.findings,
+        cachedReports = data.map((row: Record<string, unknown>) => ({
+          id: row.id as string,
+          fileName: row.file_name as string,
+          type: row.type as string,
+          fileSize: row.file_size as string,
+          analysisDate: row.analysis_date as string,
+          securityScore: row.security_score as number,
+          status: row.status as string,
+          entropy: row.entropy as Report["entropy"],
+          rsa: row.rsa as Report["rsa"],
+          aes: row.aes as Report["aes"],
+          patterns: row.patterns as Report["patterns"],
+          recommendations: row.recommendations as Report["recommendations"],
+          findings: row.findings as string,
         }));
         notifyUpdate();
       }
@@ -95,7 +94,7 @@ if (typeof window !== "undefined" && !isAuthInitialized) {
       try {
         const local = localStorage.getItem("cipher_scope_reports_db");
         cachedReports = local ? JSON.parse(local) : [];
-      } catch (e) {
+      } catch {
         cachedReports = [];
       }
       notifyUpdate();
@@ -115,7 +114,7 @@ export function saveReport(report: Report): void {
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem("cipher_scope_reports_db", JSON.stringify(cachedReports));
-    } catch (e) {}
+    } catch {}
 
     // 2. Async database sync
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -154,7 +153,7 @@ export function deleteReport(id: string): void {
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem("cipher_scope_reports_db", JSON.stringify(cachedReports));
-    } catch (e) {}
+    } catch {}
 
     // 2. Async database delete
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -189,23 +188,23 @@ if (typeof window !== "undefined") {
   try {
     const localKeys = localStorage.getItem("cipher_scope_keys_db");
     if (localKeys) cachedKeys = JSON.parse(localKeys);
-  } catch (e) {}
+  } catch {}
 
   supabase.auth.onAuthStateChange(async (event, session) => {
     if (session?.user) {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("cryptographic_keys")
         .select("*")
         .order("created_at", { ascending: false });
       if (data) {
-        cachedKeys = data.map((row: any) => ({
-          id: row.id,
-          keyType: row.key_type,
-          keyValue: row.key_value,
-          keySize: row.key_size,
-          label: row.label,
-          generatedAt: row.generated_at,
-          description: row.description,
+        cachedKeys = data.map((row: Record<string, unknown>) => ({
+          id: row.id as string,
+          keyType: row.key_type as CryptographicKey["keyType"],
+          keyValue: row.key_value as string,
+          keySize: row.key_size as number,
+          label: row.label as string,
+          generatedAt: row.generated_at as string,
+          description: row.description as string,
         }));
         notifyUpdate();
       }
@@ -213,7 +212,7 @@ if (typeof window !== "undefined") {
       try {
         const localKeys = localStorage.getItem("cipher_scope_keys_db");
         cachedKeys = localKeys ? JSON.parse(localKeys) : [];
-      } catch (e) {
+      } catch {
         cachedKeys = [];
       }
       notifyUpdate();
@@ -232,7 +231,7 @@ export function saveKey(key: CryptographicKey): void {
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
-    } catch (e) {}
+    } catch {}
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -263,7 +262,7 @@ export function deleteKey(id: string): void {
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
-    } catch (e) {}
+    } catch {}
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
