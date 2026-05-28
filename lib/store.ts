@@ -38,6 +38,8 @@ export interface Report {
     repeatedSequences: string[];
     blockRepetition: boolean;
     observations: string;
+    unstructuredChunks?: { id: number; type: string; text: string; length: number }[];
+    structuredParameters?: { category: string; element: string; value: string; classification: string; status: string }[];
   };
   recommendations: { priority: string; action: string }[];
   findings: string;

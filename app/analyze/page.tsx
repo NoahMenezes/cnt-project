@@ -139,6 +139,7 @@ export default function AnalyzePage() {
   const [hasMounted, setHasMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [tableTab, setTableTab] = useState<"unstructured" | "structured">("structured");
 
   useEffect(() => {
     setHasMounted(true);
@@ -803,6 +804,124 @@ export default function AnalyzePage() {
                           ))}
                         </div>
                       </motion.div>
+                    </div>
+
+                    {/* Extraction Tables Section */}
+                    <div className="mt-6 rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/20 pb-4">
+                        <div>
+                          <h3 className="text-base font-bold text-foreground">Document Text Extraction & Structuring</h3>
+                          <p className="text-xs text-foreground/40 mt-1">Compare the raw unstructured lines from the document with the AI-classified structured parameters table.</p>
+                        </div>
+                        <div className="flex rounded-lg bg-foreground/[0.04] p-1 self-start">
+                          <button
+                            onClick={() => setTableTab("unstructured")}
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                              tableTab === "unstructured"
+                                ? "bg-background text-foreground shadow"
+                                : "text-foreground/50 hover:text-foreground"
+                            }`}
+                          >
+                            Unstructured Raw Extraction
+                          </button>
+                          <button
+                            onClick={() => setTableTab("structured")}
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                              tableTab === "structured"
+                                ? "bg-background text-foreground shadow"
+                                : "text-foreground/50 hover:text-foreground"
+                            }`}
+                          >
+                            AI Structured Table
+                          </button>
+                        </div>
+                      </div>
+
+                      {tableTab === "unstructured" ? (
+                        <div className="overflow-x-auto rounded-xl border border-border/30 max-h-[400px] overflow-y-auto pr-1">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead className="sticky top-0 bg-background/95 backdrop-blur z-10">
+                              <tr className="bg-foreground/[0.02] border-b border-border/20 text-foreground/50">
+                                <th className="p-3 font-semibold w-16">ID</th>
+                                <th className="p-3 font-semibold w-32">Block Type</th>
+                                <th className="p-3 font-semibold">Raw Paragraph Content</th>
+                                <th className="p-3 font-semibold w-24">Length</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(!result.patterns || !result.patterns.unstructuredChunks || result.patterns.unstructuredChunks.length === 0) ? (
+                                <tr>
+                                  <td colSpan={4} className="p-8 text-center text-foreground/30">No unstructured chunks found.</td>
+                                </tr>
+                              ) : (
+                                result.patterns.unstructuredChunks.map((chunk: any) => (
+                                  <tr key={chunk.id} className="border-b border-border/10 hover:bg-foreground/[0.01] transition-all">
+                                    <td className="p-3 font-mono text-foreground/40">{chunk.id}</td>
+                                    <td className="p-3">
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                        chunk.type === "Section Header"
+                                          ? "bg-blue-500/10 text-blue-400"
+                                          : chunk.type === "Formula / Code"
+                                          ? "bg-purple-500/10 text-purple-400 font-mono"
+                                          : chunk.type === "List Item"
+                                          ? "bg-yellow-500/10 text-yellow-400"
+                                          : "bg-foreground/5 text-foreground/60"
+                                      }`}>
+                                        {chunk.type}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 text-foreground/80 leading-relaxed font-mono whitespace-pre-wrap">{chunk.text}</td>
+                                    <td className="p-3 text-foreground/40">{chunk.length} chars</td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-border/30">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-foreground/[0.02] border-b border-border/20 text-foreground/50">
+                                <th className="p-3 font-semibold">Category</th>
+                                <th className="p-3 font-semibold">Key Element</th>
+                                <th className="p-3 font-semibold">Extracted Value</th>
+                                <th className="p-3 font-semibold">Classification Role</th>
+                                <th className="p-3 font-semibold w-24 text-center">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(!result.patterns || !result.patterns.structuredParameters || result.patterns.structuredParameters.length === 0) ? (
+                                <tr>
+                                  <td colSpan={5} className="p-8 text-center text-foreground/30">No structured parameters detected.</td>
+                                </tr>
+                              ) : (
+                                result.patterns.structuredParameters.map((param: any, idx: number) => (
+                                  <tr key={idx} className="border-b border-border/10 hover:bg-foreground/[0.01] transition-all">
+                                    <td className="p-3 font-semibold text-foreground/75">{param.category}</td>
+                                    <td className="p-3 font-mono text-foreground">{param.element}</td>
+                                    <td className="p-3 text-foreground/80 font-mono">{param.value}</td>
+                                    <td className="p-3 text-foreground/60 leading-relaxed">{param.classification}</td>
+                                    <td className="p-3 text-center">
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                        param.status === "Secure"
+                                          ? "bg-emerald-500/10 text-emerald-400"
+                                          : param.status === "Critical"
+                                          ? "bg-red-500/10 text-red-400"
+                                          : param.status === "High"
+                                          ? "bg-orange-500/10 text-orange-400"
+                                          : "bg-yellow-500/10 text-yellow-400"
+                                      }`}>
+                                        {param.status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 )}

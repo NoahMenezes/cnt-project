@@ -251,6 +251,7 @@ def perform_cryptographic_analysis(file_name: str, content: str):
     security_assessment = f"RSA config risk is {rsa_info['riskLevel']}. AES mode is {aes_info['mode']} with {aes_info['passwordComplexity']} password rating."
 
     ai_success = False
+    structured_parameters_list = []
     
     # 1. Try Groq Cloud (Llama 3.3)
     groq_api_key = os.environ.get("GROQ_API_KEY")
@@ -267,13 +268,22 @@ def perform_cryptographic_analysis(file_name: str, content: str):
                 f"2. RSA Parameters: Key size {rsa_info['keySize']}, exponent e={rsa_info['exponent']}\n"
                 f"3. AES Parameters: Mode {aes_info['mode']}, Key strength {aes_info['keyStrength']}\n"
                 f"4. Source excerpt: {content[:1500]}\n\n"
-                f"Provide a brief assessment summary and specific recommendations.\n"
+                f"Provide a brief assessment summary and specific recommendations, and extract a list of all cryptographic, randomness, or mathematical algorithms/parameters mentioned in the excerpt to organize them into a structured table schema.\n"
                 f"You MUST return a JSON object exactly formatted as:\n"
                 f'{{\n'
                 f'  "securityAssessment": "Detailed analysis of the configuration vulnerabilities found.",\n'
                 f'  "findings": "A summary sentence of the overall file security status.",\n'
                 f'  "recommendations": [\n'
                 f'    {{"priority": "Critical"|"High"|"Medium"|"Low", "action": "Specific recommendation description"}}\n'
+                f'  ],\n'
+                f'  "structuredParameters": [\n'
+                f'    {{\n'
+                f'      "category": "Algorithm"|"Entropy"|"RSA Parameter"|"AES Parameter"|"Vulnerability",\n'
+                f'      "element": "Name of the element, e.g. LCG, BBS, Key size, public exponent etc.",\n'
+                f'      "value": "The value or details discovered from the document, e.g. X0 seed, 2048-bit, GCM, etc.",\n'
+                f'      "classification": "Brief description of its role or classification.",\n'
+                f'      "status": "Critical"|"High"|"Medium"|"Low"|"Secure"\n'
+                f'    }}\n'
                 f'  ]\n'
                 f'}}'
             )
@@ -308,6 +318,8 @@ def perform_cryptographic_analysis(file_name: str, content: str):
                     findings = ai_data["findings"]
                 if "recommendations" in ai_data and isinstance(ai_data["recommendations"], list):
                     recommendations_list = ai_data["recommendations"]
+                if "structuredParameters" in ai_data and isinstance(ai_data["structuredParameters"], list):
+                    structured_parameters_list = ai_data["structuredParameters"]
                 ai_success = True
                 print("Groq analysis succeeded!")
         except Exception as e:
@@ -331,6 +343,9 @@ def perform_cryptographic_analysis(file_name: str, content: str):
                 f'  "findings": "...",\n'
                 f'  "recommendations": [\n'
                 f'    {{"priority": "...", "action": "..."}}\n'
+                f'  ],\n'
+                f'  "structuredParameters": [\n'
+                f'    {{"category": "...", "element": "...", "value": "...", "classification": "...", "status": "..."}}\n'
                 f'  ]\n'
                 f'}}'
             )
@@ -349,10 +364,71 @@ def perform_cryptographic_analysis(file_name: str, content: str):
                     findings = ai_data["findings"]
                 if "recommendations" in ai_data and isinstance(ai_data["recommendations"], list):
                     recommendations_list = ai_data["recommendations"]
+                if "structuredParameters" in ai_data and isinstance(ai_data["structuredParameters"], list):
+                    structured_parameters_list = ai_data["structuredParameters"]
                 ai_success = True
                 print("Ollama analysis succeeded!")
         except Exception as e:
             print(f"Ollama local query skipped or failed. Error: {e}")
+
+    # Build unstructured chunks
+    unstructured_chunks_list = get_unstructured_chunks(content)
+
+    # Build structured parameters if not populated by AI
+    if not structured_parameters_list:
+        structured_parameters_list = [
+            {
+                "category": "AES Parameter",
+                "element": "Encryption Mode",
+                "value": aes_info["mode"],
+                "classification": "Symmetric Block Cipher Mode",
+                "status": "Secure" if aes_info["mode"] == "GCM" else "High"
+            },
+            {
+                "category": "RSA Parameter",
+                "element": "Key Size",
+                "value": f"{rsa_info['keySize']}-bit",
+                "classification": "Asymmetric Key Strength",
+                "status": "Secure" if rsa_info["keySize"] >= 3072 else "Low"
+            },
+            {
+                "category": "RSA Parameter",
+                "element": "Public Exponent",
+                "value": f"e={rsa_info['exponent']}",
+                "classification": "Asymmetric Public Exponent",
+                "status": "Secure" if rsa_info["exponent"] == 65537 else "Critical"
+            },
+            {
+                "category": "Entropy",
+                "element": "Shannon Entropy",
+                "value": f"{entropy_val} / 8.0",
+                "classification": "Information Density Randomness",
+                "status": "Secure" if entropy_val >= 7.5 else "Low"
+            }
+        ]
+        
+        # Heuristically add LCG / BBS if present in text
+        t_lower = content.lower()
+        if "lcg" in t_lower or "linear congruential" in t_lower:
+            structured_parameters_list.append({
+                "category": "Algorithm",
+                "element": "Linear Congruential Generator (LCG)",
+                "value": "Modulus m, Multiplier a, Increment c",
+                "classification": "Mathematical PRNG algorithm",
+                "status": "Critical"
+            })
+        if "bbs" in t_lower or "blum blum shub" in t_lower:
+            structured_parameters_list.append({
+                "category": "Algorithm",
+                "element": "Blum Blum Shub (BBS)",
+                "value": "p, q primes, seed s",
+                "classification": "Cryptographically Secure PRNG",
+                "status": "Secure"
+            })
+
+    # Pack both tables into patterns dict
+    pattern_info["unstructuredChunks"] = unstructured_chunks_list
+    pattern_info["structuredParameters"] = structured_parameters_list
 
     # Build the final Report structure
     report_id = f"rpt-{str(uuid.uuid4())[:8]}"
