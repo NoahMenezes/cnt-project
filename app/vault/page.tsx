@@ -19,7 +19,6 @@ const NAV = [
   { title: "Hybrid Lab", href: "/hybrid-lab" },
   { title: "Reports", href: "/reports" },
   { title: "Key Vault", href: "/vault", isActive: true },
-  { title: "Profile", href: "/profile" },
 ];
 
 function getFileIcon(name: string) {

@@ -22,7 +22,6 @@ const NAV = [
   { title: "Hybrid Lab", href: "/hybrid-lab" },
   { title: "Reports", href: "/reports", isActive: true },
   { title: "Key Vault", href: "/vault" },
-  { title: "Profile", href: "/profile" },
 ];
 
 function scoreColor(s: number) {

@@ -119,7 +119,6 @@ export default function Dashboard() {
     { title: "Hybrid Lab", href: "/hybrid-lab" },
     { title: "Reports", href: "/reports" },
     { title: "Key Vault", href: "/vault" },
-    { title: "Profile", href: "/profile" },
   ];
 
   const [hasMounted, setHasMounted] = useState(false);
