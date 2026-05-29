@@ -378,11 +378,12 @@ export default function Dashboard() {
   ];
 
   const [hasMounted, setHasMounted] = useState(false);
-  const [reports, setReports] = useState<Report[]>(() => getReports());
+  const [reports, setReports] = useState<Report[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => {
+      setReports(getReports());
       setHasMounted(true);
     }, 0);
     const handler = () => setReports(getReports());

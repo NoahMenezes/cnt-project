@@ -22,16 +22,24 @@ const NAV = [
 ];
 
 export default function KeyVaultPage() {
-  const [keys, setKeys] = useState<CryptographicKey[]>(() => getKeys());
+  const [keys, setKeys] = useState<CryptographicKey[]>([]);
   const [search, setSearch] = useState("");
   const [visibleKeyIds, setVisibleKeyIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    // Populate state asynchronously on client mount
+    const t = setTimeout(() => {
+      setKeys(getKeys());
+    }, 0);
+
     const handleUpdate = () => {
       setKeys(getKeys());
     };
     window.addEventListener("cipher_scope_db_update", handleUpdate);
-    return () => window.removeEventListener("cipher_scope_db_update", handleUpdate);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("cipher_scope_db_update", handleUpdate);
+    };
   }, []);
 
   const handleCopy = (val: string) => {

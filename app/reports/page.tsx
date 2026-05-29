@@ -145,8 +145,8 @@ function DetailPanel({ report, onClose }: { report: Report; onClose: () => void 
 const PER_PAGE = 5;
 
 export default function ReportsPage() {
-  const [reports, setReports] = useState<Report[]>(() => getReports());
-  const [keys, setKeys] = useState<CryptographicKey[]>(() => getKeys());
+  const [reports, setReports] = useState<Report[]>([]);
+  const [keys, setKeys] = useState<CryptographicKey[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<"analysisDate" | "securityScore" | "fileName">("analysisDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -156,6 +156,12 @@ export default function ReportsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Populate state asynchronously on client mount
+    const t = setTimeout(() => {
+      setReports(getReports());
+      setKeys(getKeys());
+    }, 0);
+
     const checkQueryParam = () => {
       if (typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search);
@@ -178,7 +184,10 @@ export default function ReportsPage() {
     };
 
     window.addEventListener("cipher_scope_db_update", handleUpdate);
-    return () => window.removeEventListener("cipher_scope_db_update", handleUpdate);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("cipher_scope_db_update", handleUpdate);
+    };
   }, []);
 
   const filtered = useMemo(() => {
