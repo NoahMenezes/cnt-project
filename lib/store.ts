@@ -46,68 +46,59 @@ export interface Report {
 }
 
 let cachedReports: Report[] = [];
-let isAuthInitialized = false;
+let isStoreInitialized = false;
 
-// Function to trigger update events to keep components reactive
+// Dispatch update events to keep components reactive
 function notifyUpdate() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("cipher_scope_db_update"));
   }
 }
 
-// Load initial guest/local storage fallback and listen for Supabase auth state changes
-if (typeof window !== "undefined" && !isAuthInitialized) {
-  isAuthInitialized = true;
-  
+// Load from localStorage on startup (Clerk userId fetched per-operation via API)
+if (typeof window !== "undefined" && !isStoreInitialized) {
+  isStoreInitialized = true;
   try {
     const local = localStorage.getItem("cipher_scope_reports_db");
     if (local) cachedReports = JSON.parse(local);
   } catch {}
+}
 
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    if (session?.user) {
-      // Fetch authenticated user's reports from Supabase database
-      const { data } = await supabase
-        .from("reports")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (data) {
-        cachedReports = data.map((row: Record<string, unknown>) => ({
-          id: row.id as string,
-          fileName: row.file_name as string,
-          type: row.type as string,
-          fileSize: row.file_size as string,
-          analysisDate: row.analysis_date as string,
-          securityScore: row.security_score as number,
-          status: row.status as string,
-          entropy: row.entropy as Report["entropy"],
-          rsa: row.rsa as Report["rsa"],
-          aes: row.aes as Report["aes"],
-          patterns: row.patterns as Report["patterns"],
-          recommendations: row.recommendations as Report["recommendations"],
-          findings: row.findings as string,
-        }));
-        notifyUpdate();
-      }
-    } else {
-      // Fallback to local storage reports if logged out
-      try {
-        const local = localStorage.getItem("cipher_scope_reports_db");
-        cachedReports = local ? JSON.parse(local) : [];
-      } catch {
-        cachedReports = [];
-      }
-      notifyUpdate();
-    }
-  });
+/** Call this once after Clerk user loads to pull Supabase records for that user */
+export async function syncReportsForUser(clerkUserId: string) {
+  const { data } = await supabase
+    .from("reports")
+    .select("*")
+    .eq("user_id", clerkUserId)
+    .order("created_at", { ascending: false });
+  if (data) {
+    cachedReports = data.map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      fileName: row.file_name as string,
+      type: row.type as string,
+      fileSize: row.file_size as string,
+      analysisDate: row.analysis_date as string,
+      securityScore: row.security_score as number,
+      status: row.status as string,
+      entropy: row.entropy as Report["entropy"],
+      rsa: row.rsa as Report["rsa"],
+      aes: row.aes as Report["aes"],
+      patterns: row.patterns as Report["patterns"],
+      recommendations: row.recommendations as Report["recommendations"],
+      findings: row.findings as string,
+    }));
+    try {
+      localStorage.setItem("cipher_scope_reports_db", JSON.stringify(cachedReports));
+    } catch {}
+    notifyUpdate();
+  }
 }
 
 export function getReports(): Report[] {
   return cachedReports;
 }
 
-export function saveReport(report: Report): void {
-  // 1. Optimistic local cache save
+export function saveReport(report: Report, clerkUserId?: string): void {
   cachedReports = [report, ...cachedReports.filter((r) => r.id !== report.id)];
   notifyUpdate();
 
@@ -116,37 +107,33 @@ export function saveReport(report: Report): void {
       localStorage.setItem("cipher_scope_reports_db", JSON.stringify(cachedReports));
     } catch {}
 
-    // 2. Async database sync
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        supabase
-          .from("reports")
-          .upsert({
-            id: report.id,
-            user_id: session.user.id,
-            file_name: report.fileName,
-            type: report.type,
-            file_size: report.fileSize,
-            analysis_date: report.analysisDate,
-            security_score: report.securityScore,
-            status: report.status,
-            entropy: report.entropy,
-            rsa: report.rsa,
-            aes: report.aes,
-            patterns: report.patterns,
-            recommendations: report.recommendations,
-            findings: report.findings,
-          })
-          .then(({ error }) => {
-            if (error) console.error("Failed to sync report to Supabase:", error);
-          });
-      }
-    });
+    if (clerkUserId) {
+      supabase
+        .from("reports")
+        .upsert({
+          id: report.id,
+          user_id: clerkUserId,
+          file_name: report.fileName,
+          type: report.type,
+          file_size: report.fileSize,
+          analysis_date: report.analysisDate,
+          security_score: report.securityScore,
+          status: report.status,
+          entropy: report.entropy,
+          rsa: report.rsa,
+          aes: report.aes,
+          patterns: report.patterns,
+          recommendations: report.recommendations,
+          findings: report.findings,
+        })
+        .then(({ error }) => {
+          if (error) console.error("Failed to sync report to Supabase:", error);
+        });
+    }
   }
 }
 
-export function deleteReport(id: string): void {
-  // 1. Optimistic local cache delete
+export function deleteReport(id: string, clerkUserId?: string): void {
   cachedReports = cachedReports.filter((r) => r.id !== id);
   notifyUpdate();
 
@@ -155,18 +142,15 @@ export function deleteReport(id: string): void {
       localStorage.setItem("cipher_scope_reports_db", JSON.stringify(cachedReports));
     } catch {}
 
-    // 2. Async database delete
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        supabase
-          .from("reports")
-          .delete()
-          .eq("id", id)
-          .then(({ error }) => {
-            if (error) console.error("Failed to delete report from Supabase:", error);
-          });
-      }
-    });
+    if (clerkUserId) {
+      supabase
+        .from("reports")
+        .delete()
+        .eq("id", id)
+        .then(({ error }) => {
+          if (error) console.error("Failed to delete report from Supabase:", error);
+        });
+    }
   }
 }
 
@@ -179,59 +163,54 @@ export interface CryptographicKey {
   label: string;
   generatedAt: string;
   description?: string;
-  // Encryption context — stored when a key is tied to an encrypted document
-  plaintextSnippet?: string;    // first 200 chars of original plaintext
-  ciphertextPayload?: string;   // full ciphertext (encrypted document body)
-  encryptedSessionKey?: string; // RSA-encrypted AES session key
-  aesIV?: string;               // AES initialization vector
-  aesMode?: string;             // AES mode used (GCM, CBC, ECB)
-  pairedKeyId?: string;         // id of the matching RSA key in the pair
+  plaintextSnippet?: string;
+  ciphertextPayload?: string;
+  encryptedSessionKey?: string;
+  aesIV?: string;
+  aesMode?: string;
+  pairedKeyId?: string;
 }
 
 let cachedKeys: CryptographicKey[] = [];
+let isKeysInitialized = false;
 
-// Initialize key loading
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && !isKeysInitialized) {
+  isKeysInitialized = true;
   try {
     const localKeys = localStorage.getItem("cipher_scope_keys_db");
     if (localKeys) cachedKeys = JSON.parse(localKeys);
   } catch {}
+}
 
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    if (session?.user) {
-      const { data } = await supabase
-        .from("cryptographic_keys")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (data) {
-        cachedKeys = data.map((row: Record<string, unknown>) => ({
-          id: row.id as string,
-          keyType: row.key_type as CryptographicKey["keyType"],
-          keyValue: row.key_value as string,
-          keySize: row.key_size as number,
-          label: row.label as string,
-          generatedAt: row.generated_at as string,
-          description: row.description as string,
-        }));
-        notifyUpdate();
-      }
-    } else {
-      try {
-        const localKeys = localStorage.getItem("cipher_scope_keys_db");
-        cachedKeys = localKeys ? JSON.parse(localKeys) : [];
-      } catch {
-        cachedKeys = [];
-      }
-      notifyUpdate();
-    }
-  });
+/** Call once after Clerk user loads to pull Supabase keys for that user */
+export async function syncKeysForUser(clerkUserId: string) {
+  const { data } = await supabase
+    .from("cryptographic_keys")
+    .select("*")
+    .eq("user_id", clerkUserId)
+    .order("created_at", { ascending: false });
+  if (data) {
+    cachedKeys = data.map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      keyType: row.key_type as CryptographicKey["keyType"],
+      keyValue: row.key_value as string,
+      keySize: row.key_size as number,
+      label: row.label as string,
+      generatedAt: row.generated_at as string,
+      description: row.description as string,
+    }));
+    try {
+      localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
+    } catch {}
+    notifyUpdate();
+  }
 }
 
 export function getKeys(): CryptographicKey[] {
   return cachedKeys;
 }
 
-export function saveKey(key: CryptographicKey): void {
+export function saveKey(key: CryptographicKey, clerkUserId?: string): void {
   cachedKeys = [key, ...cachedKeys.filter((k) => k.id !== key.id)];
   notifyUpdate();
 
@@ -240,29 +219,27 @@ export function saveKey(key: CryptographicKey): void {
       localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
     } catch {}
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        supabase
-          .from("cryptographic_keys")
-          .upsert({
-            id: key.id,
-            user_id: session.user.id,
-            key_type: key.keyType,
-            key_value: key.keyValue,
-            key_size: key.keySize,
-            label: key.label,
-            generated_at: key.generatedAt,
-            description: key.description,
-          })
-          .then(({ error }) => {
-            if (error) console.error("Failed to sync key to Supabase:", error);
-          });
-      }
-    });
+    if (clerkUserId) {
+      supabase
+        .from("cryptographic_keys")
+        .upsert({
+          id: key.id,
+          user_id: clerkUserId,
+          key_type: key.keyType,
+          key_value: key.keyValue,
+          key_size: key.keySize,
+          label: key.label,
+          generated_at: key.generatedAt,
+          description: key.description,
+        })
+        .then(({ error }) => {
+          if (error) console.error("Failed to sync key to Supabase:", error);
+        });
+    }
   }
 }
 
-export function deleteKey(id: string): void {
+export function deleteKey(id: string, clerkUserId?: string): void {
   cachedKeys = cachedKeys.filter((k) => k.id !== id);
   notifyUpdate();
 
@@ -271,29 +248,29 @@ export function deleteKey(id: string): void {
       localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
     } catch {}
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        supabase
-          .from("cryptographic_keys")
-          .delete()
-          .eq("id", id)
-          .then(({ error }) => {
-            if (error) console.error("Failed to delete key from Supabase:", error);
-          });
-      }
-    });
+    if (clerkUserId) {
+      supabase
+        .from("cryptographic_keys")
+        .delete()
+        .eq("id", id)
+        .then(({ error }) => {
+          if (error) console.error("Failed to delete key from Supabase:", error);
+        });
+    }
   }
 }
 
 export function getStats() {
   const reports = getReports();
   const totalFiles = reports.length;
-  
-  const avgSecurityScore = totalFiles > 0
-    ? parseFloat((reports.reduce((acc, r) => acc + r.securityScore, 0) / totalFiles).toFixed(1))
-    : 0;
 
-  // RSA Key Size distribution
+  const avgSecurityScore =
+    totalFiles > 0
+      ? parseFloat(
+          (reports.reduce((acc, r) => acc + r.securityScore, 0) / totalFiles).toFixed(1)
+        )
+      : 0;
+
   let rsa4096 = 0;
   let rsa2048 = 0;
   let rsaWeak = 0;
@@ -306,7 +283,6 @@ export function getStats() {
 
   const totalRsa = rsa4096 + rsa2048 + rsaWeak || 1;
 
-  // File categories count
   const fileCategories: Record<string, number> = {};
   reports.forEach((r) => {
     const cat = r.type + " Files";
@@ -316,11 +292,13 @@ export function getStats() {
   const formattedCategories = Object.entries(fileCategories).map(([label, value]) => ({
     label,
     value: value.toString(),
-    subtitle: `${value} file${value > 1 ? "s" : ""}`
+    subtitle: `${value} file${value > 1 ? "s" : ""}`,
   }));
 
-  // Vulnerability counts
-  const vulnerabilitiesCount = reports.reduce((acc, r) => acc + r.rsa.vulnerabilities.length, 0);
+  const vulnerabilitiesCount = reports.reduce(
+    (acc, r) => acc + r.rsa.vulnerabilities.length,
+    0
+  );
 
   return {
     totalFiles,
@@ -333,9 +311,12 @@ export function getStats() {
     ],
     fileCategories: formattedCategories.slice(0, 3),
     recentEvents: reports.slice(0, 3).map((r) => ({
-      label: r.status === "Critical" || r.status === "Weak" ? "RSA Weak Modulus Flagged" : "File Analyzed",
+      label:
+        r.status === "Critical" || r.status === "Weak"
+          ? "RSA Weak Modulus Flagged"
+          : "File Analyzed",
       value: "Just now",
-      subtitle: r.fileName
-    }))
+      subtitle: r.fileName,
+    })),
   };
 }

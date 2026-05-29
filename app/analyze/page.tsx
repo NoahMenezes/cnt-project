@@ -544,71 +544,67 @@ export default function OperationPage() {
     <div className="relative min-h-screen bg-background">
       <Header navigationData={navData} />
 
-      <main className="relative z-10 pt-20 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="flex flex-col gap-8">
+    <main className="relative z-10 pt-6 pb-16 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
+        <div className="flex flex-col gap-6">
           
           {/* Page Title Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
-              <Badge variant="outline" className="border-primary/30 text-primary mb-2">
-                <Zap className="h-3 w-3 mr-1 animate-pulse" /> Cryptographic Workspace
-              </Badge>
-              <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-                Document Operation Lab
-              </h1>
-              <p className="text-sm text-foreground/50 mt-1">
-                Upload raw documents, execute robust hybrid RSA-AES encryption layers, inspect ciphertext data, and safely decrypt original payloads.
+              <div className="flex items-center gap-2 mb-1">
+                <Zap className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs text-primary font-medium tracking-wide uppercase">Cryptographic Workspace</span>
+              </div>
+              <h1 className="text-xl font-bold tracking-tight text-foreground">Document Operation Lab</h1>
+              <p className="text-xs text-foreground/40 mt-0.5">
+                Hybrid RSA-AES encryption, ciphertext inspection, and document recovery.
               </p>
             </div>
-            
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => {
-                setPlaintext("// Welcome to the Operation Lab Cryptographic Editor.\nHello, Cryptography World!");
-                setCiphertext("");
-                setDecryptedText("");
-                setIsDecrypted(false);
-                addLog("Workspace cleared successfully.", "info");
-              }} className="border-border/60 hover:bg-foreground/[0.04]">
-                <Trash2 className="h-4 w-4 mr-2" /> Clear All
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={() => {
+              setPlaintext("");
+              setCiphertext("");
+              setDecryptedText("");
+              setIsDecrypted(false);
+              addLog("Workspace cleared.", "info");
+            }} className="h-8 text-xs border-border/50 hover:bg-foreground/[0.04] shrink-0">
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Clear All
+            </Button>
           </div>
 
-          {/* Encryption & Decryption Action Buttons */}
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-            <Button 
-              onClick={handleEncrypt} 
+          {/* Encrypt button + mode toggle — compact single row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={handleEncrypt}
               disabled={isProcessing}
-              className="flex-1 w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 text-base"
+              size="sm"
+              className="h-8 px-4 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground"
             >
-              <Lock className="h-5 w-5 mr-2" /> Run Hybrid Encryption
+              <Lock className="h-3.5 w-3.5 mr-1.5" />
+              {isProcessing ? "Encrypting…" : "Run Hybrid Encryption"}
             </Button>
 
-            <div className="flex items-center gap-3 bg-foreground/[0.03] border border-border/20 rounded-xl p-2 shrink-0 w-full md:w-auto justify-between md:justify-start">
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEncryptionOption("rsa_payload")}
-                  className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${
-                    encryptionOption === "rsa_payload"
-                      ? "bg-primary text-primary-foreground shadow"
-                      : "text-foreground/50 hover:bg-foreground/[0.04]"
-                  }`}
-                >
-                  RSA Encrypted (Double)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEncryptionOption("standard")}
-                  className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${
-                    encryptionOption === "standard"
-                      ? "bg-primary text-primary-foreground shadow"
-                      : "text-foreground/50 hover:bg-foreground/[0.04]"
-                  }`}
-                >
-                  Standard Hybrid (AES)
-                </button>
-              </div>
+            <div className="flex items-center gap-1 bg-foreground/[0.03] border border-border/20 rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => setEncryptionOption("rsa_payload")}
+                className={`text-[11px] font-medium px-2.5 py-1 rounded-md transition-all ${
+                  encryptionOption === "rsa_payload"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-foreground/50 hover:text-foreground"
+                }`}
+              >
+                RSA+AES (Double)
+              </button>
+              <button
+                type="button"
+                onClick={() => setEncryptionOption("standard")}
+                className={`text-[11px] font-medium px-2.5 py-1 rounded-md transition-all ${
+                  encryptionOption === "standard"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-foreground/50 hover:text-foreground"
+                }`}
+              >
+                AES Only
+              </button>
             </div>
           </div>
 
@@ -617,10 +613,10 @@ export default function OperationPage() {
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`group relative mx-auto w-full max-w-3xl rounded-2xl border-2 border-dashed p-6 text-center cursor-pointer transition-all duration-300 ${
+            className={`group relative mx-auto w-full rounded-xl border-2 border-dashed p-4 text-center cursor-pointer transition-all duration-300 ${
               isDragging
                 ? "border-primary bg-primary/[0.04]"
-                : "border-border/40 bg-background/40 hover:border-border/80 hover:bg-foreground/[0.02]"
+                : "border-border/30 bg-background/30 hover:border-border/60 hover:bg-foreground/[0.02]"
             }`}
           >
             <input
@@ -634,30 +630,36 @@ export default function OperationPage() {
               accept=".txt,.pdf,.docx,.json,.csv"
             />
             {isUploading ? (
-              <div className="space-y-3">
-                <RefreshCw className="h-8 w-8 mx-auto text-primary animate-spin" />
-                <p className="text-sm font-semibold text-foreground">Processing Document...</p>
-                <div className="h-1.5 w-48 bg-foreground/10 rounded-full mx-auto overflow-hidden">
-                  <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+              <div className="flex items-center justify-center gap-3 py-1">
+                <RefreshCw className="h-4 w-4 text-primary animate-spin" />
+                <div className="text-left">
+                  <p className="text-xs font-semibold text-foreground">Processing…</p>
+                  <div className="h-1 w-32 bg-foreground/10 rounded-full mt-1 overflow-hidden">
+                    <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="space-y-2">
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-foreground/[0.04] text-foreground/50 group-hover:scale-105 transition-transform">
-                  <Upload className="h-5 w-5" />
+              <div className="flex items-center justify-center gap-3 py-1">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground/[0.04] text-foreground/40 group-hover:scale-105 transition-transform shrink-0">
+                  <Upload className="h-4 w-4" />
                 </div>
-                <p className="text-sm font-semibold text-foreground">
-                  Drag &amp; drop document, or <span className="text-primary hover:underline">browse files</span>
-                </p>
-                <p className="text-xs text-foreground/40">
-                  Supports PDF, DOCX, CSV, TXT, JSON (Max 10MB)
-                </p>
+                <div className="text-left">
+                  <p className="text-xs font-semibold text-foreground">
+                    Drag & drop document, or <span className="text-primary">browse files</span>
+                  </p>
+                  <p className="text-[10px] text-foreground/35">PDF, DOCX, CSV, TXT, JSON · Max 10 MB</p>
+                </div>
+                {uploadedFile && (
+                  <span className="ml-auto text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                    {uploadedFile.name}
+                  </span>
+                )}
               </div>
             )}
           </div>
 
-          
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
             <div className="rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-border/20 pb-3">
                 <div className="flex items-center gap-2">
@@ -771,17 +773,17 @@ export default function OperationPage() {
             )}
           </AnimatePresence>
 
-          {/* Key Generation & Management Section */}
-          <div className="rounded-2xl border border-primary/30 bg-primary/[0.03] p-6 backdrop-blur">
-            <div className="flex items-center gap-3 mb-4">
-              <Key className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-bold text-foreground">Generate & Store Cryptographic Keys</h2>
+          {/* Key Generation Section */}
+          <div className="rounded-xl border border-border/30 bg-foreground/[0.02] p-4 backdrop-blur">
+            <div className="flex items-center gap-2 mb-3">
+              <Key className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold text-foreground">Generate & Store Cryptographic Keys</h2>
             </div>
-            <p className="text-sm text-foreground/60 mb-4">
-              Generate the essential keys needed for RSA+AES hybrid encryption: RSA Public/Private Keypair, and AES Session Key. All keys will be securely stored in your Supabase database.
+            <p className="text-xs text-foreground/50 mb-3">
+              Generate RSA public/private keypair and AES session key. Keys are stored in your Vault.
             </p>
             
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 bg-foreground/[0.02] border border-border/10 rounded-xl p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3 bg-foreground/[0.02] border border-border/10 rounded-lg p-3">
               <div>
                 <label className="block text-[10px] font-semibold text-foreground/60 uppercase tracking-wider mb-2">RSA Modulus Size</label>
                 <select
@@ -834,7 +836,7 @@ export default function OperationPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Generate RSA Key Pair */}
               <Button 
                 disabled={!plaintext.trim()}
@@ -891,9 +893,9 @@ export default function OperationPage() {
                   ]);
                   addLog(`Generated and saved RSA ${rsaBits}-bit Key Pair`, "success");
                 }}
-                className="bg-blue-500/80 hover:bg-blue-600 text-white font-semibold flex items-center justify-center gap-2 py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                className="h-8 text-xs bg-blue-500/80 hover:bg-blue-600 text-white font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <Shield className="h-4 w-4" /> Generate RSA Key Pair
+                <Shield className="h-3.5 w-3.5" /> Generate RSA Keypair
               </Button>
 
               {/* Generate AES Session Key */}
@@ -931,9 +933,9 @@ export default function OperationPage() {
                   ]);
                   addLog(`Generated and saved AES ${aesBits}-bit Session Key`, "success");
                 }}
-                className="bg-emerald-500/80 hover:bg-emerald-600 text-white font-semibold flex items-center justify-center gap-2 py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                className="h-8 text-xs bg-emerald-500/80 hover:bg-emerald-600 text-white font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <Zap className="h-4 w-4" /> Generate AES Session Key
+                <Zap className="h-3.5 w-3.5" /> Generate AES Key
               </Button>
             </div>
 
@@ -988,7 +990,7 @@ export default function OperationPage() {
             )}
           </div>
 
-          <div className="mt-4 flex justify-end">
+          <div className="flex justify-end">
             <Button
               onClick={() => {
                 if (!rsaKeys && !aesKey) {
@@ -1033,9 +1035,10 @@ export default function OperationPage() {
                 addLog("Workspace keys successfully saved to Vault.", "success");
                 router.push("/vault");
               }}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 py-2.5 rounded-xl shadow flex items-center gap-2"
+              size="sm"
+              className="h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 rounded-lg shadow flex items-center gap-1.5"
             >
-              <Save className="h-4 w-4" /> Save Keys & Open Key Vault
+              <Save className="h-3.5 w-3.5" /> Save Keys & Open Vault
             </Button>
           </div>
 
