@@ -445,6 +445,27 @@ export default function HybridLabPage() {
       }
       const { d, n } = parsed;
 
+      // Enforce strict key matching: verify that the modulus (n) of the private key matches the document's key modulus
+      if (selectedKey) {
+        let expectedN: bigint | null = null;
+        if (selectedKey.keyType === "RSA_PUBLIC") {
+          const pubParsed = extractRSAPublicNumbers(selectedKey.keyValue);
+          if (pubParsed) expectedN = pubParsed.n;
+        } else if (selectedKey.keyType === "RSA_PRIVATE") {
+          const privParsed = extractRSAPrivateNumbers(selectedKey.keyValue);
+          if (privParsed) expectedN = privParsed.n;
+        }
+
+        if (!expectedN && pairedPrivateKey) {
+          const pairedParsed = extractRSAPrivateNumbers(pairedPrivateKey.keyValue);
+          if (pairedParsed) expectedN = pairedParsed.n;
+        }
+
+        if (expectedN && n !== expectedN) {
+          throw new Error("Mismatched Key Error: The pasted RSA Private Key does not mathematically match the selected document public key. Each key pair is unique; please paste the correct matching private key.");
+        }
+      }
+
       // Step 2: Get the encrypted AES session key and ciphertext
       const encSessKey = selectedKey?.encryptedSessionKey ?? "";
       let plaintext = "";

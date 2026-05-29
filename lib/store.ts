@@ -127,7 +127,13 @@ export function saveReport(report: Report, clerkUserId?: string): void {
           findings: report.findings,
         })
         .then(({ error }) => {
-          if (error) console.error("Failed to sync report to Supabase:", error);
+          if (error) {
+            console.error("Failed to sync report to Supabase:", error);
+            console.error("Supabase Error Message:", error.message);
+            console.error("Supabase Error Details:", error.details);
+            console.error("Supabase Error Hint:", error.hint);
+            console.error("Supabase Error Code:", error.code);
+          }
         });
     }
   }
@@ -148,7 +154,13 @@ export function deleteReport(id: string, clerkUserId?: string): void {
         .delete()
         .eq("id", id)
         .then(({ error }) => {
-          if (error) console.error("Failed to delete report from Supabase:", error);
+          if (error) {
+            console.error("Failed to delete report from Supabase:", error);
+            console.error("Supabase Error Message:", error.message);
+            console.error("Supabase Error Details:", error.details);
+            console.error("Supabase Error Hint:", error.hint);
+            console.error("Supabase Error Code:", error.code);
+          }
         });
     }
   }
@@ -328,6 +340,10 @@ export function saveKey(key: CryptographicKey, clerkUserId?: string): void {
         .then(({ error }) => {
           if (error) {
             console.error("Failed to sync to cryptographic_keys_v2, falling back to legacy table:", error);
+            console.error("Supabase Error Message:", error.message);
+            console.error("Supabase Error Details:", error.details);
+            console.error("Supabase Error Hint:", error.hint);
+            console.error("Supabase Error Code:", error.code);
             // Fallback to legacy v1 table with serialized metadata JSON string
             const meta = {
               description: key.description,
@@ -353,7 +369,13 @@ export function saveKey(key: CryptographicKey, clerkUserId?: string): void {
                 description: descVal,
               })
               .then(({ error: errV1 }) => {
-                if (errV1) console.error("Failed to sync to fallback cryptographic_keys table:", errV1);
+                if (errV1) {
+                  console.error("Failed to sync to fallback cryptographic_keys table:", errV1);
+                  console.error("Supabase Fallback Error Message:", errV1.message);
+                  console.error("Supabase Fallback Error Details:", errV1.details);
+                  console.error("Supabase Fallback Error Hint:", errV1.hint);
+                  console.error("Supabase Fallback Error Code:", errV1.code);
+                }
               });
           }
         });
