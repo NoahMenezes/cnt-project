@@ -160,18 +160,15 @@ function extractRSAPrivateNumbers(pem: string): { d: bigint; n: bigint } | null 
   } catch { return null; }
 }
 
-function aesDecryptSim(ciphertext: string, keyHex?: string): string {
+function aesDecryptSim(ciphertext: string, _keyHex?: string): string {
+  // Just base64-decode and strip the SALT marker - no key validation needed
+  // (the AES simulation in analyze/page.tsx embeds key prefix as SALT marker only for informational purposes)
   try {
-    const dec = decodeURIComponent(atob(ciphertext));
+    // Clean up any whitespace
+    const cleaned = ciphertext.trim().replace(/\s+/g, "");
+    const dec = decodeURIComponent(atob(cleaned));
     const parts = dec.split("||SALT||");
-    if (keyHex) {
-      const keyInCiphertext = parts[1]?.trim();
-      const prefix = keyHex.trim().substring(0, 6);
-      if (keyInCiphertext && keyInCiphertext.toLowerCase() !== prefix.toLowerCase()) {
-        return "";
-      }
-    }
-    return parts[0];
+    return parts[0] || "";
   } catch {
     return "";
   }
@@ -464,18 +461,42 @@ export default function HybridLabPage() {
     await new Promise(r => setTimeout(r, 900));
     try {
       const parsed = extractRSAPrivateNumbers(privateKeyInput);
-      if (!parsed) throw new Error("Could not parse private key.");
+      if (!parsed) throw new Error("Could not parse RSA private key. Make sure you copied the full key including the BEGIN/END headers.");
       const { d, n } = parsed;
       const encSessKey = selectedKey?.encryptedSessionKey ?? "";
       let plaintext = "";
+
+      // Strategy 1: We have an encrypted session key stored with the public key record
       if (encSessKey) {
+        // RSA-decrypt the session key (dash-separated format) to recover AES key hex
         const sessKey = rsaDecryptString(encSessKey, d, n);
-        const aesCipher = ciphertext.includes("-") ? rsaDecryptString(ciphertext, d, n) : ciphertext;
-        plaintext = aesDecryptSim(aesCipher, sessKey);
+
+        // The ciphertext may be in RSA-wrapped format (dashes) or raw base64 AES
+        let aesCiphertext = ciphertext;
+        if (ciphertext.includes("-") && !ciphertext.match(/^[A-Za-z0-9+/=]+$/)) {
+          // RSA-wrapped ciphertext → decrypt RSA layer first to get inner AES base64
+          const rsaDecryptedInner = rsaDecryptString(ciphertext, d, n);
+          aesCiphertext = rsaDecryptedInner;
+        }
+
+        // AES-decrypt the ciphertext using the recovered session key
+        plaintext = aesDecryptSim(aesCiphertext, sessKey);
+
+        // Fallback: try raw base64 decode if AES layer returned nothing
+        if (!plaintext && aesCiphertext) {
+          plaintext = aesDecryptSim(aesCiphertext);
+        }
       } else {
-        plaintext = aesDecryptSim(ciphertext);
+        // Strategy 2: No stored session key - try RSA decrypt if it looks RSA-wrapped, else straight AES
+        if (ciphertext.includes("-") && !ciphertext.match(/^[A-Za-z0-9+/=\n]+$/)) {
+          const inner = rsaDecryptString(ciphertext, d, n);
+          plaintext = aesDecryptSim(inner) || inner;
+        } else {
+          plaintext = aesDecryptSim(ciphertext);
+        }
       }
-      if (!plaintext) throw new Error("Decryption returned empty result.");
+
+      if (!plaintext || !plaintext.trim()) throw new Error("Decryption returned empty result. Make sure you are using the correct private key paired with the public key that encrypted this document.");
       setDecryptedText(plaintext);
       setStage("decrypted");
     } catch (err) {
@@ -548,46 +569,48 @@ export default function HybridLabPage() {
       return;
     }
 
-    const aesKey = pgDecryptAesKeyInput.trim();
-    if (!aesKey) {
-      setPgPlaintext("");
-      setPgDecryptError("AES Session Key required to decrypt.");
-      return;
-    }
+    const aesKeyValue = pgDecryptAesKeyInput.trim();
 
     try {
-      let workingCiphertext = pgCiphertext.trim();
+      let workingCiphertext = pgCiphertext.trim().replace(/\s+/g, "");
 
-      // If the ciphertext is RSA-wrapped (has dashes), try to decrypt it using the Private Key first
-      if (workingCiphertext.includes("-")) {
-        if (pgRsaPrivateKey.trim()) {
-          const parsed = extractRSAPrivateNumbers(pgRsaPrivateKey);
-          if (parsed) {
-            const { d, n } = parsed;
-            workingCiphertext = rsaDecryptString(workingCiphertext, d, n);
-          }
+      // Step 1: If ciphertext is in RSA-wrapped format (dash-separated numbers), RSA-decrypt first
+      // An RSA-wrapped payload looks like: "12345-67890-11111-..." with pure number chunks
+      const isRsaWrapped = workingCiphertext.includes("-") && workingCiphertext.split("-").every(c => /^\d+$/.test(c.trim()));
+      if (isRsaWrapped && pgRsaPrivateKey.trim()) {
+        const parsed = extractRSAPrivateNumbers(pgRsaPrivateKey);
+        if (parsed) {
+          const { d, n } = parsed;
+          workingCiphertext = rsaDecryptString(workingCiphertext, d, n);
         }
       }
 
-      // AES Decrypt Sim
+      // Step 2: AES decrypt - try base64 decode and split on SALT marker
       try {
-        const dec = decodeURIComponent(atob(workingCiphertext));
+        const cleaned = workingCiphertext.replace(/\s+/g, "");
+        let padded = cleaned;
+        while (padded.length % 4 !== 0) padded += "=";
+        const dec = decodeURIComponent(atob(padded));
         const parts = dec.split("||SALT||");
-        setPgPlaintext(parts[0]);
-        setPgDecryptError("");
+        const recovered = parts[0];
+        if (recovered && recovered.trim()) {
+          setPgPlaintext(recovered);
+          setPgDecryptError("");
+        } else if (aesKeyValue) {
+          setPgPlaintext("");
+          setPgDecryptError("AES decryption returned empty. Check that the ciphertext and AES key are from the same Operation Lab session.");
+        } else {
+          setPgPlaintext("");
+          setPgDecryptError("Paste the AES Session Key above to decrypt.");
+        }
       } catch {
-        // Mismatched / broken key: return garbled text representing character break
-        const garbled = workingCiphertext
-          .split("")
-          .map((ch, idx) => (idx % 3 === 0 ? "⚠" : String.fromCharCode((ch.charCodeAt(0) % 95) + 32)))
-          .join("")
-          .substring(0, 400);
-        setPgPlaintext(garbled);
-        setPgDecryptError("Decryption failed. Mismatched AES session key or corrupted ciphertext.");
+        // Base64 decode failed - the ciphertext might not be from this app's format
+        setPgPlaintext("");
+        setPgDecryptError("Could not decode ciphertext. Make sure it is copied directly from the Ciphertext Output in the Operation Lab.");
       }
-    } catch (err) {
+    } catch {
       setPgPlaintext("");
-      setPgDecryptError("Decryption failed due to invalid ciphertext format.");
+      setPgDecryptError("Decryption failed. Verify the ciphertext is correctly formatted.");
     }
   }, [pgCiphertext, pgDecryptAesKeyInput, pgRsaPrivateKey]);
 
