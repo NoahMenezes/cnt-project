@@ -22,7 +22,6 @@ const NAV = [
   { title: "Hybrid Lab", href: "/hybrid-lab", isActive: true },
   { title: "Reports", href: "/reports" },
   { title: "Key Vault", href: "/vault" },
-  { title: "Visualizations", href: "/visualizations" },
   { title: "Profile", href: "/profile" },
 ];
 
