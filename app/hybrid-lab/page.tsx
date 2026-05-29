@@ -408,6 +408,29 @@ export default function HybridLabPage() {
     }
   }, [pgCiphertext, pgDecryptAesKeyInput, pgRsaPrivateKey]);
 
+  const handleLoadDemoData = useCallback(() => {
+    setPgAesKey("5d7e3a2b8c9d0e1f2a3b4c5d6e7f8a9b");
+    setPgRsaPublicKey("-----BEGIN PUBLIC KEY-----\nNjQzODY5MzM5ODI2NjE=\nNjU1Mzc=\n-----END PUBLIC KEY-----");
+    setPgWrappedKey("8558004898116-62416693054577-17086801462632-37845510878773-50660605962636-36640857652316-1738094783779-52388149354949-44883697935429-15684957561458-41476606189793-62416693054577-25969664356656-37845510878773-33746819099818-25595458048334-1738094783779-36640857652316-50660605962636-52388149354949-22374542698118-15684957561458-8558004898116-62416693054577-3768925979207-37845510878773-17086801462632-25595458048334-44883697935429-36640857652316-41476606189793-52388149354949");
+    setPgCiphertext("Q09ORklERU5USUFMJTNBJTIwVGhlJTIwaHlicmlkJTIwZW5jcnlwdGlvbiUyMHByb3RvY29sJTIwaGFzJTIwYmVlbiUyMHN1Y2Nlc3NmdWxseSUyMHZlcmlmaWVkLiU3QyU3Q1NBTFQlN0MlN0M1ZDdlM2E=");
+    setPgRsaPrivateKey("-----BEGIN RSA PRIVATE KEY-----\nNjQzODY5MzM5ODI2NjE=\nMjEyNjE4OTQyMjE4MjU=\n-----END RSA PRIVATE KEY-----");
+    setPgDecryptAesKeyInput("5d7e3a2b8c9d0e1f2a3b4c5d6e7f8a9b");
+    setPgWrapError("");
+    setPgDecryptError("");
+  }, []);
+
+  const handleClearAllPlayground = useCallback(() => {
+    setPgAesKey("");
+    setPgRsaPublicKey("");
+    setPgWrappedKey("");
+    setPgCiphertext("");
+    setPgRsaPrivateKey("");
+    setPgDecryptAesKeyInput("");
+    setPgPlaintext("");
+    setPgWrapError("");
+    setPgDecryptError("");
+  }, []);
+
   return (
     <div className="relative min-h-screen bg-background">
       <Header navigationData={NAV} />
@@ -739,57 +762,111 @@ export default function HybridLabPage() {
               </div>
             ) : (
               /* --- Interactive Cryptographic Playground Tab --- */
-              <div className="grid gap-6 lg:grid-cols-2">
-
-                {/* Left Card: Key Wrapping Sandbox */}
-                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-5">
-                  <div className="flex items-center justify-between border-b border-border/10 pb-3">
+              <div className="space-y-6">
+                {/* Guide & Preset Controller Banner */}
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-2xl border border-primary/25 bg-primary/5 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 backdrop-blur"
+                >
+                  <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <Layers className="h-5 w-5 text-blue-400" />
-                      <div>
-                        <h2 className="text-base font-bold text-foreground">Asymmetric Key Wrapping</h2>
-                        <p className="text-xs text-foreground/40">Encrypt an AES Session Key using an RSA Public Key</p>
+                      <Sparkles className="h-4.5 w-4.5 text-primary animate-pulse" />
+                      <h3 className="text-sm font-bold text-foreground">Interactive Playground Sandbox</h3>
+                    </div>
+                    <p className="text-xs text-foreground/60 max-w-2xl leading-relaxed">
+                      This sandbox lets you manually wrap a symmetric key with an RSA public key, and then decrypt the final payload. If you are new to hybrid encryption, click <strong>Load Demo Scenario</strong> to run a pre-configured flow.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2.5 shrink-0">
+                    <Button
+                      onClick={handleLoadDemoData}
+                      size="sm"
+                      className="rounded-xl text-xs h-9 font-bold bg-primary hover:bg-primary/95 text-primary-foreground gap-1.5"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" /> Load Demo Scenario
+                    </Button>
+                    <Button
+                      onClick={handleClearAllPlayground}
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl text-xs h-9 text-foreground/60 border-border/40 hover:text-foreground hover:bg-background/80"
+                    >
+                      Reset Sandbox
+                    </Button>
+                  </div>
+                </motion.div>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+
+                  {/* Left Card: Key Wrapping Sandbox */}
+                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-5">
+                    <div className="flex items-center justify-between border-b border-border/10 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-5 w-5 text-blue-400" />
+                        <div>
+                          <h2 className="text-base font-bold text-foreground">Asymmetric Key Wrapping</h2>
+                          <p className="text-xs text-foreground/40">Encrypt an AES Session Key using an RSA Public Key</p>
+                        </div>
                       </div>
+                      <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/5">
+                        RSA Wrap
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/5">
-                      RSA Wrap
-                    </Badge>
-                  </div>
 
-                  {/* AES Session Key Input */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">AES Session Key</label>
-                      <button
-                        onClick={() => {
-                          const randKey = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-                          setPgAesKey(randKey);
-                        }}
-                        className="text-[10px] text-primary hover:underline"
-                      >
-                        Generate random key
-                      </button>
+                    {/* AES Session Key Input */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">AES Session Key</label>
+                        <button
+                          onClick={() => {
+                            const randKey = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+                            setPgAesKey(randKey);
+                          }}
+                          className="text-[10px] text-primary hover:underline font-semibold"
+                        >
+                          Generate random key
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={pgAesKey}
+                        onChange={e => setPgAesKey(e.target.value)}
+                        placeholder="Paste AES Session Key (e.g. 5d7e3a2b...)"
+                        className="w-full rounded-xl border border-border/40 bg-background/40 px-3.5 py-2.5 text-xs font-mono text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/50"
+                      />
                     </div>
-                    <input
-                      type="text"
-                      value={pgAesKey}
-                      onChange={e => setPgAesKey(e.target.value)}
-                      placeholder="Paste AES Session Key (e.g. 5d7e3a2b...)"
-                      className="w-full rounded-xl border border-border/40 bg-background/40 px-3.5 py-2.5 text-xs font-mono text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/50"
-                    />
-                  </div>
 
-                  {/* RSA Public Key PEM Input */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider block">RSA Public Key (PEM)</label>
-                    <textarea
-                      value={pgRsaPublicKey}
-                      onChange={e => setPgRsaPublicKey(e.target.value)}
-                      rows={5}
-                      placeholder="-----BEGIN PUBLIC KEY-----&#10;Paste public key PEM here..."
-                      className="w-full rounded-xl border border-border/40 bg-background/40 px-3.5 py-2.5 text-xs font-mono text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/50 resize-none"
-                    />
-                  </div>
+                    {/* RSA Public Key PEM Input */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider block">RSA Public Key (PEM)</label>
+                        {keys.filter(k => k.keyType === "RSA_PUBLIC").length > 0 && (
+                          <div className="flex flex-wrap gap-1 items-center">
+                            <span className="text-[9px] text-foreground/30 mr-1">Autofill:</span>
+                            {keys.filter(k => k.keyType === "RSA_PUBLIC").slice(0, 2).map(k => (
+                              <button
+                                key={k.id}
+                                onClick={() => {
+                                  setPgRsaPublicKey(k.keyValue);
+                                }}
+                                className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 border border-blue-500/15 font-mono truncate max-w-[80px]"
+                                title={k.label || k.documentName}
+                              >
+                                {k.label || k.documentName || k.id.substring(0, 6)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <textarea
+                        value={pgRsaPublicKey}
+                        onChange={e => setPgRsaPublicKey(e.target.value)}
+                        rows={5}
+                        placeholder="-----BEGIN PUBLIC KEY-----&#10;Paste public key PEM here..."
+                        className="w-full rounded-xl border border-border/40 bg-background/40 px-3.5 py-2.5 text-xs font-mono text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/50 resize-none"
+                      />
+                    </div>
 
                   {/* Output Wrapped Key */}
                   <div className="pt-3 border-t border-border/10 space-y-3">
@@ -841,7 +918,29 @@ export default function HybridLabPage() {
 
                   {/* Encrypted Ciphertext Input */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider block">Encrypted Ciphertext</label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider block">Encrypted Ciphertext</label>
+                      {keys.filter(k => k.keyType === "RSA_PUBLIC" && k.ciphertextPayload).length > 0 && (
+                        <div className="flex flex-wrap gap-1 items-center">
+                          <span className="text-[9px] text-foreground/30 mr-1">Autofill:</span>
+                          {keys.filter(k => k.keyType === "RSA_PUBLIC" && k.ciphertextPayload).slice(0, 2).map(k => (
+                            <button
+                              key={k.id}
+                              onClick={() => {
+                                setPgCiphertext(k.ciphertextPayload || "");
+                                if (k.encryptedSessionKey) {
+                                  setPgWrappedKey(k.encryptedSessionKey);
+                                }
+                              }}
+                              className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-300 hover:bg-orange-500/20 border border-orange-500/15 font-mono truncate max-w-[80px]"
+                              title={k.documentName}
+                            >
+                              {k.documentName || k.id.substring(0, 6)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <textarea
                       value={pgCiphertext}
                       onChange={e => setPgCiphertext(e.target.value)}
@@ -854,10 +953,29 @@ export default function HybridLabPage() {
                   {/* RSA Private Key PEM (Optional/Required if Ciphertext is wrapped) */}
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">RSA Private Key (PEM) <span className="text-[10px] text-foreground/30 font-normal lowercase">(only if ciphertext contains RSA layer)</span></label>
-                      <button onClick={() => setShowPgPrivKey(s => !s)} className="text-foreground/40 hover:text-foreground/75">
-                        {showPgPrivKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">RSA Private Key (PEM)</label>
+                        <button onClick={() => setShowPgPrivKey(s => !s)} className="text-foreground/45 hover:text-foreground/75">
+                          {showPgPrivKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                        </button>
+                      </div>
+                      {keys.filter(k => k.keyType === "RSA_PRIVATE").length > 0 && (
+                        <div className="flex flex-wrap gap-1 items-center">
+                          <span className="text-[9px] text-foreground/30 mr-1">Autofill:</span>
+                          {keys.filter(k => k.keyType === "RSA_PRIVATE").slice(0, 2).map(k => (
+                            <button
+                              key={k.id}
+                              onClick={() => {
+                                setPgRsaPrivateKey(k.keyValue);
+                              }}
+                              className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/15 font-mono truncate max-w-[80px]"
+                              title={k.label || k.documentName}
+                            >
+                              {k.label || k.documentName || k.id.substring(0, 6)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <textarea
                       value={pgRsaPrivateKey}
@@ -933,7 +1051,8 @@ export default function HybridLabPage() {
                 </motion.div>
 
               </div>
-            )}
+            </div>
+          )}
 
           </div>
         </main>
