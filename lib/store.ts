@@ -169,6 +169,7 @@ export interface CryptographicKey {
   aesIV?: string;
   aesMode?: string;
   pairedKeyId?: string;
+  documentName?: string;
 }
 
 let cachedKeys: CryptographicKey[] = [];
@@ -190,15 +191,47 @@ export async function syncKeysForUser(clerkUserId: string) {
     .eq("user_id", clerkUserId)
     .order("created_at", { ascending: false });
   if (data) {
-    cachedKeys = data.map((row: Record<string, unknown>) => ({
-      id: row.id as string,
-      keyType: row.key_type as CryptographicKey["keyType"],
-      keyValue: row.key_value as string,
-      keySize: row.key_size as number,
-      label: row.label as string,
-      generatedAt: row.generated_at as string,
-      description: row.description as string,
-    }));
+    cachedKeys = data.map((row: Record<string, unknown>) => {
+      let desc = row.description as string || "";
+      let docName = "";
+      let pSnippet = "";
+      let cPayload = "";
+      let encSessionKey = "";
+      let iv = "";
+      let mode = "";
+      let pairedId = "";
+
+      if (desc.startsWith("METADATA_JSON:")) {
+        try {
+          const parsed = JSON.parse(desc.substring(14));
+          desc = parsed.description || "";
+          docName = parsed.documentName || "";
+          pSnippet = parsed.plaintextSnippet || "";
+          cPayload = parsed.ciphertextPayload || "";
+          encSessionKey = parsed.encryptedSessionKey || "";
+          iv = parsed.aesIV || "";
+          mode = parsed.aesMode || "";
+          pairedId = parsed.pairedKeyId || "";
+        } catch {}
+      }
+
+      return {
+        id: row.id as string,
+        keyType: row.key_type as CryptographicKey["keyType"],
+        keyValue: row.key_value as string,
+        keySize: row.key_size as number,
+        label: row.label as string,
+        generatedAt: row.generated_at as string,
+        description: desc,
+        documentName: docName,
+        plaintextSnippet: pSnippet,
+        ciphertextPayload: cPayload,
+        encryptedSessionKey: encSessionKey,
+        aesIV: iv,
+        aesMode: mode,
+        pairedKeyId: pairedId,
+      };
+    });
     try {
       localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
     } catch {}
@@ -220,6 +253,18 @@ export function saveKey(key: CryptographicKey, clerkUserId?: string): void {
     } catch {}
 
     if (clerkUserId) {
+      const meta = {
+        description: key.description,
+        documentName: key.documentName,
+        plaintextSnippet: key.plaintextSnippet,
+        ciphertextPayload: key.ciphertextPayload,
+        encryptedSessionKey: key.encryptedSessionKey,
+        aesIV: key.aesIV,
+        aesMode: key.aesMode,
+        pairedKeyId: key.pairedKeyId,
+      };
+      const descVal = "METADATA_JSON:" + JSON.stringify(meta);
+
       supabase
         .from("cryptographic_keys")
         .upsert({
@@ -230,7 +275,7 @@ export function saveKey(key: CryptographicKey, clerkUserId?: string): void {
           key_size: key.keySize,
           label: key.label,
           generated_at: key.generatedAt,
-          description: key.description,
+          description: descVal,
         })
         .then(({ error }) => {
           if (error) console.error("Failed to sync key to Supabase:", error);

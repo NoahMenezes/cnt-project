@@ -124,7 +124,7 @@ function generateRSAPairSim(bits: number) {
 
   // Custom PEM builders
   const pubPem = `-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA${btoa(n.toString()).substring(0, 60)}\n${btoa(e.toString())}IDAQAB\n-----END PUBLIC KEY-----`;
-  const privPem = `-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA${btoa(n.toString()).substring(0, 50)}\n${btoa(phi.toString()).substring(0, 50)}\n-----END RSA PRIVATE KEY-----`;
+  const privPem = `-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA${btoa(n.toString()).substring(0, 50)}\n${btoa(d.toString()).substring(0, 50)}\n-----END RSA PRIVATE KEY-----`;
 
   return {
     p: p.toString(),
@@ -934,6 +934,7 @@ export default function OperationPage() {
                     aesIV: aesIV,
                     aesMode: aesMode,
                     pairedKeyId: privateKeyId,
+                    documentName: uploadedFile ? uploadedFile.name : "Plaintext Notepad Document",
                   };
                   saveKey(publicKey);
 
@@ -946,6 +947,7 @@ export default function OperationPage() {
                     generatedAt: new Date().toISOString(),
                     description: "RSA private key for decryption - KEEP SECURE",
                     pairedKeyId: publicKeyId,
+                    documentName: uploadedFile ? uploadedFile.name : "Plaintext Notepad Document",
                   };
                   saveKey(privateKey);
 
@@ -991,6 +993,7 @@ export default function OperationPage() {
                     ciphertextPayload: ciphertext,
                     aesIV: aesIV,
                     aesMode: aesMode,
+                    documentName: uploadedFile ? uploadedFile.name : "Plaintext Notepad Document",
                   };
                   saveKey(aesKeyObj);
 
@@ -1069,6 +1072,7 @@ export default function OperationPage() {
                   addLog("No active keys in workspace to save. Please generate keys first.", "error");
                   return;
                 }
+                const docName = uploadedFile ? uploadedFile.name : "Plaintext Notepad Document";
                 if (rsaKeys) {
                   const pubKey: CryptographicKey = {
                     id: `pub_${Date.now()}`,
@@ -1077,7 +1081,13 @@ export default function OperationPage() {
                     keySize: rsaBits,
                     label: `RSA Public Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
-                    description: "Workspace RSA Public Key"
+                    description: "Workspace RSA Public Key",
+                    plaintextSnippet: plaintext.slice(0, 200),
+                    ciphertextPayload: ciphertext,
+                    encryptedSessionKey: encryptedSessionKey,
+                    aesIV: aesIV,
+                    aesMode: aesMode,
+                    documentName: docName,
                   };
                   saveKey(pubKey);
 
@@ -1088,7 +1098,8 @@ export default function OperationPage() {
                     keySize: rsaBits,
                     label: `RSA Private Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
-                    description: "Workspace RSA Private Key - KEEP SECURE"
+                    description: "Workspace RSA Private Key - KEEP SECURE",
+                    documentName: docName,
                   };
                   saveKey(privKey);
                 }
@@ -1100,7 +1111,12 @@ export default function OperationPage() {
                     keySize: aesBits,
                     label: `AES Session Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
-                    description: "Workspace AES Session Key"
+                    description: "Workspace AES Session Key",
+                    plaintextSnippet: plaintext.slice(0, 200),
+                    ciphertextPayload: ciphertext,
+                    aesIV: aesIV,
+                    aesMode: aesMode,
+                    documentName: docName,
                   };
                   saveKey(aesKeyObj);
                 }
