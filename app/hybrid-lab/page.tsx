@@ -176,6 +176,15 @@ function aesDecryptSim(ciphertext: string, keyHex?: string): string {
   }
 }
 
+function getFileIcon(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".pdf")) return "PDF Document";
+  if (lower.endsWith(".docx") || lower.endsWith(".doc")) return "Word Document";
+  if (lower.endsWith(".csv")) return "CSV Spreadsheet";
+  if (lower.endsWith(".json")) return "JSON Data File";
+  return "Document";
+}
+
 type Stage = "select" | "loaded" | "sent" | "decrypted";
 
 export default function HybridLabPage() {
@@ -219,9 +228,15 @@ export default function HybridLabPage() {
 
   const pubKeys = keys.filter(k =>
     k.keyType === "RSA_PUBLIC" && k.ciphertextPayload &&
-    (k.label.toLowerCase().includes(search.toLowerCase()) ||
-      k.id.toLowerCase().includes(search.toLowerCase()))
+    ((k.label && k.label.toLowerCase().includes(search.toLowerCase())) ||
+      k.id.toLowerCase().includes(search.toLowerCase()) ||
+      (k.documentName && k.documentName.toLowerCase().includes(search.toLowerCase())))
   );
+
+  const pairedPrivateKey = useMemo(() => {
+    if (!selectedKey?.pairedKeyId) return null;
+    return keys.find(k => k.id === selectedKey.pairedKeyId && k.keyType === "RSA_PRIVATE");
+  }, [selectedKey, keys]);
 
   const handleSelectKey = useCallback((key: CryptographicKey) => {
     setSelectedKey(key);
@@ -431,243 +446,297 @@ export default function HybridLabPage() {
             </div>
 
             {activeTab === "simulator" ? (
-              <>
-                {/* Flow Banner */}
-                <div className="flex flex-wrap items-center gap-2 text-xs text-foreground/50 font-mono">
-                  {["Select Key", "Load Ciphertext", "Send", "Decrypt with Private Key", "Plaintext Recovered"].map((s, i, arr) => (
-                    <React.Fragment key={s}>
-                      <span className={`px-2 py-1 rounded-md border ${stage === ["select", "loaded", "sent", "sent", "decrypted"][i] ? "border-primary/50 bg-primary/10 text-primary" : "border-border/30 bg-background/30"}`}>{s}</span>
-                      {i < arr.length - 1 && <ArrowRight className="h-3 w-3 shrink-0 opacity-40" />}
-                    </React.Fragment>
-                  ))}
-                </div>
+              <div className="grid gap-6 lg:grid-cols-5">
+                {/* LEFT COLUMN: Vault Documents List */}
+                <div className="lg:col-span-2 space-y-4">
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur space-y-4"
+                  >
+                    <div>
+                      <h2 className="text-sm font-bold text-foreground">Vault Documents</h2>
+                      <p className="text-[10px] text-foreground/45 mt-0.5">Select an encrypted document payload to decrypt</p>
+                    </div>
 
-                <div className="grid gap-6 lg:grid-cols-5">
-                  {/* LEFT – key picker */}
-                  <div className="lg:col-span-2 space-y-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground/30" />
+                      <input
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Search by filename or key ID..."
+                        className="w-full rounded-lg border border-border/45 bg-background/40 pl-9 pr-3 py-2 text-xs text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/50"
+                      />
+                    </div>
 
-                    {/* Key ID input */}
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur space-y-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/40">Paste Key ID</p>
-                      <form onSubmit={handleKeyIdSubmit} className="flex gap-2">
-                        <input
-                          value={keyInputValue}
-                          onChange={e => { setKeyInputValue(e.target.value); setKeyInputError(""); }}
-                          placeholder="pub_1748453..."
-                          className="flex-1 rounded-lg border border-border/40 bg-background/40 px-3 py-2 text-xs font-mono text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/50"
-                        />
-                        <Button type="submit" size="sm" className="rounded-lg text-xs h-9 gap-1">
-                          <Search className="h-3.5 w-3.5" /> Load
-                        </Button>
-                      </form>
-                      {keyInputError && <p className="text-xs text-red-400">{keyInputError}</p>}
-                    </motion.div>
-
-                    {/* Key table */}
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/40">Stored Public Keys</p>
-                        <span className="text-xs text-foreground/30">{pubKeys.length} with payloads</span>
-                      </div>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground/30" />
-                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search keys…"
-                          className="w-full rounded-lg border border-border/40 bg-background/40 pl-9 pr-3 py-2 text-xs text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/50" />
-                      </div>
-                      <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
-                        {pubKeys.length === 0 ? (
-                          <div className="flex flex-col items-center gap-3 py-8 text-center">
-                            <Inbox className="h-8 w-8 text-foreground/20" />
-                            <p className="text-xs text-foreground/40">No RSA public keys with encrypted payloads found.</p>
-                            <Link href="/analyze"><Button size="sm" variant="outline" className="rounded-full text-xs">Go to Operation Lab</Button></Link>
-                          </div>
-                        ) : pubKeys.map(k => (
-                          <button key={k.id} onClick={() => handleSelectKey(k)}
-                            className={`w-full text-left rounded-xl border p-3 transition-all space-y-1 ${selectedKey?.id === k.id ? "border-primary/50 bg-primary/5" : "border-border/30 bg-foreground/[0.02] hover:border-border/60 hover:bg-foreground/[0.04]"}`}>
+                    <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
+                      {pubKeys.length === 0 ? (
+                        <div className="flex flex-col items-center gap-3 py-12 text-center">
+                          <Inbox className="h-8 w-8 text-foreground/20" />
+                          <p className="text-xs text-foreground/40">No matching document payloads found in Vault.</p>
+                          <Link href="/analyze">
+                            <Button size="sm" variant="outline" className="rounded-xl text-xs">
+                              Go to Operation Lab
+                            </Button>
+                          </Link>
+                        </div>
+                      ) : (
+                        pubKeys.map(k => (
+                          <button
+                            key={k.id}
+                            onClick={() => handleSelectKey(k)}
+                            className={`w-full text-left rounded-xl border p-3 transition-all space-y-1.5 ${
+                              selectedKey?.id === k.id
+                                ? "border-primary/50 bg-primary/5"
+                                : "border-border/30 bg-foreground/[0.02] hover:border-border/60 hover:bg-foreground/[0.04]"
+                            }`}
+                          >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <Shield className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-                                <span className="text-xs font-semibold text-foreground truncate max-w-[140px]">{k.label}</span>
+                                <FileText className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                                <span className="text-xs font-semibold text-foreground truncate max-w-[150px]">
+                                  {k.documentName || "Untitled Payload"}
+                                </span>
                               </div>
-                              <span className="text-[10px] text-foreground/30 font-mono">{k.keySize}b</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 font-mono">
+                                {k.keySize}b RSA
+                              </span>
                             </div>
                             {k.plaintextSnippet && (
-                              <p className="text-[10px] text-foreground/40 truncate pl-5">📄 {k.plaintextSnippet.slice(0, 60)}…</p>
+                              <p className="text-[10px] text-foreground/40 line-clamp-1 font-mono pl-5.5">
+                                {k.plaintextSnippet}
+                              </p>
                             )}
-                            <p className="text-[10px] text-foreground/25 font-mono pl-5">{k.id}</p>
+                            <div className="flex items-center justify-between text-[9px] text-foreground/25 pl-5.5">
+                              <span>ID: {k.id.slice(0, 10)}...</span>
+                              <span>{new Date(k.generatedAt).toLocaleDateString()}</span>
+                            </div>
                           </button>
-                        ))}
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                </div>
+
+                {/* RIGHT COLUMN: Action & Recovery Workspace */}
+                <div className="lg:col-span-3 space-y-4">
+                  {stage === "select" || !selectedKey ? (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="h-full min-h-[350px] rounded-2xl border border-dashed border-border/40 bg-background/30 p-12 flex flex-col items-center justify-center gap-4 text-center"
+                    >
+                      <Unlock className="h-10 w-10 text-foreground/15" />
+                      <div>
+                        <p className="text-sm font-semibold text-foreground/70">No Document Selected</p>
+                        <p className="text-xs text-foreground/40 max-w-xs mt-1 mx-auto">
+                          Select an encrypted document payload from the list on the left to begin decryption.
+                        </p>
                       </div>
                     </motion.div>
-                  </div>
-
-                  {/* RIGHT – workspace */}
-                  <div className="lg:col-span-3 space-y-4">
-
-                    {stage === "select" && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                        className="rounded-2xl border border-dashed border-border/40 bg-background/30 p-12 flex flex-col items-center gap-4 text-center">
-                        <Key className="h-12 w-12 text-foreground/15" />
-                        <p className="text-sm text-foreground/40">Select a key from the table or paste a Key ID to load the encrypted document.</p>
-                      </motion.div>
-                    )}
-
-                    <AnimatePresence>
-                      {stage !== "select" && selectedKey && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
-
-                          {/* Key Info Banner */}
-                          <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                              <Shield className="h-4 w-4 text-blue-400 shrink-0" />
-                              <div>
-                                <p className="text-sm font-semibold text-foreground">{selectedKey.label}</p>
-                                <p className="text-[10px] font-mono text-foreground/40">{selectedKey.id}</p>
-                              </div>
-                            </div>
-                            <button onClick={reset} className="text-xs text-foreground/40 hover:text-foreground/70 transition-colors">Change key</button>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-4"
+                    >
+                      {/* Document Header Banner */}
+                      <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-4.5 w-4.5 text-blue-400 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-foreground">{selectedKey.documentName || "Untitled Payload"}</p>
+                            <p className="text-[9px] font-mono text-foreground/40">Modulus ID: {selectedKey.id}</p>
                           </div>
+                        </div>
+                        <button
+                          onClick={reset}
+                          className="text-[11px] text-foreground/40 hover:text-foreground/75 transition-colors font-medium"
+                        >
+                          Change Document
+                        </button>
+                      </div>
 
-                          {/* Plaintext snippet */}
-                          {selectedKey.plaintextSnippet && (
-                            <div className="rounded-xl border border-border/30 bg-foreground/[0.02] p-4 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <FileText className="h-3.5 w-3.5 text-foreground/40" />
-                                <span className="text-xs font-semibold uppercase tracking-widest text-foreground/40">Original Plaintext (preview)</span>
-                              </div>
-                              <p className="text-xs text-foreground/60 leading-relaxed font-mono">
-                                {selectedKey.plaintextSnippet}{selectedKey.plaintextSnippet.length >= 200 ? "…" : ""}
-                              </p>
-                            </div>
-                          )}
+                      {/* Ciphertext Box */}
+                      <div className="rounded-2xl border border-orange-500/20 bg-background/60 p-5 backdrop-blur space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Lock className="h-3.5 w-3.5 text-orange-400" />
+                            <span className="text-xs font-bold uppercase tracking-wider text-foreground/75">Encrypted Payload (Ciphertext)</span>
+                          </div>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(ciphertext);
+                              }}
+                              className="flex items-center gap-1 text-[11px] text-foreground/40 hover:text-foreground/75 transition-colors"
+                            >
+                              <Copy className="h-3 w-3" /> Copy
+                            </button>
+                            <button
+                              onClick={handleDownloadEncrypted}
+                              className="flex items-center gap-1 text-[11px] text-foreground/40 hover:text-foreground/75 transition-colors"
+                            >
+                              <Download className="h-3 w-3" /> Download
+                            </button>
+                          </div>
+                        </div>
 
-                          {/* Ciphertext workspace */}
-                          <div className="rounded-2xl border border-orange-500/20 bg-background/60 p-5 backdrop-blur space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Lock className="h-4 w-4 text-orange-400" />
-                                <span className="text-xs font-bold uppercase tracking-widest text-foreground">Encrypted Ciphertext</span>
-                              </div>
-                              <div className="flex gap-2">
-                                <button onClick={() => navigator.clipboard.writeText(ciphertext)}
-                                  className="flex items-center gap-1 text-xs text-foreground/40 hover:text-foreground/77 transition-colors">
-                                  <Copy className="h-3 w-3" /> Copy
-                                </button>
-                              </div>
+                        <textarea
+                          value={ciphertext}
+                          readOnly
+                          rows={4}
+                          className="w-full rounded-xl border border-orange-500/10 bg-orange-500/[0.02] px-4 py-3 font-mono text-[11px] text-orange-400/80 focus:outline-none resize-none"
+                        />
+
+                        {selectedKey.encryptedSessionKey && (
+                          <div className="rounded-lg border border-border/15 bg-foreground/[0.01] p-3 space-y-1.5">
+                            <div className="flex justify-between items-center text-[9px] text-foreground/40 font-semibold uppercase tracking-wider">
+                              <span>RSA-Encrypted AES Session Key</span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(selectedKey.encryptedSessionKey || "");
+                                }}
+                                className="hover:text-foreground/70 flex items-center gap-0.5"
+                              >
+                                <Copy className="h-2.5 w-2.5" /> Copy Key
+                              </button>
                             </div>
-                            <textarea
-                              value={ciphertext}
-                              onChange={e => setCiphertext(e.target.value)}
-                              rows={8}
-                              className="w-full rounded-xl border border-orange-500/10 bg-orange-500/[0.02] px-4 py-3 font-mono text-xs text-orange-400/80 focus:outline-none focus:border-orange-500/30 resize-y"
-                            />
-                            <div className="text-[10px] text-foreground/30 text-right">{ciphertext.length} chars</div>
-                            {selectedKey.encryptedSessionKey && (
-                              <div className="rounded-lg border border-border/20 bg-foreground/[0.02] p-3 space-y-1">
-                                <p className="text-[10px] text-foreground/40 font-semibold uppercase tracking-wider">RSA-Encrypted AES Session Key</p>
-                                <p className="font-mono text-[9px] text-foreground/60 truncate">{selectedKey.encryptedSessionKey}</p>
-                              </div>
-                            )}
+                            <p className="font-mono text-[10px] text-foreground/55 break-all line-clamp-1">{selectedKey.encryptedSessionKey}</p>
                             {selectedKey.aesMode && (
-                              <div className="flex gap-3 text-[10px] text-foreground/40">
-                                <span>Mode: <span className="text-foreground/60">{selectedKey.aesMode}</span></span>
-                                {selectedKey.aesIV && <span>IV: <span className="text-foreground/60 font-mono">{selectedKey.aesIV}</span></span>}
+                              <div className="flex gap-3 text-[9px] text-foreground/35 border-t border-border/5 pt-1.5">
+                                <span>Algorithm: <span className="text-foreground/50 font-semibold">AES-{selectedKey.aesMode}</span></span>
+                                {selectedKey.aesIV && <span>IV: <span className="text-foreground/50 font-mono">{selectedKey.aesIV.substring(0, 16)}...</span></span>}
                               </div>
                             )}
                           </div>
+                        )}
+                      </div>
 
-                          {/* Actions */}
-                          {stage === "loaded" && (
-                            <div className="flex flex-wrap gap-3">
-                              <Button onClick={handleDownloadEncrypted} variant="outline" className="gap-2 rounded-xl text-sm">
-                                <Download className="h-4 w-4" /> Download Encrypted File
-                              </Button>
-                              <Button onClick={handleSend} disabled={isSending} className="gap-2 rounded-xl text-sm">
-                                {isSending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                                {isSending ? "Transmitting…" : "Send Encrypted Data"}
-                              </Button>
-                            </div>
+                      {/* Decryption Chamber */}
+                      <div className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur space-y-4">
+                        <div className="flex items-center justify-between border-b border-border/10 pb-2">
+                          <div className="flex items-center gap-2">
+                            <Unlock className="h-4 w-4 text-primary" />
+                            <span className="text-xs font-bold uppercase tracking-wider text-foreground/75">Decryption Area</span>
+                          </div>
+                          
+                          {pairedPrivateKey && stage !== "decrypted" && (
+                            <button
+                              onClick={() => {
+                                setPrivateKeyInput(pairedPrivateKey.keyValue);
+                              }}
+                              className="text-[10px] font-semibold text-primary hover:underline flex items-center gap-1"
+                            >
+                              <Sparkles className="h-3 w-3 animate-pulse" /> Auto-fill matching Private Key
+                            </button>
                           )}
+                        </div>
 
-                          {stage === "sent" && (
-                            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                              className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 flex items-center gap-3">
-                              <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
-                              <p className="text-sm text-emerald-400">Encrypted bundle transmitted to recipient. Enter the RSA Private Key below to decrypt.</p>
-                            </motion.div>
-                          )}
-
-                          {/* Private key + decrypt */}
-                          {(stage === "sent" || stage === "decrypted") && (
-                            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                              className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur space-y-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <Unlock className="h-4 w-4 text-red-400" />
-                                  <span className="text-xs font-bold uppercase tracking-widest text-foreground">Enter RSA Private Key</span>
-                                </div>
-                                <button onClick={() => setShowPrivKey(s => !s)} className="text-foreground/40 hover:text-foreground/70 transition-colors">
-                                  {showPrivKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                </button>
-                              </div>
+                        {stage !== "decrypted" ? (
+                          <div className="space-y-3">
+                            <div className="relative">
                               <textarea
                                 value={privateKeyInput}
                                 onChange={e => { setPrivateKeyInput(e.target.value); setDecryptError(""); }}
                                 rows={4}
-                                placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;Paste the private key here…"
-                                className={`w-full rounded-xl border border-border/40 bg-background/40 px-4 py-3 font-mono text-xs focus:outline-none focus:border-primary/50 resize-none transition-all ${showPrivKey ? "text-foreground/80" : "text-transparent [text-shadow:0_0_6px_rgba(255,255,255,0.3)]"}`}
+                                placeholder="Paste the matching RSA Private Key PEM to decrypt the session key and document..."
+                                className={`w-full rounded-xl border border-border/45 bg-background/40 px-4 py-3 font-mono text-xs focus:outline-none focus:border-primary/50 resize-none transition-all ${
+                                  showPrivKey ? "text-foreground/80" : "text-transparent [text-shadow:0_0_6px_rgba(255,255,255,0.35)]"
+                                }`}
                               />
-                              {decryptError && (
-                                <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
-                                  <AlertTriangle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-                                  <p className="text-xs text-red-400">{decryptError}</p>
-                                </div>
-                              )}
-                              {stage !== "decrypted" && (
-                                <Button onClick={handleDecrypt} disabled={isDecrypting || !privateKeyInput.trim()} className="w-full gap-2 rounded-xl">
-                                  {isDecrypting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Unlock className="h-4 w-4" />}
-                                  {isDecrypting ? "Decrypting…" : "Decrypt with Private Key"}
-                                </Button>
-                              )}
-                            </motion.div>
-                          )}
+                              <button
+                                type="button"
+                                onClick={() => setShowPrivKey(s => !s)}
+                                className="absolute right-3.5 top-3.5 text-foreground/35 hover:text-foreground/60 transition-colors"
+                              >
+                                {showPrivKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
 
-                          {/* Decrypted result */}
-                          {stage === "decrypted" && decryptedText && (
-                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                              className="rounded-2xl border border-emerald-500/20 bg-background/60 p-5 backdrop-blur space-y-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <CheckCircle className="h-4 w-4 text-emerald-400" />
-                                  <span className="text-xs font-bold uppercase tracking-widest text-foreground">Decrypted Plaintext</span>
-                                </div>
-                                <button onClick={() => navigator.clipboard.writeText(decryptedText)}
-                                  className="flex items-center gap-1 text-xs text-foreground/40 hover:text-foreground/70 transition-colors">
-                                  <Copy className="h-3 w-3" /> Copy
+                            {decryptError && (
+                              <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2.5">
+                                <AlertTriangle className="h-3.5 w-3.5 text-red-400 shrink-0 mt-0.5" />
+                                <p className="text-xs text-red-400">{decryptError}</p>
+                              </div>
+                            )}
+
+                            <Button
+                              onClick={handleDecrypt}
+                              disabled={isDecrypting || !privateKeyInput.trim()}
+                              className="w-full gap-2 rounded-xl text-xs h-10 font-bold"
+                            >
+                              {isDecrypting ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Unlock className="h-3.5 w-3.5" />
+                              )}
+                              {isDecrypting ? "Decrypting document..." : "Decrypt Document"}
+                            </Button>
+                          </div>
+                        ) : (
+                          // Decrypted successfully
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5">
+                              <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                              <p className="text-xs text-emerald-400 font-semibold">
+                                Plaintext document successfully recovered! RSA session key decrypted and AES payload fully restored.
+                              </p>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between items-center text-[10px] text-foreground/45 font-semibold uppercase tracking-wider">
+                                <span>Recovered Plaintext Content</span>
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(decryptedText);
+                                  }}
+                                  className="hover:text-foreground/75 flex items-center gap-1 text-[11px]"
+                                >
+                                  <Copy className="h-3 w-3" /> Copy Plaintext
                                 </button>
                               </div>
-                              <textarea value={decryptedText} readOnly rows={8}
-                                className="w-full rounded-xl border border-emerald-500/10 bg-emerald-500/[0.02] px-4 py-3 font-mono text-xs text-foreground focus:outline-none resize-y" />
-                              <div className="flex gap-3">
-                                <Button onClick={() => {
+                              <textarea
+                                value={decryptedText}
+                                readOnly
+                                rows={6}
+                                className="w-full rounded-xl border border-emerald-500/10 bg-emerald-500/[0.02] px-4 py-3 font-mono text-xs text-foreground focus:outline-none resize-none"
+                              />
+                            </div>
+
+                            <div className="flex gap-2 pt-1">
+                              <Button
+                                onClick={() => {
                                   const blob = new Blob([decryptedText], { type: "text/plain" });
-                                  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-                                  a.download = "decrypted_document.txt"; a.click();
-                                }} variant="outline" className="gap-2 rounded-xl text-xs">
-                                  <Download className="h-3.5 w-3.5" /> Download Plaintext
-                                </Button>
-                                <Button onClick={reset} variant="ghost" className="gap-2 rounded-xl text-xs">
-                                  <RefreshCw className="h-3.5 w-3.5" /> Start Over
-                                </Button>
-                              </div>
-                            </motion.div>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                                  const a = document.createElement("a");
+                                  a.href = URL.createObjectURL(blob);
+                                  a.download = `recovered_${selectedKey.documentName || "doc"}.txt`;
+                                  a.click();
+                                }}
+                                variant="outline"
+                                className="gap-2 rounded-xl text-xs h-9"
+                              >
+                                <Download className="h-3.5 w-3.5" /> Download Document
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  setPrivateKeyInput("");
+                                  setDecryptedText("");
+                                  setStage("loaded");
+                                }}
+                                variant="ghost"
+                                className="gap-2 rounded-xl text-xs h-9 text-foreground/50 hover:text-foreground"
+                              >
+                                <RefreshCw className="h-3.5 w-3.5" /> Start Over
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
-              </>
+              </div>
             ) : (
               /* --- Interactive Cryptographic Playground Tab --- */
               <div className="grid gap-6 lg:grid-cols-2">
