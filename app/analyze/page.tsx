@@ -10,7 +10,7 @@ import {
   Upload, FileText, AlertTriangle, CheckCircle, Shield,
   Copy, Lock, Zap,
   Download, Save, RefreshCw, Trash2, Key,
-  Bold, Italic, Code2
+  Bold, Italic, Code2, Database
 } from "lucide-react";
 import { saveKey, CryptographicKey } from "@/lib/store";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -122,9 +122,9 @@ function generateRSAPairSim(bits: number) {
   const e = BigInt(65537);
   const d = modInverse(e, phi);
 
-  // Custom PEM builders
-  const pubPem = `-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA${btoa(n.toString()).substring(0, 60)}\n${btoa(e.toString())}IDAQAB\n-----END PUBLIC KEY-----`;
-  const privPem = `-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA${btoa(n.toString()).substring(0, 50)}\n${btoa(d.toString()).substring(0, 50)}\n-----END RSA PRIVATE KEY-----`;
+  // Custom PEM builders - each line is fully base64-encoded to avoid truncation & alignment errors
+  const pubPem = `-----BEGIN PUBLIC KEY-----\n${btoa(n.toString())}\n${btoa(e.toString())}\n-----END PUBLIC KEY-----`;
+  const privPem = `-----BEGIN RSA PRIVATE KEY-----\n${btoa(n.toString())}\n${btoa(d.toString())}\n-----END RSA PRIVATE KEY-----`;
 
   return {
     p: p.toString(),
@@ -239,6 +239,15 @@ function garbledDecryptAttempt(
         .join("");
     }
   }
+}
+
+function getFileIcon(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".pdf")) return "PDF Document";
+  if (lower.endsWith(".docx") || lower.endsWith(".doc")) return "Word Document";
+  if (lower.endsWith(".csv")) return "CSV Spreadsheet";
+  if (lower.endsWith(".json")) return "JSON Data File";
+  return "Document";
 }
 
 function PlaintextTipTapEditor({
@@ -1016,51 +1025,108 @@ export default function OperationPage() {
 
             {/* Display Generated Keys */}
             {generatedKeysDisplay.length > 0 && (
-              <div className="space-y-3 mt-4">
-                <h3 className="text-sm font-semibold text-foreground">Generated Keys</h3>
-                {generatedKeysDisplay.map((key, idx) => (
-                  <motion.div
-                    key={idx}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="rounded-xl border border-border/30 bg-foreground/[0.02] p-4 space-y-2"
+              <div className="space-y-4 mt-6">
+                <div className="flex items-center justify-between border-b border-border/10 pb-2">
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <Database className="h-4 w-4 text-primary" /> Active Document Workspace
+                  </h3>
+                  <button
+                    onClick={() => setGeneratedKeysDisplay([])}
+                    className="text-xs text-foreground/40 hover:text-foreground/60 transition-colors"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {key.type === "RSA_PUBLIC" && <Shield className="h-4 w-4 text-blue-400" />}
-                        {key.type === "RSA_PRIVATE" && <Lock className="h-4 w-4 text-red-400" />}
-                        {key.type === "AES_SESSION" && <Key className="h-4 w-4 text-emerald-400" />}
-                        <span className="text-xs font-semibold text-foreground">{key.label}</span>
+                    Clear Display
+                  </button>
+                </div>
+                
+                <div className="rounded-2xl border border-border/30 bg-background/40 p-5 space-y-4 shadow-sm backdrop-blur">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/10 pb-3 gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
+                        <FileText className="h-4 w-4" />
                       </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-mono ${
-                        key.type === "RSA_PUBLIC" ? "bg-blue-500/20 text-blue-300" :
-                        key.type === "RSA_PRIVATE" ? "bg-red-500/20 text-red-300" :
-                        "bg-emerald-500/20 text-emerald-300"
-                      }`}>
-                        {key.type === "RSA_PUBLIC" ? "RSA Public" : key.type === "RSA_PRIVATE" ? "RSA Private" : "AES Session"}
-                      </span>
+                      <div>
+                        <h4 className="text-xs font-bold text-foreground flex items-center gap-2 flex-wrap">
+                          {uploadedFile ? uploadedFile.name : "Plaintext Notepad Document"}
+                          <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-mono">
+                            {getFileIcon(uploadedFile ? uploadedFile.name : "Plaintext Notepad Document")}
+                          </Badge>
+                        </h4>
+                        <p className="text-[10px] text-foreground/40 mt-0.5">
+                          {generatedKeysDisplay.length} associated cryptographic key{generatedKeysDisplay.length > 1 ? "s" : ""} in current workspace
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xs text-foreground/50">{key.size} bits</p>
-                    <div className="bg-background/40 rounded-lg p-3 max-h-[150px] overflow-y-auto">
-                      <p className="text-[10px] font-mono text-foreground/70 break-all">{key.value}</p>
+                  </div>
+
+                  {/* Restored Document Preview Snippet */}
+                  {plaintext && (
+                    <div className="bg-foreground/[0.02] border border-border/10 rounded-xl p-3 space-y-1">
+                      <p className="text-[9px] uppercase tracking-wider font-semibold text-foreground/40">Restored Document Plaintext Preview</p>
+                      <p className="text-[11px] font-mono text-foreground/60 line-clamp-2 leading-relaxed bg-background/30 p-2 rounded-lg border border-border/5">
+                        {plaintext}
+                      </p>
                     </div>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(key.value);
-                        addLog(`Copied ${key.type === "RSA_PUBLIC" ? "RSA Public Key" : key.type === "RSA_PRIVATE" ? "RSA Private Key" : "AES Session Key"} to clipboard`, "success");
-                      }}
-                      className="text-xs text-foreground/50 hover:text-foreground/70 transition-colors flex items-center gap-1"
-                    >
-                      <Copy className="h-3 w-3" /> Copy Key
-                    </button>
-                  </motion.div>
-                ))}
-                <button
-                  onClick={() => setGeneratedKeysDisplay([])}
-                  className="text-xs text-foreground/40 hover:text-foreground/60 transition-colors"
-                >
-                  Clear Display
-                </button>
+                  )}
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-[11px] border-collapse">
+                      <thead>
+                        <tr className="border-b border-border/10 text-foreground/40 font-semibold uppercase tracking-wider">
+                          <th className="py-2 px-2">Key Type</th>
+                          <th className="py-2 px-2">Label</th>
+                          <th className="py-2 px-2">Bit Strength</th>
+                          <th className="py-2 px-2">Key Value / Modulus</th>
+                          <th className="py-2 px-2 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {generatedKeysDisplay.map((key, idx) => {
+                          let badgeStyle = "bg-blue-500/10 text-blue-300 border-blue-500/20";
+                          let typeLabel = "RSA Public";
+                          if (key.type === "RSA_PRIVATE") {
+                            badgeStyle = "bg-red-500/10 text-red-300 border-red-500/20";
+                            typeLabel = "RSA Private";
+                          } else if (key.type === "AES_SESSION") {
+                            badgeStyle = "bg-emerald-500/10 text-emerald-300 border-emerald-500/20";
+                            typeLabel = "AES Session";
+                          }
+
+                          return (
+                            <tr key={idx} className="border-b border-border/5 hover:bg-foreground/[0.01] transition-colors">
+                              <td className="py-2 px-2">
+                                <Badge variant="outline" className={`border ${badgeStyle} text-[9px]`}>
+                                  {typeLabel}
+                                </Badge>
+                              </td>
+                              <td className="py-2 px-2 font-medium text-foreground font-semibold">
+                                {key.label}
+                              </td>
+                              <td className="py-2 px-2 text-foreground/50 font-mono">
+                                {key.size} bits
+                              </td>
+                              <td className="py-2 px-2 font-mono text-foreground/60 max-w-[200px] truncate" title={key.value}>
+                                {key.value}
+                              </td>
+                              <td className="py-2 px-2 text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(key.value);
+                                    addLog(`Copied ${typeLabel} to clipboard`, "success");
+                                  }}
+                                  className="h-6 w-6 text-foreground/40 hover:text-foreground/75 rounded-md"
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             )}
           </div>

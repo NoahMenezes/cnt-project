@@ -87,18 +87,36 @@ function safeAtob(str: string): string {
 
 function extractRSAPublicNumbers(pem: string): { e: bigint; n: bigint } | null {
   try {
-    const lines = pem.split("\n").filter(l => !l.startsWith("---") && l.trim());
+    const lines = pem.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("---"));
+    const decodedLines: string[] = [];
+    for (const line of lines) {
+      const decoded = safeAtob(line);
+      if (decoded && /^\d+$/.test(decoded)) {
+        decodedLines.push(decoded);
+      }
+    }
+    
+    // New format: lines decode to pure digits
+    if (decodedLines.length >= 2) {
+      const numbers = decodedLines.map(BigInt);
+      const sorted = [...numbers].sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
+      return { e: sorted[1], n: sorted[0] };
+    }
+    
+    // Fallback: joined base64 block
     const b64 = lines.join("");
     const raw = safeAtob(b64);
     const nums = raw.match(/\d+/g);
     if (nums && nums.length >= 2) {
-      const sorted = [...nums].sort((a, b) => b.length - a.length);
-      return { e: BigInt(sorted[1]), n: BigInt(sorted[0]) };
+      const sorted = [...nums].map(BigInt).sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
+      return { e: sorted[1], n: sorted[0] };
     }
+    
+    // Direct matches in raw text fallback
     const directNums = pem.match(/\d+/g);
     if (directNums && directNums.length >= 2) {
-      const sorted = [...directNums].sort((a, b) => b.length - a.length);
-      return { e: BigInt(sorted[1]), n: BigInt(sorted[0]) };
+      const sorted = [...directNums].map(BigInt).sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
+      return { e: sorted[1], n: sorted[0] };
     }
     return null;
   } catch { return null; }
@@ -106,27 +124,53 @@ function extractRSAPublicNumbers(pem: string): { e: bigint; n: bigint } | null {
 
 function extractRSAPrivateNumbers(pem: string): { d: bigint; n: bigint } | null {
   try {
-    const lines = pem.split("\n").filter(l => !l.startsWith("---") && l.trim());
+    const lines = pem.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("---"));
+    const decodedLines: string[] = [];
+    for (const line of lines) {
+      const decoded = safeAtob(line);
+      if (decoded && /^\d+$/.test(decoded)) {
+        decodedLines.push(decoded);
+      }
+    }
+    
+    // New format: lines decode to pure digits
+    if (decodedLines.length >= 2) {
+      const numbers = decodedLines.map(BigInt);
+      const sorted = [...numbers].sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
+      return { d: sorted[1], n: sorted[0] };
+    }
+    
+    // Fallback: joined base64 block
     const b64 = lines.join("");
     const raw = safeAtob(b64);
     const nums = raw.match(/\d+/g);
     if (nums && nums.length >= 2) {
-      const sorted = [...nums].sort((a, b) => b.length - a.length);
-      return { d: BigInt(sorted[1]), n: BigInt(sorted[0]) };
+      const sorted = [...nums].map(BigInt).sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
+      return { d: sorted[1], n: sorted[0] };
     }
+    
+    // Direct matches in raw text fallback
     const directNums = pem.match(/\d+/g);
     if (directNums && directNums.length >= 2) {
-      const sorted = [...directNums].sort((a, b) => b.length - a.length);
-      return { d: BigInt(sorted[1]), n: BigInt(sorted[0]) };
+      const sorted = [...directNums].map(BigInt).sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
+      return { d: sorted[1], n: sorted[0] };
     }
     return null;
   } catch { return null; }
 }
 
-function aesDecryptSim(ciphertext: string): string {
+function aesDecryptSim(ciphertext: string, keyHex?: string): string {
   try {
     const dec = decodeURIComponent(atob(ciphertext));
-    return dec.split("||SALT||")[0];
+    const parts = dec.split("||SALT||");
+    if (keyHex) {
+      const payloadParts = parts[1]?.split("||");
+      const keyInCiphertext = payloadParts?.[0];
+      if (keyInCiphertext && keyInCiphertext.trim() !== keyHex.trim()) {
+        return "";
+      }
+    }
+    return parts[0];
   } catch {
     return "";
   }
@@ -228,9 +272,8 @@ export default function HybridLabPage() {
       let plaintext = "";
       if (encSessKey) {
         const sessKey = rsaDecryptString(encSessKey, d, n);
-        plaintext = aesDecryptSim(rsaDecryptString(ciphertext, d, n));
-        if (!plaintext) plaintext = aesDecryptSim(ciphertext.includes("-") ? rsaDecryptString(ciphertext, d, n) : ciphertext);
-        void sessKey;
+        const aesCipher = ciphertext.includes("-") ? rsaDecryptString(ciphertext, d, n) : ciphertext;
+        plaintext = aesDecryptSim(aesCipher, sessKey);
       } else {
         plaintext = aesDecryptSim(ciphertext);
       }
