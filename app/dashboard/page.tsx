@@ -176,19 +176,29 @@ export default function Dashboard() {
 
   // Score trend: one point per report (most recent last)
   const scoreTrend = useMemo(() => {
-    return [...reports].reverse().map((r, i) => ({
-      name: `#${i + 1}`,
-      score: r.securityScore,
-      file: r.fileName.slice(0, 12),
-    }));
+    return [...reports]
+      .sort((a, b) => new Date(a.analysisDate).getTime() - new Date(b.analysisDate).getTime())
+      .map((r, i) => ({
+        name: reports.length <= 5
+          ? new Date(r.analysisDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+          : `#${i + 1}`,
+        score: r.securityScore,
+        file: r.fileName.length > 15 ? r.fileName.slice(0, 13) + "…" : r.fileName,
+        entropy: +(r.entropy?.value ?? 0).toFixed(2),
+      }));
   }, [reports]);
 
-  // Entropy trend
+  // Entropy trend uses same sorted array
   const entropyTrend = useMemo(() => {
-    return [...reports].reverse().map((r, i) => ({
-      name: `#${i + 1}`,
-      entropy: r.entropy?.value ?? 0,
-    }));
+    return [...reports]
+      .sort((a, b) => new Date(a.analysisDate).getTime() - new Date(b.analysisDate).getTime())
+      .map((r, i) => ({
+        name: reports.length <= 5
+          ? new Date(r.analysisDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+          : `#${i + 1}`,
+        entropy: +(r.entropy?.value ?? 0).toFixed(2),
+        file: r.fileName.length > 15 ? r.fileName.slice(0, 13) + "…" : r.fileName,
+      }));
   }, [reports]);
 
   // RSA key radar
@@ -709,7 +719,13 @@ export default function Dashboard() {
                               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">Security Score Trend</p>
                               <p className="text-xs text-foreground/40 mb-4">Score per uploaded document</p>
                               <ResponsiveContainer width="100%" height={240}>
-                                <LineChart data={scoreTrend} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
+                                <AreaChart data={scoreTrend} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
+                                  <defs>
+                                    <linearGradient id="scoreGradSum" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                                    </linearGradient>
+                                  </defs>
                                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
                                   <XAxis dataKey="name" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} />
                                   <YAxis domain={[0, 100]} stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} width={30} />
@@ -717,8 +733,8 @@ export default function Dashboard() {
                                     contentStyle={{ backgroundColor: "var(--background)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
                                     formatter={(v: unknown, _: unknown, p: { payload?: { file?: string } }) => [`${v}/100 (${p.payload?.file || ""})`, "Score"]}
                                   />
-                                  <Line type="natural" dataKey="score" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: "#6366f1" }} activeDot={{ r: 6 }} />
-                                </LineChart>
+                                  <Area type="monotone" dataKey="score" stroke="#6366f1" strokeWidth={2.5} fill="url(#scoreGradSum)" dot={{ r: 3, fill: "#6366f1" }} activeDot={{ r: 6 }} />
+                                </AreaChart>
                               </ResponsiveContainer>
                             </motion.div>
 
@@ -727,13 +743,19 @@ export default function Dashboard() {
                               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">Entropy Trend</p>
                               <p className="text-xs text-foreground/40 mb-4">Shannon entropy per document (max 8.0)</p>
                               <ResponsiveContainer width="100%" height={240}>
-                                <LineChart data={entropyTrend} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
+                                <AreaChart data={entropyTrend} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
+                                  <defs>
+                                    <linearGradient id="entropyGradSum" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                    </linearGradient>
+                                  </defs>
                                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
                                   <XAxis dataKey="name" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} />
                                   <YAxis domain={[0, 8]} stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} width={30} />
-                                  <Tooltip contentStyle={{ backgroundColor: "var(--background)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} />
-                                  <Line type="natural" dataKey="entropy" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: "#10b981" }} activeDot={{ r: 6 }} />
-                                </LineChart>
+                                  <Tooltip contentStyle={{ backgroundColor: "var(--background)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} formatter={(v: unknown) => [`${v} bits/byte`, "Entropy"]} />
+                                  <Area type="monotone" dataKey="entropy" stroke="#10b981" strokeWidth={2.5} fill="url(#entropyGradSum)" dot={{ r: 3, fill: "#10b981" }} activeDot={{ r: 6 }} />
+                                </AreaChart>
                               </ResponsiveContainer>
                             </motion.div>
                           </div>
