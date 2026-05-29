@@ -17,10 +17,11 @@ import { useEffect } from "react";
 const NAV = [
   { title: "Home", href: "/" },
   { title: "Dashboard", href: "/dashboard" },
-  { title: "Analyze", href: "/analyze" },
+  { title: "Operation Lab", href: "/analyze" },
   { title: "Hybrid Lab", href: "/hybrid-lab" },
   { title: "Reports", href: "/reports" },
   { title: "Key Vault", href: "/vault" },
+  { title: "Visualizations", href: "/visualizations" },
   { title: "Profile", href: "/profile", isActive: true },
 ];
 

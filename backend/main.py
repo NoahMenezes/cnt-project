@@ -646,7 +646,7 @@ class FixGarbledRequest(BaseModel):
     text: str
 
 @app.post("/analyze/fix-garbled")
-async def fix_garbled_text(req: FixGarbledRequest):
+def fix_garbled_text(req: FixGarbledRequest):
     groq_api_key = os.environ.get("GROQ_API_KEY")
     if not groq_api_key:
         raise HTTPException(status_code=500, detail="Groq API key not configured")
@@ -656,61 +656,51 @@ async def fix_garbled_text(req: FixGarbledRequest):
             "Authorization": f"Bearer {groq_api_key}",
             "Content-Type": "application/json"
         }
-        prompt = (
-            "You are an expert at repairing text documents that have suffered from mojibake, "
-            "garbled characters, or encoding errors. Fix the following text and return ONLY the "
-            "corrected clean text. Do not add any conversational filler, markdown formatting, or explanations.\n\n"
-            f"{req.text}"
-        )
-        payload = {
-            "model": "llama-3.3-70b-versatile",
-            "messages": [
-                {
-                    "role": "system", 
-                    "content": "Return only the corrected text. Nothing else."
-                },
-                {
-                    "role": "user", 
-                    "content": prompt
+        
+        import urllib.parse
+        import re
+        
+        # 1. Algorithmic Pre-processing: Decode URL-encoded text
+        decoded_text = urllib.parse.unquote_plus(req.text)
+        
+        # 2. Extract only readable English characters and standard punctuation
+        # This strips out the corrupted binary data which cannot be recovered 
+        # (AES blocks get misaligned when ciphertext is manually edited)
+        # We allow standard ASCII (32-126) plus newlines and tabs
+        cleaner_text = re.sub(r'[^\x09\x0A\x0D\x20-\x7E]+', '', decoded_text)
+        
+        # Optional: collapse multiple weird spaces/newlines that might have resulted from stripping
+        # but preserving the main structure
+        corrected_text = re.sub(r'\n{3,}', '\n\n', cleaner_text).strip()
+        
+        if not corrected_text:
+            corrected_text = "No readable English text could be recovered from this corrupted payload."
+        
+        # Save to supabase
+        supabase_url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+        service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        if supabase_url and service_key:
+            try:
+                headers_supa = {
+                    "apikey": service_key,
+                    "Authorization": f"Bearer {service_key}",
+                    "Content-Type": "application/json",
+                    "Prefer": "resolution=merge-duplicates"
                 }
-            ],
-            "temperature": 0.1
-        }
-        response = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=25.0
-        )
-        if response.status_code == 200:
-            res_data = response.json()
-            corrected_text = res_data["choices"][0]["message"]["content"].strip()
-            
-            # Save to supabase
-            supabase_url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
-            service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-            if supabase_url and service_key:
-                try:
-                    headers_supa = {
-                        "apikey": service_key,
-                        "Authorization": f"Bearer {service_key}",
-                        "Content-Type": "application/json",
-                        "Prefer": "resolution=merge-duplicates"
-                    }
-                    doc_id = f"corr-{str(uuid.uuid4())[:8]}"
-                    row = {
-                        "id": doc_id,
-                        "user_id": req.userId,
-                        "original_text": req.text,
-                        "corrected_text": corrected_text,
-                        "document_name": req.fileName
-                    }
-                    requests.post(f"{supabase_url}/rest/v1/corrected_documents", json=row, headers=headers_supa)
-                except Exception as e:
-                    print(f"Warning: Failed to save to corrected_documents: {e}")
+                doc_id = f"corr-{str(uuid.uuid4())[:8]}"
+                row = {
+                    "id": doc_id,
+                    "user_id": req.userId,
+                    "original_text": req.text,
+                    "corrected_text": corrected_text,
+                    "document_name": req.fileName
+                }
+                requests.post(f"{supabase_url}/rest/v1/corrected_documents", json=row, headers=headers_supa)
+            except Exception as e:
+                print(f"Warning: Failed to save to corrected_documents: {e}")
 
-            return {"correctedText": corrected_text}
-        else:
-            raise HTTPException(status_code=response.status_code, detail=f"Groq API failed: {response.text}")
+        return {"correctedText": corrected_text}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

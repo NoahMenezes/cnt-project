@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import {
-  Key, Shield, Lock, Copy, Trash2, Search, ArrowLeft, Eye, EyeOff, Database, FileText, LockKeyhole
+  Key, Shield, Copy, Trash2, Search, ArrowLeft, Eye, EyeOff, Database, FileText, LockKeyhole
 } from "lucide-react";
 import { getKeys, deleteKey, CryptographicKey, syncKeysForUser } from "@/lib/store";
 import { useUser } from "@clerk/nextjs";
@@ -19,6 +19,7 @@ const NAV = [
   { title: "Hybrid Lab", href: "/hybrid-lab" },
   { title: "Reports", href: "/reports" },
   { title: "Key Vault", href: "/vault", isActive: true },
+  { title: "Visualizations", href: "/visualizations" },
   { title: "Profile", href: "/profile" },
 ];
 

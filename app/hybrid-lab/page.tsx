@@ -4,14 +4,14 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
-  Key, Lock, Unlock, Layers, Copy, Eye, EyeOff,
-  Download, Send, CheckCircle, AlertTriangle, Shield,
-  FileText, RefreshCw, Search, ArrowRight, Inbox,
-  Sliders, Sparkles, Check, ArrowDown, HelpCircle, Wand2
+  Lock, Unlock, Layers, Copy, Eye, EyeOff,
+  Download, CheckCircle, AlertTriangle,
+  FileText, RefreshCw, Search, Inbox,
+  Sparkles, Check, Wand2
 } from "lucide-react";
-import { getKeys, CryptographicKey, syncKeysForUser } from "@/lib/store";
+import { getKeys, CryptographicKey, syncKeysForUser, saveReport } from "@/lib/store";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 
@@ -22,6 +22,7 @@ const NAV = [
   { title: "Hybrid Lab", href: "/hybrid-lab", isActive: true },
   { title: "Reports", href: "/reports" },
   { title: "Key Vault", href: "/vault" },
+  { title: "Visualizations", href: "/visualizations" },
   { title: "Profile", href: "/profile" },
 ];
 
@@ -174,14 +175,7 @@ function aesDecryptSim(ciphertext: string): string {
 }
 
 
-function getFileIcon(name: string) {
-  const lower = name.toLowerCase();
-  if (lower.endsWith(".pdf")) return "PDF Document";
-  if (lower.endsWith(".docx") || lower.endsWith(".doc")) return "Word Document";
-  if (lower.endsWith(".csv")) return "CSV Spreadsheet";
-  if (lower.endsWith(".json")) return "JSON Data File";
-  return "Document";
-}
+
 
 type Stage = "select" | "loaded" | "sent" | "decrypted";
 
@@ -208,10 +202,8 @@ export default function HybridLabPage() {
   const [stage, setStage] = useState<Stage>("select");
   const [decryptedText, setDecryptedText] = useState("");
   const [decryptError, setDecryptError] = useState("");
-  const [isSending, setIsSending] = useState(false);
   const [isDecrypting, setIsDecrypting] = useState(false);
   const [keyInputValue, setKeyInputValue] = useState("");
-  const [keyInputError, setKeyInputError] = useState("");
   const [isFixingGarbled, setIsFixingGarbled] = useState(false);
   const [correctedText, setCorrectedText] = useState("");
   const [fixError, setFixError] = useState("");
@@ -241,7 +233,7 @@ export default function HybridLabPage() {
   useEffect(() => {
     try {
       const activeTabSaved = localStorage.getItem("hl_activeTab");
-      if (activeTabSaved) setActiveTab(activeTabSaved as any);
+      if (activeTabSaved) setActiveTab(activeTabSaved as "simulator" | "playground");
 
       // Simulator
       const selectedKeyIdSaved = localStorage.getItem("hl_selectedKeyId");
@@ -256,7 +248,7 @@ export default function HybridLabPage() {
       const showPrivKeySaved = localStorage.getItem("hl_showPrivKey");
       if (showPrivKeySaved) setShowPrivKey(showPrivKeySaved === "true");
       const stageSaved = localStorage.getItem("hl_stage");
-      if (stageSaved) setStage(stageSaved as any);
+      if (stageSaved) setStage(stageSaved as Stage);
       const decryptedTextSaved = localStorage.getItem("hl_decryptedText");
       if (decryptedTextSaved) setDecryptedText(decryptedTextSaved);
       const decryptErrorSaved = localStorage.getItem("hl_decryptError");
@@ -429,17 +421,7 @@ export default function HybridLabPage() {
     setDecryptError("");
     setPrivateKeyInput("");
     setKeyInputValue("");
-    setKeyInputError("");
   }, []);
-
-  const handleKeyIdSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    const id = keyInputValue.trim();
-    const found = keys.find(k => k.id === id && k.keyType === "RSA_PUBLIC" && k.ciphertextPayload);
-    if (!found) { setKeyInputError("No encrypted document found for this Key ID."); return; }
-    setKeyInputError("");
-    handleSelectKey(found);
-  }, [keyInputValue, keys, handleSelectKey]);
 
   const handleDownloadEncrypted = () => {
     if (!ciphertext) return;
@@ -448,13 +430,6 @@ export default function HybridLabPage() {
     a.href = URL.createObjectURL(blob);
     a.download = `encrypted_${selectedKey?.id ?? "payload"}.enc`;
     a.click();
-  };
-
-  const handleSend = async () => {
-    setIsSending(true);
-    await new Promise(r => setTimeout(r, 1800));
-    setIsSending(false);
-    setStage("sent");
   };
 
   const handleDecrypt = async () => {
@@ -473,6 +448,18 @@ export default function HybridLabPage() {
       // Step 2: Get the encrypted AES session key and ciphertext
       const encSessKey = selectedKey?.encryptedSessionKey ?? "";
       let plaintext = "";
+      
+      // Automatic Algorithm to clean corrupted AES padded bytes & URL encoding
+      const cleanCorruptedText = (text: string) => {
+        let clean = text;
+        try {
+          if (clean.includes("%20") || clean.includes("%3A")) {
+            clean = decodeURIComponent(clean.replace(/\+/g, " "));
+          }
+        } catch {}
+        // Drop unrecoverable binary garbage from block misalignment
+        return clean.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, '');
+      };
 
       // ── Strategy A: Full hybrid decrypt (session key + ciphertext both present) ──────
       if (encSessKey && ciphertext) {
@@ -490,7 +477,7 @@ export default function HybridLabPage() {
         plaintext = aesDecryptSim(aesCiphertext);
 
         if (plaintext) {
-          setDecryptedText(plaintext);
+          setDecryptedText(cleanCorruptedText(plaintext));
           setStage("decrypted");
           setIsDecrypting(false);
           return;
@@ -501,7 +488,7 @@ export default function HybridLabPage() {
           const tryWithHex = aesDecryptSim(aesKeyHex);
           if (tryWithHex) {
             plaintext = tryWithHex;
-            setDecryptedText(plaintext);
+            setDecryptedText(cleanCorruptedText(plaintext));
             setStage("decrypted");
             setIsDecrypting(false);
             return;
@@ -513,7 +500,7 @@ export default function HybridLabPage() {
       if (!encSessKey && ciphertext) {
         plaintext = aesDecryptSim(ciphertext);
         if (plaintext) {
-          setDecryptedText(plaintext);
+          setDecryptedText(cleanCorruptedText(plaintext));
           setStage("decrypted");
           setIsDecrypting(false);
           return;
@@ -527,7 +514,7 @@ export default function HybridLabPage() {
         const tryAes = aesDecryptSim(inner);
         plaintext = tryAes || inner;
         if (plaintext && plaintext.trim()) {
-          setDecryptedText(plaintext);
+          setDecryptedText(cleanCorruptedText(plaintext));
           setStage("decrypted");
           setIsDecrypting(false);
           return;
@@ -540,7 +527,7 @@ export default function HybridLabPage() {
         const tryAes = aesDecryptSim(inner);
         plaintext = tryAes || inner;
         if (plaintext && plaintext.trim()) {
-          setDecryptedText(plaintext);
+          setDecryptedText(cleanCorruptedText(plaintext));
           setStage("decrypted");
           setIsDecrypting(false);
           return;
@@ -565,18 +552,27 @@ export default function HybridLabPage() {
     setCorrectedText("");
 
     try {
-      const res = await fetch("http://localhost:8000/analyze/fix-garbled", {
+      // Trigger a full AI Cryptographic Analysis which will update the Dashboard
+      const res = await fetch("http://localhost:8000/analyze/text", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user?.id || "default-local-user",
-          fileName: selectedKey?.documentName || "Unknown Document",
-          text: decryptedText,
+          fileName: selectedKey?.documentName || "Decrypted Document",
+          content: decryptedText,
         }),
       });
-      if (!res.ok) throw new Error("Failed to fix garbled text");
+      if (!res.ok) {
+        const errBody = await res.text();
+        let detail = "Failed to run AI analysis";
+        try { detail = JSON.parse(errBody).detail || detail; } catch {}
+        throw new Error(detail);
+      }
+      
       const data = await res.json();
-      setCorrectedText(data.correctedText);
+      saveReport(data, user?.id || "default-local-user");
+      
+      // We successfully generated a report in the database
+      setCorrectedText("✅ AI Analysis Complete! Head over to the Dashboard to view the full AI-generated Cryptographic Report and Analysis metrics.");
     } catch (err) {
       setFixError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -592,7 +588,6 @@ export default function HybridLabPage() {
     setDecryptError("");
     setPrivateKeyInput("");
     setKeyInputValue("");
-    setKeyInputError("");
   };
 
   // --- Real-time Playground Computations ---
@@ -614,7 +609,7 @@ export default function HybridLabPage() {
       const wrapped = rsaEncryptString(pgAesKey.trim(), e, n);
       setPgWrappedKey(wrapped);
       setPgWrapError("");
-    } catch (err) {
+    } catch {
       setPgWrapError("Key wrapping failed.");
       setPgWrappedKey("");
     }

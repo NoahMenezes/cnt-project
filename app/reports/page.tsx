@@ -10,8 +10,9 @@ import {
   X, ChevronLeft, ChevronRight, AlertTriangle, FileSearch,
   Info, Shield, Key, Copy, Lock
 } from "lucide-react";
-import { getReports, deleteReport as deleteReportFromStore, Report, getKeys, deleteKey as deleteKeyFromStore, CryptographicKey } from "@/lib/store";
+import { getReports, deleteReport as deleteReportFromStore, Report, getKeys, deleteKey as deleteKeyFromStore, CryptographicKey, syncReportsForUser, syncKeysForUser } from "@/lib/store";
 import { useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 
 const NAV = [
@@ -21,6 +22,7 @@ const NAV = [
   { title: "Hybrid Lab", href: "/hybrid-lab" },
   { title: "Reports", href: "/reports", isActive: true },
   { title: "Key Vault", href: "/vault" },
+  { title: "Visualizations", href: "/visualizations" },
   { title: "Profile", href: "/profile" },
 ];
 
@@ -154,6 +156,17 @@ export default function ReportsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { user } = useUser();
+
+  useEffect(() => {
+    if (user?.id) {
+      syncReportsForUser(user.id);
+      syncKeysForUser(user.id);
+    } else {
+      syncReportsForUser("default-local-user");
+      syncKeysForUser("default-local-user");
+    }
+  }, [user]);
 
   useEffect(() => {
     // Populate state asynchronously on client mount

@@ -193,22 +193,41 @@ export async function syncKeysForUser(clerkUserId: string) {
     .order("created_at", { ascending: false });
 
   if (!errV2 && dataV2) {
-    cachedKeys = dataV2.map((row: Record<string, any>) => ({
-      id: row.id,
-      keyType: row.key_type as CryptographicKey["keyType"],
-      keyValue: row.key_value,
-      keySize: row.key_size,
-      label: row.label,
-      generatedAt: row.generated_at,
-      description: row.description || "",
-      documentName: row.document_name || "",
-      plaintextSnippet: row.plaintext_snippet || "",
-      ciphertextPayload: row.ciphertext_payload || "",
-      encryptedSessionKey: row.encrypted_session_key || "",
-      aesIV: row.aes_iv || "",
-      aesMode: row.aes_mode || "",
-      pairedKeyId: row.paired_key_id || "",
-    }));
+    interface CryptographicKeyV2Row {
+      id: string;
+      key_type: string;
+      key_value: string;
+      key_size: number;
+      label: string;
+      generated_at: string;
+      description?: string;
+      document_name?: string;
+      plaintext_snippet?: string;
+      ciphertext_payload?: string;
+      encrypted_session_key?: string;
+      aes_iv?: string;
+      aes_mode?: string;
+      paired_key_id?: string;
+    }
+    cachedKeys = dataV2.map((row: unknown) => {
+      const r = row as CryptographicKeyV2Row;
+      return {
+        id: r.id,
+        keyType: r.key_type as CryptographicKey["keyType"],
+        keyValue: r.key_value,
+        keySize: r.key_size,
+        label: r.label,
+        generatedAt: r.generated_at,
+        description: r.description || "",
+        documentName: r.document_name || "",
+        plaintextSnippet: r.plaintext_snippet || "",
+        ciphertextPayload: r.ciphertext_payload || "",
+        encryptedSessionKey: r.encrypted_session_key || "",
+        aesIV: r.aes_iv || "",
+        aesMode: r.aes_mode || "",
+        pairedKeyId: r.paired_key_id || "",
+      };
+    });
     try {
       localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
     } catch {}

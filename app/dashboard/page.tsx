@@ -2,21 +2,21 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Header from "@/components/layout/header";
-import { getReports, Report } from "@/lib/store";
+import { getReports, Report, syncReportsForUser } from "@/lib/store";
+import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { motion, type Variants } from "framer-motion";
 import Link from "next/link";
 import {
-  Activity, BarChart3, ChevronRight, Clock, Download,
-  Zap, Shield, FileText, AlertTriangle, Lock, Brain, Menu, FileSearch,
+  Activity, ChevronRight, Clock, Download,
+  Zap, Shield, FileText, AlertTriangle, Lock, Brain, Menu,
+  Copy, Check, TrendingUp
 } from "lucide-react";
 import {
   CartesianGrid, Line, LineChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis, BarChart, Bar, RadarChart,
   PolarGrid, PolarAngleAxis, Radar,
-  PieChart, Pie, Cell, ScatterChart, Scatter,
-  AreaChart, Area, ReferenceLine, Legend,
 } from "recharts";
 
 
@@ -80,290 +80,9 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Constants (visualizations) ──────────────────────────────────────────────
-const DONUT_COLORS = ["#ef4444", "#f97316", "#f59e0b", "#3b82f6"];
-const ENTROPY_COLORS = ["#ef4444", "#f97316", "#f59e0b", "#10b981", "#06b6d4"];
-const TOOLTIP_STYLE = {
-  backgroundColor: "var(--background)", border: "1px solid var(--border)",
-  borderRadius: 8, fontSize: 12, padding: "8px 12px",
-};
 
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}
-      className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-4">
-      <h3 className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground">{title}</h3>
-      {children}
-    </motion.div>
-  );
-}
 
-function VisualizationsSection({ reports, hasMounted }: { reports: Report[]; hasMounted: boolean }) {
-  const [activeFilter, setActiveFilter] = useState<"daily" | "weekly" | "monthly">("weekly");
 
-  const chartData = useMemo(() => {
-    // Security trends grouped by date
-    const trendsMap: Record<string, { sum: number; count: number }> = {};
-    reports.forEach((r) => {
-      const d = new Date(r.analysisDate);
-      const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      if (!trendsMap[dateStr]) trendsMap[dateStr] = { sum: 0, count: 0 };
-      trendsMap[dateStr].sum += r.securityScore;
-      trendsMap[dateStr].count += 1;
-    });
-    const securityTrends = Object.entries(trendsMap).map(([date, data]) => ({
-      date, avgScore: Math.round(data.sum / data.count),
-    }));
-
-    // RSA vs AES
-    let rsaCrit = 0, rsaWeak = 0, rsaMod = 0, rsaSec = 0;
-    let aesCrit = 0, aesWeak = 0, aesMod = 0, aesSec = 0;
-    reports.forEach((r) => {
-      if (r.rsa.keySize < 1024) rsaCrit++; else if (r.rsa.keySize < 2048) rsaWeak++;
-      else if (r.rsa.keySize < 4096) rsaMod++; else rsaSec++;
-      if (r.aes.mode === "ECB" && r.aes.passwordComplexity === "Weak") aesCrit++;
-      else if (r.aes.mode === "ECB" || r.aes.passwordComplexity === "Weak") aesWeak++;
-      else if (r.aes.mode === "CBC") aesMod++; else aesSec++;
-    });
-    const rsaVsAES = [
-      { category: "Critical", rsa: rsaCrit, aes: aesCrit },
-      { category: "Weak", rsa: rsaWeak, aes: aesWeak },
-      { category: "Moderate", rsa: rsaMod, aes: aesMod },
-      { category: "Secure", rsa: rsaSec, aes: aesSec },
-    ];
-
-    // Weakness distribution
-    let smallRsa = 0, weakExp = 0, ecbMode = 0, weakPass = 0;
-    reports.forEach((r) => {
-      if (r.rsa.keySize < 2048) smallRsa++;
-      if (r.rsa.exponent === 3) weakExp++;
-      if (r.aes.mode === "ECB") ecbMode++;
-      if (r.aes.passwordComplexity === "Weak") weakPass++;
-    });
-    const totalIssues = (smallRsa + weakExp + ecbMode + weakPass) || 1;
-    const weaknessDistribution = [
-      { name: "Small RSA Key", value: Math.round((smallRsa / totalIssues) * 100), count: smallRsa },
-      { name: "Weak Exponent", value: Math.round((weakExp / totalIssues) * 100), count: weakExp },
-      { name: "ECB Mode", value: Math.round((ecbMode / totalIssues) * 100), count: ecbMode },
-      { name: "Weak Password", value: Math.round((weakPass / totalIssues) * 100), count: weakPass },
-    ].filter(w => w.count > 0);
-    if (weaknessDistribution.length === 0) weaknessDistribution.push({ name: "No Issues", value: 100, count: 0 });
-
-    // Entropy distribution buckets
-    let b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0;
-    reports.forEach((r) => {
-      const e = r.entropy.value;
-      if (e < 2) b1++; else if (e < 4) b2++; else if (e < 6) b3++;
-      else if (e < 7.5) b4++; else b5++;
-    });
-    const entropyDistribution = [
-      { range: "0–2", count: b1 }, { range: "2–4", count: b2 },
-      { range: "4–6", count: b3 }, { range: "6–7.5", count: b4 }, { range: "7.5–8", count: b5 },
-    ];
-
-    // Character frequency (static hex sample)
-    const characterFrequency = [
-      { char: "E", frequency: 182 }, { char: "A", frequency: 165 },
-      { char: "F", frequency: 148 }, { char: "0", frequency: 134 },
-      { char: "B", frequency: 129 }, { char: "C", frequency: 121 },
-      { char: "D", frequency: 118 }, { char: "1", frequency: 112 },
-      { char: "9", frequency: 104 }, { char: "3", frequency: 97 },
-    ];
-
-    // Encryption time vs file size
-    const encryptionTimeVsFileSize = reports.map((r) => {
-      let sizeKB = parseFloat(r.fileSize) || 10;
-      if (r.fileSize.includes("MB")) sizeKB *= 1024;
-      let baseTime = sizeKB * 1.5;
-      if (r.aes.mode === "CBC") baseTime *= 1.2;
-      if (r.rsa.keySize >= 4096) baseTime += 80;
-      else if (r.rsa.keySize >= 2048) baseTime += 30;
-      return { fileSizeKB: Math.round(sizeKB), timeMs: Math.round(baseTime), fileName: r.fileName };
-    });
-
-    // Activity trends
-    const actMap: Record<string, number> = {};
-    reports.forEach((r) => {
-      const dateStr = new Date(r.analysisDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      actMap[dateStr] = (actMap[dateStr] || 0) + 1;
-    });
-    const activityTrends = Object.entries(actMap).map(([date, analyses]) => ({ date, analyses }));
-
-    const totalAnalyses = reports.length;
-    const averageScore = totalAnalyses > 0 ? Math.round(reports.reduce((a, r) => a + r.securityScore, 0) / totalAnalyses) : 0;
-    const weakFindings = reports.reduce((a, r) => a + (r.rsa?.vulnerabilities?.length ?? 0), 0);
-    const mostCommonIssue = smallRsa > ecbMode ? "Weak RSA Key Size" : ecbMode > 0 ? "ECB Mode Encryption" : "None Detected";
-
-    return { securityTrends, rsaVsAES, weaknessDistribution, entropyDistribution, characterFrequency, encryptionTimeVsFileSize, activityTrends, totalAnalyses, averageScore, weakFindings, mostCommonIssue };
-  }, [reports]);
-
-  const stats = hasMounted ? chartData : { totalAnalyses: 0, averageScore: 0, weakFindings: 0, mostCommonIssue: "—" };
-
-  return (
-    <div className="space-y-8 pt-6 border-t border-border/20">
-      <div className="flex items-center gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground/50">Analytics &amp; Visualizations</h2>
-        <div className="h-px flex-1 bg-border/30" />
-        <Badge variant="outline" className="text-xs border-border/40">
-          <BarChart3 className="h-3 w-3 mr-1" />Analytics
-        </Badge>
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "Total Analyses", value: stats.totalAnalyses, icon: FileSearch },
-          { label: "Avg Security Score", value: stats.averageScore, icon: Shield },
-          { label: "Weak Findings", value: stats.weakFindings, icon: AlertTriangle },
-          { label: "Top Issue", value: stats.mostCommonIssue, icon: BarChart3 },
-        ].map(({ label, value, icon: Icon }) => (
-          <motion.div key={label} whileHover={{ y: -4 }} transition={{ duration: 0.2 }}
-            className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
-              <Icon className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-foreground/40">{label}</p>
-              <p className="text-xl font-bold text-foreground leading-none mt-0.5">{value}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Filter bar */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-foreground/40 uppercase tracking-widest">Range:</span>
-        <div className="flex gap-1 rounded-lg bg-muted/50 p-1">
-          {(["daily", "weekly", "monthly"] as const).map(f => (
-            <button key={f} onClick={() => setActiveFilter(f)}
-              className={`px-4 py-1.5 rounded-md text-xs font-medium capitalize transition-all ${
-                activeFilter === f ? "bg-background text-foreground shadow-sm" : "text-foreground/50 hover:text-foreground"
-              }`}>{f}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Charts grid */}
-      {hasMounted && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <SectionCard title="Security Score Trends">
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={chartData.securityTrends.length ? chartData.securityTrends : [{ date: "No data", avgScore: 0 }]}
-                margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
-                <XAxis dataKey="date" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
-                <YAxis domain={[0, 100]} stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={30} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: "var(--foreground)" }} />
-                <ReferenceLine y={70} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: "Threshold", fill: "#f59e0b", fontSize: 10, position: "right" }} />
-                <Line type="natural" dataKey="avgScore" stroke="var(--primary)" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </SectionCard>
-
-          <SectionCard title="RSA vs AES Issues by Risk Level">
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={chartData.rsaVsAES} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
-                <XAxis dataKey="category" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
-                <YAxis stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={25} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="rsa" name="RSA" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="aes" name="AES" fill="#10b981" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </SectionCard>
-
-          <SectionCard title="Weakness Distribution">
-            <div className="flex items-center gap-6">
-              <ResponsiveContainer width="60%" height={200}>
-                <PieChart>
-                  <Pie data={chartData.weaknessDistribution} dataKey="value" nameKey="name"
-                    cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}>
-                    {chartData.weaknessDistribution.map((_: unknown, i: number) => (
-                      <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: unknown, n: unknown) => [`${v}%`, n as string]} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-2 flex-1">
-                {chartData.weaknessDistribution.map((d: { name: string; value: number }, i: number) => (
-                  <div key={d.name} className="flex items-center gap-2 text-xs">
-                    <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: DONUT_COLORS[i] }} />
-                    <span className="text-foreground/60 flex-1">{d.name}</span>
-                    <span className="text-foreground font-semibold">{d.value}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Entropy Distribution">
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartData.entropyDistribution} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
-                <XAxis dataKey="range" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
-                <YAxis stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={25} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: unknown) => [v as string | number, "Files"]} />
-                <Bar dataKey="count" name="Files" radius={[4, 4, 0, 0]}>
-                  {chartData.entropyDistribution.map((_: unknown, i: number) => (
-                    <Cell key={i} fill={ENTROPY_COLORS[i % ENTROPY_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </SectionCard>
-
-          <SectionCard title="Character Frequency (Top 10)">
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={chartData.characterFrequency} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} horizontal={false} />
-                <XAxis type="number" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
-                <YAxis type="category" dataKey="char" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={20} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: unknown) => [v as string | number, "Occurrences"]} />
-                <Bar dataKey="frequency" fill="var(--primary)" radius={[0, 4, 4, 0]} opacity={0.8} />
-              </BarChart>
-            </ResponsiveContainer>
-          </SectionCard>
-
-          <SectionCard title="Encryption Time vs File Size">
-            <ResponsiveContainer width="100%" height={220}>
-              <ScatterChart margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
-                <XAxis dataKey="fileSizeKB" name="File Size" unit=" KB" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
-                <YAxis dataKey="timeMs" name="Time" unit=" ms" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={45} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: unknown, n: unknown) => [v as string | number, n === "fileSizeKB" ? "KB" : "ms"]} />
-                <Scatter data={chartData.encryptionTimeVsFileSize.length ? chartData.encryptionTimeVsFileSize : [{ fileSizeKB: 0, timeMs: 0 }]} fill="#6366f1" />
-              </ScatterChart>
-            </ResponsiveContainer>
-          </SectionCard>
-
-          <div className="lg:col-span-2">
-            <SectionCard title="Analysis Activity Trends">
-              <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={chartData.activityTrends.length ? chartData.activityTrends : [{ date: "No data", analyses: 0 }]}
-                  margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                  <defs>
-                    <linearGradient id="actGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
-                  <XAxis dataKey="date" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} />
-                  <YAxis stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 11 }} width={25} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: unknown) => [v as string | number, "Analyses"]} />
-                  <Area type="natural" dataKey="analyses" stroke="var(--primary)" strokeWidth={2.5} fill="url(#actGrad)" dot={false} activeDot={{ r: 5 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </SectionCard>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
@@ -374,12 +93,23 @@ export default function Dashboard() {
     { title: "Hybrid Lab", href: "/hybrid-lab" },
     { title: "Reports", href: "/reports" },
     { title: "Key Vault", href: "/vault" },
+    { title: "Visualizations", href: "/visualizations" },
     { title: "Profile", href: "/profile" },
   ];
 
   const [hasMounted, setHasMounted] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const { user } = useUser();
+
+  useEffect(() => {
+    if (user?.id) {
+      syncReportsForUser(user.id);
+    } else {
+      syncReportsForUser("default-local-user");
+    }
+  }, [user]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -395,7 +125,14 @@ export default function Dashboard() {
   }, []);
 
   // ── Derived data ──────────────────────────────────────────────────────────
-  const latest = reports[0] ?? null;
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+
+  const activeReport = useMemo(() => {
+    if (!selectedReportId) return null;
+    return reports.find((r) => r.id === selectedReportId) || null;
+  }, [reports, selectedReportId]);
+
+  const latest = activeReport || reports[0] || null;
 
   const avgScore = useMemo(() => {
     if (!reports.length) return 0;
@@ -540,193 +277,335 @@ export default function Dashboard() {
               ) : (
                 <motion.div variants={container} initial="hidden" animate="visible" className="space-y-8">
 
+                  {/* ── Document Selector ──────────────────────────────────── */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-border/30 bg-background/40 backdrop-blur rounded-2xl p-5">
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-foreground tracking-tight">Real-time Forensics Selector</p>
+                      <p className="text-xs text-foreground/40">Compare consolidated operations metrics or focus on a single forensic session</p>
+                    </div>
+                    <select
+                      value={selectedReportId || "all"}
+                      onChange={(e) => {
+                        setSelectedReportId(e.target.value === "all" ? null : e.target.value);
+                      }}
+                      className="rounded-full border border-border/40 bg-background/80 px-4 py-2 text-sm text-foreground focus:outline-none focus:border-primary/50 backdrop-blur w-full sm:w-72"
+                    >
+                      <option value="all">🔍 Consolidated Global Overview</option>
+                      {reports.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          📄 {r.fileName} ({new Date(r.analysisDate).toLocaleDateString()})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* ── Metric Cards ─────────────────────────────────────── */}
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <MetricCard label="Files Analyzed" value={reports.length.toString()} sub="total documents" icon={<FileText className="h-5 w-5" />} color="#6366f1" />
-                    <MetricCard label="Avg Security Score" value={`${avgScore}/100`} sub={scoreLabel(avgScore)} icon={<Shield className="h-5 w-5" />} color={scoreColor(avgScore)} />
-                    <MetricCard label="Latest RSA Key" value={latest ? `${latest.rsa.keySize}-bit` : "—"} sub={latest?.rsa.riskLevel ?? ""} icon={<Lock className="h-5 w-5" />} color="#8b5cf6" />
-                    <MetricCard label="Vulnerabilities" value={vulnCount.toString()} sub="across all reports" icon={<AlertTriangle className="h-5 w-5" />} color={vulnCount > 0 ? "#ef4444" : "#10b981"} />
-                  </div>
-
-                  {/* ── Latest AI Forensic Spotlight ─────────────────────── */}
-                  {latest && (
-                    <div>
-                      <SectionTitle>Latest AI Forensic Analysis — {latest.fileName}</SectionTitle>
-                      <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-5">
-                        <div className="flex flex-wrap gap-3 items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="relative flex h-2.5 w-2.5">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                            </div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground">AI Forensic Findings</p>
-                          </div>
-                          <div className="flex gap-2 flex-wrap">
-                            <Badge variant="outline" className="text-xs border-border/40">{latest.type}</Badge>
-                            <Badge variant="outline" className="text-xs" style={{ borderColor: scoreColor(latest.securityScore) + "50", color: scoreColor(latest.securityScore), backgroundColor: scoreColor(latest.securityScore) + "15" }}>
-                              {latest.securityScore}/100 · {scoreLabel(latest.securityScore)}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs border-border/40 text-foreground/50">{relTime(latest.analysisDate)}</Badge>
-                          </div>
-                        </div>
-
-                        <div className="grid gap-4 md:grid-cols-2">
-                          {/* Security Assessment from AI */}
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wider flex items-center gap-2">
-                              <Brain className="h-3.5 w-3.5 text-violet-400" /> Security Assessment
-                            </p>
-                            <p className="text-sm text-foreground/70 leading-relaxed bg-foreground/[0.02] border border-border/10 rounded-xl p-4 min-h-[100px]">
-                              {latestAiJson?.securityAssessment || latest.findings || "No AI assessment available."}
-                            </p>
-                          </div>
-
-                          {/* Recommendations from AI */}
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wider flex items-center gap-2">
-                              <AlertTriangle className="h-3.5 w-3.5 text-orange-400" /> AI Recommendations
-                            </p>
-                            <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-                              {(latestAiJson?.recommendations ?? latest.recommendations ?? []).map((r: { priority: string; action: string }, i: number) => {
-                                const colors: Record<string, string> = {
-                                  Critical: "text-red-400 border-red-500/20 bg-red-500/10",
-                                  High: "text-orange-400 border-orange-500/20 bg-orange-500/10",
-                                  Medium: "text-yellow-400 border-yellow-500/20 bg-yellow-500/10",
-                                  Low: "text-blue-400 border-blue-500/20 bg-blue-500/10",
-                                };
-                                const cls = colors[r.priority] ?? colors.Low;
-                                return (
-                                  <div key={i} className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-relaxed ${cls}`}>
-                                    <span className="font-bold shrink-0">{r.priority}</span>
-                                    <span>{r.action}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Crypto params row */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-border/10">
-                          {[
-                            { k: "Entropy", v: `${latest.entropy?.value}/8.0`, s: latest.entropy?.classification },
-                            { k: "RSA Key", v: `${latest.rsa?.keySize}-bit`, s: latest.rsa?.riskLevel },
-                            { k: "AES Mode", v: latest.aes?.mode, s: latest.aes?.keyStrength },
-                            { k: "Password", v: latest.aes?.passwordComplexity, s: latest.aes?.encryptionMode },
-                          ].map(({ k, v, s }) => (
-                            <div key={k} className="rounded-xl bg-foreground/[0.03] border border-border/10 p-3 text-center">
-                              <p className="text-xs text-foreground/40 mb-1">{k}</p>
-                              <p className="text-sm font-bold text-foreground">{v}</p>
-                              <p className="text-[10px] text-foreground/40 mt-0.5">{s}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </motion.div>
-                    </div>
-                  )}
-
-                  {/* ── Charts row ────────────────────────────────────────── */}
-                  <div>
-                    <SectionTitle>Security Trends</SectionTitle>
-                    <div className="grid gap-6 lg:grid-cols-2">
-
-                      {/* Score trend */}
-                      <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
-                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">Security Score Trend</p>
-                        <p className="text-xs text-foreground/40 mb-4">Score per uploaded document</p>
-                        <ResponsiveContainer width="100%" height={240}>
-                          <LineChart data={scoreTrend} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
-                            <XAxis dataKey="name" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} />
-                            <YAxis domain={[0, 100]} stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} width={30} />
-                            <Tooltip
-                              contentStyle={{ backgroundColor: "var(--background)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
-                             formatter={(v: unknown, _: unknown, p: { payload?: { file?: string } }) => [`${v}/100 (${p.payload?.file || ""})`, "Score"]}
-                            />
-                            <Line type="natural" dataKey="score" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: "#6366f1" }} activeDot={{ r: 6 }} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </motion.div>
-
-                      {/* Entropy trend */}
-                      <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
-                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">Entropy Trend</p>
-                        <p className="text-xs text-foreground/40 mb-4">Shannon entropy per document (max 8.0)</p>
-                        <ResponsiveContainer width="100%" height={240}>
-                          <LineChart data={entropyTrend} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
-                            <XAxis dataKey="name" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} />
-                            <YAxis domain={[0, 8]} stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} width={30} />
-                            <Tooltip contentStyle={{ backgroundColor: "var(--background)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} />
-                            <Line type="natural" dataKey="entropy" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: "#10b981" }} activeDot={{ r: 6 }} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </motion.div>
-                    </div>
-                  </div>
-
-                  {/* ── Bottom row: Radar + File bar + Recent ─────────────── */}
-                  <div className="grid gap-6 lg:grid-cols-3">
-
-                    {/* Radar — latest doc crypto strengths */}
-                    {latest && rsaRadar.length > 0 && (
-                      <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
-                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">Latest Document Profile</p>
-                        <p className="text-xs text-foreground/40 mb-4">{latest.fileName.slice(0, 24)}</p>
-                        <ResponsiveContainer width="100%" height={220}>
-                          <RadarChart data={rsaRadar}>
-                            <PolarGrid stroke="var(--border)" opacity={0.4} />
-                            <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10, fill: "var(--foreground)", opacity: 0.6 }} />
-                            <Radar dataKey="score" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.25} strokeWidth={2} />
-                            <Tooltip contentStyle={{ backgroundColor: "var(--background)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} />
-                          </RadarChart>
-                        </ResponsiveContainer>
-                      </motion.div>
+                    {activeReport ? (
+                      <>
+                        <MetricCard label="Document Type" value={activeReport.type} sub={`File size: ${activeReport.fileSize}`} icon={<FileText className="h-5 w-5" />} color="#6366f1" />
+                        <MetricCard label="Security Score" value={`${activeReport.securityScore}/100`} sub={scoreLabel(activeReport.securityScore)} icon={<Shield className="h-5 w-5" />} color={scoreColor(activeReport.securityScore)} />
+                        <MetricCard label="RSA Configuration" value={`${activeReport.rsa.keySize}-bit`} sub={activeReport.rsa.riskLevel} icon={<Lock className="h-5 w-5" />} color="#8b5cf6" />
+                        <MetricCard label="Vulnerabilities" value={activeReport.rsa.vulnerabilities.length.toString()} sub="identified weaknesses" icon={<AlertTriangle className="h-5 w-5" />} color={activeReport.rsa.vulnerabilities.length > 0 ? "#ef4444" : "#10b981"} />
+                      </>
+                    ) : (
+                      <>
+                        <MetricCard label="Files Analyzed" value={reports.length.toString()} sub="total documents" icon={<FileText className="h-5 w-5" />} color="#6366f1" />
+                        <MetricCard label="Avg Security Score" value={`${avgScore}/100`} sub={scoreLabel(avgScore)} icon={<Shield className="h-5 w-5" />} color={scoreColor(avgScore)} />
+                        <MetricCard label="Latest RSA Key" value={reports[0] ? `${reports[0].rsa.keySize}-bit` : "—"} sub={reports[0]?.rsa.riskLevel ?? ""} icon={<Lock className="h-5 w-5" />} color="#8b5cf6" />
+                        <MetricCard label="Vulnerabilities" value={vulnCount.toString()} sub="across all reports" icon={<AlertTriangle className="h-5 w-5" />} color={vulnCount > 0 ? "#ef4444" : "#10b981"} />
+                      </>
                     )}
-
-                    {/* File type distribution bar */}
-                    <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
-                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">File Type Distribution</p>
-                      <p className="text-xs text-foreground/40 mb-4">Analyzed document types</p>
-                      {fileTypeBar.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={220}>
-                          <BarChart data={fileTypeBar} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
-                            <XAxis dataKey="name" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} />
-                            <YAxis stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} width={30} allowDecimals={false} />
-                            <Tooltip contentStyle={{ backgroundColor: "var(--background)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} />
-                            <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex items-center justify-center h-[220px] text-foreground/20 text-sm">No data</div>
-                      )}
-                    </motion.div>
-
-                    {/* Recent reports list */}
-                    <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
-                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-4">Recent Analyses</p>
-                      <div className="space-y-2">
-                        {reports.slice(0, 5).map((r) => (
-                          <div key={r.id} className="flex items-center justify-between rounded-xl border border-border/15 bg-background/40 px-3 py-2.5 gap-2">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-medium text-foreground truncate">{r.fileName}</p>
-                              <p className="text-[10px] text-foreground/40">{relTime(r.analysisDate)}</p>
-                            </div>
-                            <span className="text-xs font-bold shrink-0" style={{ color: scoreColor(r.securityScore) }}>{r.securityScore}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <Link href="/reports" className="mt-4 flex items-center gap-1 text-xs text-foreground/40 hover:text-foreground transition-colors">
-                        View all reports <ChevronRight className="h-3 w-3" />
-                      </Link>
-                    </motion.div>
                   </div>
 
-                  {/* ══════════════════════════════════════════════════════════
-                      ANALYTICS & VISUALIZATIONS (merged from /visualizations)
-                  ══════════════════════════════════════════════════════════ */}
-                  <VisualizationsSection reports={reports} hasMounted={hasMounted} />
+                  {activeReport ? (
+                    /* ── ACTIVE REPORT DEEP INPSECTOR ────────────────────── */
+                    <div className="space-y-6">
+                      {/* AI Spotlight */}
+                      <div>
+                        <SectionTitle>AI Forensic Analysis Spotlight</SectionTitle>
+                        <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-5">
+                          <div className="flex flex-wrap gap-3 items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="relative flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                              </div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground">AI Forensic Findings — {activeReport.fileName}</p>
+                            </div>
+                            <div className="flex gap-2 flex-wrap">
+                              <Badge variant="outline" className="text-xs border-border/40">{activeReport.type}</Badge>
+                              <Badge variant="outline" className="text-xs" style={{ borderColor: scoreColor(activeReport.securityScore) + "50", color: scoreColor(activeReport.securityScore), backgroundColor: scoreColor(activeReport.securityScore) + "15" }}>
+                                {activeReport.securityScore}/100 · {scoreLabel(activeReport.securityScore)}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs border-border/40 text-foreground/50">{relTime(activeReport.analysisDate)}</Badge>
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            {/* Security Assessment from AI */}
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wider flex items-center gap-2">
+                                <Brain className="h-3.5 w-3.5 text-violet-400" /> Security Assessment
+                              </p>
+                              <p className="text-sm text-foreground/70 leading-relaxed bg-foreground/[0.02] border border-border/10 rounded-xl p-4 min-h-[100px]">
+                                {latestAiJson?.securityAssessment || activeReport.findings || "No AI assessment available."}
+                              </p>
+                            </div>
+
+                            {/* Recommendations from AI */}
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold text-foreground/50 uppercase tracking-wider flex items-center gap-2">
+                                <AlertTriangle className="h-3.5 w-3.5 text-orange-400" /> AI Recommendations
+                              </p>
+                              <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                                {(latestAiJson?.recommendations ?? activeReport.recommendations ?? []).map((r: { priority: string; action: string }, i: number) => {
+                                  const colors: Record<string, string> = {
+                                    Critical: "text-red-400 border-red-500/20 bg-red-500/10",
+                                    High: "text-orange-400 border-orange-500/20 bg-orange-500/10",
+                                    Medium: "text-yellow-400 border-yellow-500/20 bg-yellow-500/10",
+                                    Low: "text-blue-400 border-blue-500/20 bg-blue-500/10",
+                                  };
+                                  const cls = colors[r.priority] ?? colors.Low;
+                                  return (
+                                    <div key={i} className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-relaxed ${cls}`}>
+                                      <span className="font-bold shrink-0">{r.priority}</span>
+                                      <span>{r.action}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Crypto params row */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-border/10">
+                            {[
+                              { k: "Entropy", v: `${activeReport.entropy?.value}/8.0`, s: activeReport.entropy?.classification },
+                              { k: "RSA Key", v: `${activeReport.rsa?.keySize}-bit`, s: activeReport.rsa?.riskLevel },
+                              { k: "AES Mode", v: activeReport.aes?.mode, s: activeReport.aes?.keyStrength },
+                              { k: "Password", v: activeReport.aes?.passwordComplexity, s: activeReport.aes?.encryptionMode },
+                            ].map(({ k, v, s }) => (
+                              <div key={k} className="rounded-xl bg-foreground/[0.03] border border-border/10 p-3 text-center">
+                                <p className="text-xs text-foreground/40 mb-1">{k}</p>
+                                <p className="text-sm font-bold text-foreground">{v}</p>
+                                <p className="text-[10px] text-foreground/40 mt-0.5">{s}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </motion.div>
+                      </div>
+
+                      {/* Detail metrics row (Radar + Vulnerability details) */}
+                      <div className="grid gap-6 md:grid-cols-5">
+                        {/* Radar Profile */}
+                        {rsaRadar.length > 0 && (
+                          <motion.div variants={item} className="md:col-span-2 rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
+                            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">Document Profile</p>
+                            <p className="text-xs text-foreground/40 mb-4">Cryptographic configuration strength mapping</p>
+                            <ResponsiveContainer width="100%" height={220}>
+                              <RadarChart data={rsaRadar}>
+                                <PolarGrid stroke="var(--border)" opacity={0.4} />
+                                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10, fill: "var(--foreground)", opacity: 0.6 }} />
+                                <Radar dataKey="score" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.25} strokeWidth={2} />
+                                <Tooltip contentStyle={{ backgroundColor: "var(--background)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} />
+                              </RadarChart>
+                            </ResponsiveContainer>
+                          </motion.div>
+                        )}
+
+                        {/* Actionable Vulnerabilities Inspector */}
+                        <motion.div variants={item} className="md:col-span-3 rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur flex flex-col justify-between">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">Identified Weaknesses</p>
+                            <p className="text-xs text-foreground/40 mb-4">Specific protocol vulnerabilities detected in parsing</p>
+                            <div className="space-y-3">
+                              {activeReport.rsa.vulnerabilities.length > 0 ? (
+                                activeReport.rsa.vulnerabilities.map((v, i) => (
+                                  <div key={i} className="flex gap-3 items-start text-xs border-b border-border/5 pb-2">
+                                    <div className="mt-0.5 h-2 w-2 rounded-full bg-red-500 shrink-0" />
+                                    <div>
+                                      <p className="font-semibold text-foreground">{v}</p>
+                                      <p className="text-[10px] text-foreground/40 mt-0.5">Algorithm requirement failed during automated compliance scanning.</p>
+                                    </div>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="text-center py-8 text-foreground/40 text-xs">
+                                  No critical vulnerabilities detected in RSA configuration. Key meets baseline compliance parameters.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="pt-4 border-t border-border/10 mt-4 flex items-center justify-between">
+                            <span className="text-[10px] text-foreground/40">Compliance standard: FIPS 140-3</span>
+                            <Badge variant="outline" className={`text-[10px] ${activeReport.securityScore >= 70 ? "text-emerald-400" : "text-yellow-400"}`}>
+                              {activeReport.securityScore >= 70 ? "Baseline Passed" : "Remediation Required"}
+                            </Badge>
+                          </div>
+                        </motion.div>
+                      </div>
+
+                      {/* Corrected Plaintext Output (English) */}
+                      <div>
+                        <SectionTitle>Corrected Plaintext Output (English)</SectionTitle>
+                        <motion.div variants={item} className="rounded-2xl border border-border/40 bg-zinc-950 p-6 font-mono text-xs relative overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/10 pointer-events-none" />
+                          <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-4">
+                            <span className="text-[10px] tracking-wider text-zinc-500 uppercase">Extracted Plaintext Payload</span>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 rounded-lg text-[10px] border-white/10 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
+                                onClick={() => {
+                                  const text = activeReport.patterns?.unstructuredChunks?.[0]?.text || activeReport.findings || "";
+                                  navigator.clipboard.writeText(text);
+                                  setCopied(true);
+                                  setTimeout(() => setCopied(false), 2000);
+                                }}
+                              >
+                                {copied ? (
+                                  <>
+                                    <Check className="h-3 w-3 text-emerald-400 mr-1.5" /> Copied
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="h-3 w-3 mr-1.5" /> Copy Plaintext
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 rounded-lg text-[10px] border-white/10 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
+                                onClick={() => {
+                                  const text = activeReport.patterns?.unstructuredChunks?.[0]?.text || activeReport.findings || "";
+                                  const blob = new Blob([text], { type: "text/plain" });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement("a");
+                                  a.href = url;
+                                  a.download = `plaintext_${activeReport.fileName}.txt`;
+                                  a.click();
+                                  URL.revokeObjectURL(url);
+                                }}
+                              >
+                                <Download className="h-3 w-3 mr-1.5" /> Download (.txt)
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="max-h-72 overflow-y-auto pr-2 text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                            {activeReport.patterns?.unstructuredChunks?.[0]?.text || activeReport.findings || "No extracted plaintext payload available."}
+                          </div>
+                        </motion.div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* ── CONSOLIDATED GLOBAL OVERVIEW ────────────────────── */
+                    <>
+                      {/* Charts row */}
+                      <div>
+                        <SectionTitle>Security Trends</SectionTitle>
+                        <div className="grid gap-6 lg:grid-cols-2">
+                          {/* Score trend */}
+                          <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
+                            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">Security Score Trend</p>
+                            <p className="text-xs text-foreground/40 mb-4">Score per uploaded document</p>
+                            <ResponsiveContainer width="100%" height={240}>
+                              <LineChart data={scoreTrend} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
+                                <XAxis dataKey="name" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} />
+                                <YAxis domain={[0, 100]} stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} width={30} />
+                                <Tooltip
+                                  contentStyle={{ backgroundColor: "var(--background)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
+                                  formatter={(v: unknown, _: unknown, p: { payload?: { file?: string } }) => [`${v}/100 (${p.payload?.file || ""})`, "Score"]}
+                                />
+                                <Line type="natural" dataKey="score" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: "#6366f1" }} activeDot={{ r: 6 }} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </motion.div>
+
+                          {/* Entropy trend */}
+                          <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
+                            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">Entropy Trend</p>
+                            <p className="text-xs text-foreground/40 mb-4">Shannon entropy per document (max 8.0)</p>
+                            <ResponsiveContainer width="100%" height={240}>
+                              <LineChart data={entropyTrend} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
+                                <XAxis dataKey="name" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} />
+                                <YAxis domain={[0, 8]} stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} width={30} />
+                                <Tooltip contentStyle={{ backgroundColor: "var(--background)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} />
+                                <Line type="natural" dataKey="entropy" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: "#10b981" }} activeDot={{ r: 6 }} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </motion.div>
+                        </div>
+                      </div>
+
+                      {/* Bottom row: File bar + Recent */}
+                      <div className="grid gap-6 lg:grid-cols-2">
+                        {/* File type distribution bar */}
+                        <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
+                          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">File Type Distribution</p>
+                          <p className="text-xs text-foreground/40 mb-4">Analyzed document types</p>
+                          {fileTypeBar.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={220}>
+                              <BarChart data={fileTypeBar} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
+                                <XAxis dataKey="name" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} />
+                                <YAxis stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} width={30} allowDecimals={false} />
+                                <Tooltip contentStyle={{ backgroundColor: "var(--background)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} />
+                                <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          ) : (
+                            <div className="flex items-center justify-center h-[220px] text-foreground/20 text-sm">No data</div>
+                          )}
+                        </motion.div>
+
+                        {/* Recent reports list */}
+                        <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
+                          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-4">Recent Analyses</p>
+                          <div className="space-y-2">
+                            {reports.slice(0, 5).map((r) => (
+                              <div key={r.id} className="flex items-center justify-between rounded-xl border border-border/15 bg-background/40 px-3 py-2.5 gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-medium text-foreground truncate">{r.fileName}</p>
+                                  <p className="text-[10px] text-foreground/40">{relTime(r.analysisDate)}</p>
+                                </div>
+                                <span className="text-xs font-bold shrink-0" style={{ color: scoreColor(r.securityScore) }}>{r.securityScore}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <Link href="/reports" className="mt-4 flex items-center gap-1 text-xs text-foreground/40 hover:text-foreground transition-colors">
+                            View all reports <ChevronRight className="h-3 w-3" />
+                          </Link>
+                        </motion.div>
+                      </div>
+
+                      {/* Redirect Banner */}
+                      <motion.div variants={item} whileHover={{ y: -3 }}
+                        className="rounded-2xl border border-primary/20 bg-primary/5 p-6 backdrop-blur flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="space-y-1.5 max-w-2xl">
+                          <div className="flex items-center gap-2 text-primary">
+                            <TrendingUp className="h-4 w-4" />
+                            <span className="text-xs font-bold uppercase tracking-widest">Interactive Telemetry Hub</span>
+                          </div>
+                          <h3 className="text-lg font-bold text-foreground">Advanced Cryptographic Visualizations</h3>
+                          <p className="text-sm text-foreground/60 leading-relaxed">
+                            Deep-dive into Shannon entropy distributions, AES vs RSA key risk matrices, processing latency regressions, and character frequency spectrums.
+                          </p>
+                        </div>
+                        <Link href="/visualizations">
+                          <Button className="rounded-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90 shrink-0">
+                            Launch Analytics Engine <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                      </motion.div>
+                    </>
+                  )}
 
                 </motion.div>
               )}

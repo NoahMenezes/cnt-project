@@ -342,6 +342,7 @@ export default function OperationPage() {
     { title: "Hybrid Lab", href: "/hybrid-lab" },
     { title: "Reports", href: "/reports" },
     { title: "Key Vault", href: "/vault" },
+    { title: "Visualizations", href: "/visualizations" },
     { title: "Profile", href: "/profile" },
   ];
 
