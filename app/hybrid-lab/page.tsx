@@ -226,6 +226,178 @@ export default function HybridLabPage() {
     return () => window.removeEventListener("cipher_scope_db_update", handler);
   }, []);
 
+  // --- Load page state from localStorage on mount ---
+  useEffect(() => {
+    try {
+      const activeTabSaved = localStorage.getItem("hl_activeTab");
+      if (activeTabSaved) setActiveTab(activeTabSaved as any);
+
+      // Simulator
+      const selectedKeyIdSaved = localStorage.getItem("hl_selectedKeyId");
+      if (selectedKeyIdSaved) {
+        const found = keys.find(k => k.id === selectedKeyIdSaved);
+        if (found) setSelectedKey(found);
+      }
+      const ciphertextSaved = localStorage.getItem("hl_ciphertext");
+      if (ciphertextSaved) setCiphertext(ciphertextSaved);
+      const privateKeyInputSaved = localStorage.getItem("hl_privateKeyInput");
+      if (privateKeyInputSaved) setPrivateKeyInput(privateKeyInputSaved);
+      const showPrivKeySaved = localStorage.getItem("hl_showPrivKey");
+      if (showPrivKeySaved) setShowPrivKey(showPrivKeySaved === "true");
+      const stageSaved = localStorage.getItem("hl_stage");
+      if (stageSaved) setStage(stageSaved as any);
+      const decryptedTextSaved = localStorage.getItem("hl_decryptedText");
+      if (decryptedTextSaved) setDecryptedText(decryptedTextSaved);
+      const decryptErrorSaved = localStorage.getItem("hl_decryptError");
+      if (decryptErrorSaved) setDecryptError(decryptErrorSaved);
+      const keyInputValueSaved = localStorage.getItem("hl_keyInputValue");
+      if (keyInputValueSaved) setKeyInputValue(keyInputValueSaved);
+
+      // Playground
+      const pgAesKeySaved = localStorage.getItem("hl_pgAesKey");
+      if (pgAesKeySaved) setPgAesKey(pgAesKeySaved);
+      const pgRsaPublicKeySaved = localStorage.getItem("hl_pgRsaPublicKey");
+      if (pgRsaPublicKeySaved) setPgRsaPublicKey(pgRsaPublicKeySaved);
+      const pgWrappedKeySaved = localStorage.getItem("hl_pgWrappedKey");
+      if (pgWrappedKeySaved) setPgWrappedKey(pgWrappedKeySaved);
+      const pgCiphertextSaved = localStorage.getItem("hl_pgCiphertext");
+      if (pgCiphertextSaved) setPgCiphertext(pgCiphertextSaved);
+      const pgRsaPrivateKeySaved = localStorage.getItem("hl_pgRsaPrivateKey");
+      if (pgRsaPrivateKeySaved) setPgRsaPrivateKey(pgRsaPrivateKeySaved);
+      const pgDecryptAesKeyInputSaved = localStorage.getItem("hl_pgDecryptAesKeyInput");
+      if (pgDecryptAesKeyInputSaved) setPgDecryptAesKeyInput(pgDecryptAesKeyInputSaved);
+      const pgDecryptedAesKeySaved = localStorage.getItem("hl_pgDecryptedAesKey");
+      if (pgDecryptedAesKeySaved) setPgDecryptedAesKey(pgDecryptedAesKeySaved);
+      const pgPlaintextSaved = localStorage.getItem("hl_pgPlaintext");
+      if (pgPlaintextSaved) setPgPlaintext(pgPlaintextSaved);
+      const pgDecryptErrorSaved = localStorage.getItem("hl_pgDecryptError");
+      if (pgDecryptErrorSaved) setPgDecryptError(pgDecryptErrorSaved);
+      const showPgPrivKeySaved = localStorage.getItem("hl_showPgPrivKey");
+      if (showPgPrivKeySaved) setShowPgPrivKey(showPgPrivKeySaved === "true");
+    } catch (e) {
+      console.error("Error loading hybrid lab state:", e);
+    }
+  }, [keys]);
+
+  // --- Save page state to localStorage reactively ---
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_activeTab", activeTab);
+    } catch {}
+  }, [activeTab]);
+
+  useEffect(() => {
+    try {
+      if (selectedKey) {
+        localStorage.setItem("hl_selectedKeyId", selectedKey.id);
+      } else {
+        localStorage.removeItem("hl_selectedKeyId");
+      }
+    } catch {}
+  }, [selectedKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_ciphertext", ciphertext);
+    } catch {}
+  }, [ciphertext]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_privateKeyInput", privateKeyInput);
+    } catch {}
+  }, [privateKeyInput]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_showPrivKey", String(showPrivKey));
+    } catch {}
+  }, [showPrivKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_stage", stage);
+    } catch {}
+  }, [stage]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_decryptedText", decryptedText);
+    } catch {}
+  }, [decryptedText]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_decryptError", decryptError);
+    } catch {}
+  }, [decryptError]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_keyInputValue", keyInputValue);
+    } catch {}
+  }, [keyInputValue]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_pgAesKey", pgAesKey);
+    } catch {}
+  }, [pgAesKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_pgRsaPublicKey", pgRsaPublicKey);
+    } catch {}
+  }, [pgRsaPublicKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_pgWrappedKey", pgWrappedKey);
+    } catch {}
+  }, [pgWrappedKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_pgCiphertext", pgCiphertext);
+    } catch {}
+  }, [pgCiphertext]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_pgRsaPrivateKey", pgRsaPrivateKey);
+    } catch {}
+  }, [pgRsaPrivateKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_pgDecryptAesKeyInput", pgDecryptAesKeyInput);
+    } catch {}
+  }, [pgDecryptAesKeyInput]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_pgDecryptedAesKey", pgDecryptedAesKey);
+    } catch {}
+  }, [pgDecryptedAesKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_pgPlaintext", pgPlaintext);
+    } catch {}
+  }, [pgPlaintext]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_pgDecryptError", pgDecryptError);
+    } catch {}
+  }, [pgDecryptError]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hl_showPgPrivKey", String(showPgPrivKey));
+    } catch {}
+  }, [showPgPrivKey]);
+
   const pubKeys = keys.filter(k =>
     k.keyType === "RSA_PUBLIC" && k.ciphertextPayload &&
     ((k.label && k.label.toLowerCase().includes(search.toLowerCase())) ||
