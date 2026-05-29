@@ -9,7 +9,7 @@ import {
   Lock, Unlock, Layers, Copy, Eye, EyeOff,
   Download, CheckCircle, AlertTriangle,
   FileText, RefreshCw, Search, Inbox,
-  Sparkles, Check, Wand2
+  Sparkles, Check, Wand2, LayoutDashboard
 } from "lucide-react";
 import { getKeys, CryptographicKey, syncKeysForUser, saveReport } from "@/lib/store";
 import { useUser } from "@clerk/nextjs";
@@ -1099,18 +1099,27 @@ export default function HybridLabPage() {
                                     className="w-full rounded-xl border border-purple-500/20 bg-purple-500/[0.02] px-4 py-3 font-mono text-xs text-foreground focus:outline-none resize-none shadow-[inset_0_0_20px_rgba(168,85,247,0.03)]"
                                   />
                                 </div>
-                                <Button
-                                  onClick={() => {
-                                    const blob = new Blob([correctedText], { type: "text/plain" });
-                                    const a = document.createElement("a");
-                                    a.href = URL.createObjectURL(blob);
-                                    a.download = `corrected_${selectedKey.documentName || "doc"}.txt`;
-                                    a.click();
-                                  }}
-                                  className="gap-2 rounded-xl text-xs h-9 w-full sm:w-auto bg-purple-500 hover:bg-purple-600 text-white"
-                                >
-                                  <Download className="h-3.5 w-3.5" /> Download Corrected Document
-                                </Button>
+                                <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                                  <Button
+                                    onClick={() => {
+                                      const blob = new Blob([correctedText], { type: "text/plain" });
+                                      const a = document.createElement("a");
+                                      a.href = URL.createObjectURL(blob);
+                                      a.download = `corrected_${selectedKey.documentName || "doc"}.txt`;
+                                      a.click();
+                                    }}
+                                    className="gap-2 rounded-xl text-xs h-9 w-full sm:w-auto bg-purple-500 hover:bg-purple-600 text-white"
+                                  >
+                                    <Download className="h-3.5 w-3.5" /> Download Corrected Document
+                                  </Button>
+                                  <Link href="/dashboard">
+                                    <Button
+                                      className="gap-2 rounded-xl text-xs h-9 w-full sm:w-auto border border-purple-500/20 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300"
+                                    >
+                                      <LayoutDashboard className="h-3.5 w-3.5" /> Go to Dashboard
+                                    </Button>
+                                  </Link>
+                                </div>
                               </motion.div>
                             )}
                           </div>
