@@ -11,7 +11,8 @@ import {
   FileText, RefreshCw, Search, ArrowRight, Inbox,
   Sliders, Sparkles, Check, ArrowDown, HelpCircle
 } from "lucide-react";
-import { getKeys, CryptographicKey } from "@/lib/store";
+import { getKeys, CryptographicKey, syncKeysForUser } from "@/lib/store";
+import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 
 const NAV = [
@@ -188,8 +189,18 @@ function getFileIcon(name: string) {
 type Stage = "select" | "loaded" | "sent" | "decrypted";
 
 export default function HybridLabPage() {
+  const { user } = useUser();
   const [keys, setKeys] = useState<CryptographicKey[]>([]);
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (user?.id) {
+      syncKeysForUser(user.id);
+    } else {
+      syncKeysForUser("default-local-user");
+    }
+  }, [user]);
+
   const [activeTab, setActiveTab] = useState<"simulator" | "playground">("simulator");
 
   // --- Simulator State ---

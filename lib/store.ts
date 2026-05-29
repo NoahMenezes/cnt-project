@@ -185,13 +185,46 @@ if (typeof window !== "undefined" && !isKeysInitialized) {
 
 /** Call once after Clerk user loads to pull Supabase keys for that user */
 export async function syncKeysForUser(clerkUserId: string) {
-  const { data } = await supabase
+  // Try querying structured V2 table first
+  const { data: dataV2, error: errV2 } = await supabase
+    .from("cryptographic_keys_v2")
+    .select("*")
+    .eq("user_id", clerkUserId)
+    .order("created_at", { ascending: false });
+
+  if (!errV2 && dataV2) {
+    cachedKeys = dataV2.map((row: Record<string, any>) => ({
+      id: row.id,
+      keyType: row.key_type as CryptographicKey["keyType"],
+      keyValue: row.key_value,
+      keySize: row.key_size,
+      label: row.label,
+      generatedAt: row.generated_at,
+      description: row.description || "",
+      documentName: row.document_name || "",
+      plaintextSnippet: row.plaintext_snippet || "",
+      ciphertextPayload: row.ciphertext_payload || "",
+      encryptedSessionKey: row.encrypted_session_key || "",
+      aesIV: row.aes_iv || "",
+      aesMode: row.aes_mode || "",
+      pairedKeyId: row.paired_key_id || "",
+    }));
+    try {
+      localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
+    } catch {}
+    notifyUpdate();
+    return;
+  }
+
+  // Fallback to legacy V1 table
+  const { data: dataV1 } = await supabase
     .from("cryptographic_keys")
     .select("*")
     .eq("user_id", clerkUserId)
     .order("created_at", { ascending: false });
-  if (data) {
-    cachedKeys = data.map((row: Record<string, unknown>) => {
+
+  if (dataV1) {
+    cachedKeys = dataV1.map((row: Record<string, unknown>) => {
       let desc = row.description as string || "";
       let docName = "";
       let pSnippet = "";
@@ -253,20 +286,9 @@ export function saveKey(key: CryptographicKey, clerkUserId?: string): void {
     } catch {}
 
     if (clerkUserId) {
-      const meta = {
-        description: key.description,
-        documentName: key.documentName,
-        plaintextSnippet: key.plaintextSnippet,
-        ciphertextPayload: key.ciphertextPayload,
-        encryptedSessionKey: key.encryptedSessionKey,
-        aesIV: key.aesIV,
-        aesMode: key.aesMode,
-        pairedKeyId: key.pairedKeyId,
-      };
-      const descVal = "METADATA_JSON:" + JSON.stringify(meta);
-
+      // First try to insert into cryptographic_keys_v2 (structured format)
       supabase
-        .from("cryptographic_keys")
+        .from("cryptographic_keys_v2")
         .upsert({
           id: key.id,
           user_id: clerkUserId,
@@ -274,11 +296,47 @@ export function saveKey(key: CryptographicKey, clerkUserId?: string): void {
           key_value: key.keyValue,
           key_size: key.keySize,
           label: key.label,
+          description: key.description || "",
+          document_name: key.documentName || "",
+          plaintext_snippet: key.plaintextSnippet || "",
+          ciphertext_payload: key.ciphertextPayload || "",
+          encrypted_session_key: key.encryptedSessionKey || "",
+          aes_iv: key.aesIV || "",
+          aes_mode: key.aesMode || "",
+          paired_key_id: key.pairedKeyId || "",
           generated_at: key.generatedAt,
-          description: descVal,
         })
         .then(({ error }) => {
-          if (error) console.error("Failed to sync key to Supabase:", error);
+          if (error) {
+            console.error("Failed to sync to cryptographic_keys_v2, falling back to legacy table:", error);
+            // Fallback to legacy v1 table with serialized metadata JSON string
+            const meta = {
+              description: key.description,
+              documentName: key.documentName,
+              plaintextSnippet: key.plaintextSnippet,
+              ciphertextPayload: key.ciphertextPayload,
+              encryptedSessionKey: key.encryptedSessionKey,
+              aesIV: key.aesIV,
+              aesMode: key.aesMode,
+              pairedKeyId: key.pairedKeyId,
+            };
+            const descVal = "METADATA_JSON:" + JSON.stringify(meta);
+            supabase
+              .from("cryptographic_keys")
+              .upsert({
+                id: key.id,
+                user_id: clerkUserId,
+                key_type: key.keyType,
+                key_value: key.keyValue,
+                key_size: key.keySize,
+                label: key.label,
+                generated_at: key.generatedAt,
+                description: descVal,
+              })
+              .then(({ error: errV1 }) => {
+                if (errV1) console.error("Failed to sync to fallback cryptographic_keys table:", errV1);
+              });
+          }
         });
     }
   }
@@ -294,12 +352,21 @@ export function deleteKey(id: string, clerkUserId?: string): void {
     } catch {}
 
     if (clerkUserId) {
+      // Delete from both v2 and v1 tables
+      supabase
+        .from("cryptographic_keys_v2")
+        .delete()
+        .eq("id", id)
+        .then(({ error }) => {
+          if (error) console.error("Failed to delete key from cryptographic_keys_v2:", error);
+        });
+
       supabase
         .from("cryptographic_keys")
         .delete()
         .eq("id", id)
         .then(({ error }) => {
-          if (error) console.error("Failed to delete key from Supabase:", error);
+          if (error) console.error("Failed to delete key from legacy cryptographic_keys:", error);
         });
     }
   }

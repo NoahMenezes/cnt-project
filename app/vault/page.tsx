@@ -8,7 +8,8 @@ import { motion } from "framer-motion";
 import {
   Key, Shield, Lock, Copy, Trash2, Search, ArrowLeft, Eye, EyeOff, Database, FileText, LockKeyhole
 } from "lucide-react";
-import { getKeys, deleteKey, CryptographicKey } from "@/lib/store";
+import { getKeys, deleteKey, CryptographicKey, syncKeysForUser } from "@/lib/store";
+import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 
 const NAV = [
@@ -31,9 +32,18 @@ function getFileIcon(name: string) {
 }
 
 export default function KeyVaultPage() {
+  const { user } = useUser();
   const [keys, setKeys] = useState<CryptographicKey[]>([]);
   const [search, setSearch] = useState("");
   const [visibleKeyIds, setVisibleKeyIds] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (user?.id) {
+      syncKeysForUser(user.id);
+    } else {
+      syncKeysForUser("default-local-user");
+    }
+  }, [user]);
 
   useEffect(() => {
     // Populate state asynchronously on client mount
@@ -284,7 +294,7 @@ export default function KeyVaultPage() {
                                 <td className="py-3 px-3 text-right">
                                   <button
                                     type="button"
-                                    onClick={() => deleteKey(key.id)}
+                                    onClick={() => deleteKey(key.id, user?.id || "default-local-user")}
                                     className="p-1.5 rounded-lg text-foreground/30 hover:text-red-400 hover:bg-red-400/10 transition-all"
                                     title="Delete Key Component"
                                   >

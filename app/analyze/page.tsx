@@ -12,7 +12,8 @@ import {
   Download, Save, RefreshCw, Trash2, Key,
   Bold, Italic, Code2, Database
 } from "lucide-react";
-import { saveKey, CryptographicKey } from "@/lib/store";
+import { saveKey, CryptographicKey, syncKeysForUser } from "@/lib/store";
+import { useUser } from "@clerk/nextjs";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -321,6 +322,14 @@ function PlaintextTipTapEditor({
 }
 
 export default function OperationPage() {
+  const { user } = useUser();
+
+  useEffect(() => {
+    if (user?.id) {
+      syncKeysForUser(user.id);
+    }
+  }, [user]);
+
   const navData = [
     { title: "Home", href: "/" },
     { title: "Dashboard", href: "/dashboard" },
@@ -945,7 +954,7 @@ export default function OperationPage() {
                     pairedKeyId: privateKeyId,
                     documentName: uploadedFile ? uploadedFile.name : "Plaintext Notepad Document",
                   };
-                  saveKey(publicKey);
+                  saveKey(publicKey, user?.id || "default-local-user");
 
                   const privateKey: CryptographicKey = {
                     id: privateKeyId,
@@ -958,7 +967,7 @@ export default function OperationPage() {
                     pairedKeyId: publicKeyId,
                     documentName: uploadedFile ? uploadedFile.name : "Plaintext Notepad Document",
                   };
-                  saveKey(privateKey);
+                  saveKey(privateKey, user?.id || "default-local-user");
 
                   setGeneratedKeysDisplay([
                     {
@@ -1004,7 +1013,7 @@ export default function OperationPage() {
                     aesMode: aesMode,
                     documentName: uploadedFile ? uploadedFile.name : "Plaintext Notepad Document",
                   };
-                  saveKey(aesKeyObj);
+                  saveKey(aesKeyObj, user?.id || "default-local-user");
 
                   setGeneratedKeysDisplay(prev => [
                     ...prev,
@@ -1155,7 +1164,7 @@ export default function OperationPage() {
                     aesMode: aesMode,
                     documentName: docName,
                   };
-                  saveKey(pubKey);
+                  saveKey(pubKey, user?.id || "default-local-user");
 
                   const privKey: CryptographicKey = {
                     id: `priv_${Date.now()}`,
@@ -1167,7 +1176,7 @@ export default function OperationPage() {
                     description: "Workspace RSA Private Key - KEEP SECURE",
                     documentName: docName,
                   };
-                  saveKey(privKey);
+                  saveKey(privKey, user?.id || "default-local-user");
                 }
                 if (aesKey) {
                   const aesKeyObj: CryptographicKey = {
@@ -1184,7 +1193,7 @@ export default function OperationPage() {
                     aesMode: aesMode,
                     documentName: docName,
                   };
-                  saveKey(aesKeyObj);
+                  saveKey(aesKeyObj, user?.id || "default-local-user");
                 }
                 addLog("Workspace keys successfully saved to Vault.", "success");
                 router.push("/vault");
