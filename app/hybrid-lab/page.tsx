@@ -164,9 +164,9 @@ function aesDecryptSim(ciphertext: string, keyHex?: string): string {
     const dec = decodeURIComponent(atob(ciphertext));
     const parts = dec.split("||SALT||");
     if (keyHex) {
-      const payloadParts = parts[1]?.split("||");
-      const keyInCiphertext = payloadParts?.[0];
-      if (keyInCiphertext && keyInCiphertext.trim() !== keyHex.trim()) {
+      const keyInCiphertext = parts[1]?.trim();
+      const prefix = keyHex.trim().substring(0, 6);
+      if (keyInCiphertext && keyInCiphertext.toLowerCase() !== prefix.toLowerCase()) {
         return "";
       }
     }
