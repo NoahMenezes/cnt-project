@@ -366,7 +366,10 @@ export function deleteKey(id: string, clerkUserId?: string): void {
         .delete()
         .eq("id", id)
         .then(({ error }) => {
-          if (error) console.error("Failed to delete key from legacy cryptographic_keys:", error);
+          // Suppress error log for legacy table as it may have been dropped or has restrictive RLS
+          if (error && error.code !== '42P01') {
+            console.warn("Note: Could not delete from legacy cryptographic_keys table.", error.message);
+          }
         });
     }
   }

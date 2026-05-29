@@ -9,7 +9,7 @@ import {
   Key, Lock, Unlock, Layers, Copy, Eye, EyeOff,
   Download, Send, CheckCircle, AlertTriangle, Shield,
   FileText, RefreshCw, Search, ArrowRight, Inbox,
-  Sliders, Sparkles, Check, ArrowDown, HelpCircle
+  Sliders, Sparkles, Check, ArrowDown, HelpCircle, Wand2
 } from "lucide-react";
 import { getKeys, CryptographicKey, syncKeysForUser } from "@/lib/store";
 import { useUser } from "@clerk/nextjs";
@@ -212,6 +212,9 @@ export default function HybridLabPage() {
   const [isDecrypting, setIsDecrypting] = useState(false);
   const [keyInputValue, setKeyInputValue] = useState("");
   const [keyInputError, setKeyInputError] = useState("");
+  const [isFixingGarbled, setIsFixingGarbled] = useState(false);
+  const [correctedText, setCorrectedText] = useState("");
+  const [fixError, setFixError] = useState("");
 
   // --- Playground State ---
   const [pgAesKey, setPgAesKey] = useState("");
@@ -555,6 +558,32 @@ export default function HybridLabPage() {
     }
   };
 
+  const handleAIAnalysis = async () => {
+    if (!decryptedText) return;
+    setIsFixingGarbled(true);
+    setFixError("");
+    setCorrectedText("");
+
+    try {
+      const res = await fetch("http://localhost:8000/analyze/fix-garbled", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user?.id || "default-local-user",
+          fileName: selectedKey?.documentName || "Unknown Document",
+          text: decryptedText,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to fix garbled text");
+      const data = await res.json();
+      setCorrectedText(data.correctedText);
+    } catch (err) {
+      setFixError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsFixingGarbled(false);
+    }
+  };
+
   const reset = () => {
     setSelectedKey(null);
     setCiphertext("");
@@ -724,9 +753,9 @@ export default function HybridLabPage() {
             </div>
 
             {activeTab === "simulator" ? (
-              <div className="grid gap-6 lg:grid-cols-5">
+              <div className="grid gap-6 lg:grid-cols-12">
                 {/* LEFT COLUMN: Vault Documents List */}
-                <div className="lg:col-span-2 space-y-4">
+                <div className="lg:col-span-4 space-y-4">
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -797,7 +826,7 @@ export default function HybridLabPage() {
                 </div>
 
                 {/* RIGHT COLUMN: Action & Recovery Workspace */}
-                <div className="lg:col-span-3 space-y-4">
+                <div className="lg:col-span-8 space-y-4">
                   {stage === "select" || !selectedKey ? (
                     <motion.div
                       initial={{ opacity: 0 }}
@@ -997,17 +1026,77 @@ export default function HybridLabPage() {
                                 <Download className="h-3.5 w-3.5" /> Download Document
                               </Button>
                               <Button
+                                onClick={handleAIAnalysis}
+                                disabled={isFixingGarbled}
+                                className="gap-2 rounded-xl text-xs h-9 bg-purple-500 hover:bg-purple-600 text-white"
+                              >
+                                {isFixingGarbled ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                                AI Error Correction
+                              </Button>
+                              <Button
                                 onClick={() => {
                                   setPrivateKeyInput("");
                                   setDecryptedText("");
                                   setStage("loaded");
                                 }}
                                 variant="ghost"
-                                className="gap-2 rounded-xl text-xs h-9 text-foreground/50 hover:text-foreground"
+                                className="gap-2 rounded-xl text-xs h-9 text-foreground/50 hover:text-foreground ml-auto"
                               >
                                 <RefreshCw className="h-3.5 w-3.5" /> Start Over
                               </Button>
                             </div>
+
+                            {fixError && (
+                              <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2.5">
+                                <AlertTriangle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+                                <p className="text-xs text-red-400 font-semibold">{fixError}</p>
+                              </div>
+                            )}
+
+                            {correctedText && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mt-6 space-y-3 pt-4 border-t border-border/10"
+                              >
+                                <div className="flex items-start gap-2 rounded-lg border border-purple-500/20 bg-purple-500/5 px-3 py-2.5">
+                                  <CheckCircle className="h-4 w-4 text-purple-400 shrink-0 mt-0.5" />
+                                  <p className="text-xs text-purple-400 font-semibold">
+                                    AI Error Correction successfully done! Mojibake and encoding artifacts resolved.
+                                  </p>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <div className="flex justify-between items-center text-[10px] text-foreground/45 font-semibold uppercase tracking-wider">
+                                    <span>Corrected Plaintext Content</span>
+                                    <button
+                                      onClick={() => navigator.clipboard.writeText(correctedText)}
+                                      className="hover:text-foreground/75 flex items-center gap-1 text-[11px]"
+                                    >
+                                      <Copy className="h-3 w-3" /> Copy
+                                    </button>
+                                  </div>
+                                  <textarea
+                                    value={correctedText}
+                                    readOnly
+                                    rows={8}
+                                    className="w-full rounded-xl border border-purple-500/20 bg-purple-500/[0.02] px-4 py-3 font-mono text-xs text-foreground focus:outline-none resize-none shadow-[inset_0_0_20px_rgba(168,85,247,0.03)]"
+                                  />
+                                </div>
+                                <Button
+                                  onClick={() => {
+                                    const blob = new Blob([correctedText], { type: "text/plain" });
+                                    const a = document.createElement("a");
+                                    a.href = URL.createObjectURL(blob);
+                                    a.download = `corrected_${selectedKey.documentName || "doc"}.txt`;
+                                    a.click();
+                                  }}
+                                  className="gap-2 rounded-xl text-xs h-9 w-full sm:w-auto bg-purple-500 hover:bg-purple-600 text-white"
+                                >
+                                  <Download className="h-3.5 w-3.5" /> Download Corrected Document
+                                </Button>
+                              </motion.div>
+                            )}
                           </div>
                         )}
                       </div>

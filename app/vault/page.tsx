@@ -77,17 +77,38 @@ export default function KeyVaultPage() {
       (k.documentName && k.documentName.toLowerCase().includes(search.toLowerCase()))
   );
 
-  // Group keys by document name
-  const groupedKeys = useMemo(() => {
-    const groups: Record<string, CryptographicKey[]> = {};
-    filteredKeys.forEach((key) => {
+  // Group keys into generation sessions (by document name and time)
+  const groupedSessions = useMemo(() => {
+    const sortedKeys = [...filteredKeys].sort(
+      (a, b) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()
+    );
+    
+    const sessions: { id: string; docName: string; keys: CryptographicKey[]; latestTime: number }[] = [];
+    
+    sortedKeys.forEach((key) => {
       const doc = key.documentName || "Unassociated Keys";
-      if (!groups[doc]) {
-        groups[doc] = [];
+      const keyTime = new Date(key.generatedAt).getTime();
+      
+      let added = false;
+      for (const session of sessions) {
+        if (session.docName === doc && Math.abs(session.latestTime - keyTime) < 5000) {
+          session.keys.push(key);
+          added = true;
+          break;
+        }
       }
-      groups[doc].push(key);
+      
+      if (!added) {
+        sessions.push({
+          id: `${doc}_${keyTime}`,
+          docName: doc,
+          keys: [key],
+          latestTime: keyTime
+        });
+      }
     });
-    return groups;
+    
+    return sessions;
   }, [filteredKeys]);
 
   // Statistics
@@ -160,7 +181,7 @@ export default function KeyVaultPage() {
 
           {/* Grouped Table Rows */}
           <div className="space-y-8">
-            {Object.keys(groupedKeys).length === 0 ? (
+            {groupedSessions.length === 0 ? (
               <div className="text-center py-20 border border-dashed border-border/40 rounded-2xl bg-background/20 text-foreground/40 space-y-3">
                 <FileText className="h-10 w-10 mx-auto text-foreground/20" />
                 <p className="font-semibold">No cryptographic keys found</p>
@@ -174,13 +195,15 @@ export default function KeyVaultPage() {
                 </Link>
               </div>
             ) : (
-              Object.entries(groupedKeys).map(([docName, docKeys], docIdx) => {
+              groupedSessions.map((session, docIdx) => {
+                const docName = session.docName;
+                const docKeys = session.keys;
                 // Find any snippet to display what was in this document
                 const snippet = docKeys.find(k => k.plaintextSnippet)?.plaintextSnippet;
 
                 return (
                   <motion.div
-                    key={docName}
+                    key={session.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: docIdx * 0.05 }}
