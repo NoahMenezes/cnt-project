@@ -184,6 +184,63 @@ function editorPlainText(editor: NonNullable<ReturnType<typeof useEditor>>) {
   return editor.state.doc.textBetween(0, editor.state.doc.content.size, "\n");
 }
 
+function garbledDecryptAttempt(
+  ciphertext: string,
+  encryptionOption: "standard" | "rsa_payload",
+  rsaKeys: ReturnType<typeof generateRSAPairSim> | null
+): string {
+  if (!ciphertext.trim()) return "";
+
+  if (encryptionOption === "rsa_payload" && rsaKeys) {
+    // RSA+AES mode: decode each "-" separated chunk individually, tolerate bad chunks
+    const d = BigInt(rsaKeys.d);
+    const n = BigInt(rsaKeys.n);
+    const inner = ciphertext
+      .split("-")
+      .slice(0, 1000)
+      .map(chunk => {
+        const t = chunk.trim();
+        if (!t) return "\uFFFD";
+        try {
+          const code = modPow(BigInt(t), d, n);
+          return String.fromCharCode(Number(code));
+        } catch {
+          // Non-numeric chunk: use first char's code as a stand-in
+          return t.charAt(0) ? String.fromCharCode(t.charCodeAt(0) % 95 + 32) : "\uFFFD";
+        }
+      })
+      .join("");
+    // Try the AES layer on the garbled inner string
+    try {
+      const dec = decodeURIComponent(atob(inner));
+      return dec.split("||SALT||")[0];
+    } catch {
+      // AES layer failed — return the garbled inner chars directly (looks broken)
+      return inner;
+    }
+  }
+
+  // Standard AES (base64) or no RSA keys
+  try {
+    const dec = decodeURIComponent(atob(ciphertext));
+    return dec.split("||SALT||")[0];
+  } catch {
+    // Force through with invalid base64 chars replaced
+    try {
+      const forced = ciphertext.replace(/[^A-Za-z0-9+/]/g, "A");
+      const padded = forced + "=".repeat((4 - (forced.length % 4)) % 4);
+      const raw = atob(padded);
+      // Strip null bytes, keep visible range
+      return raw.replace(/\x00/g, "\uFFFD");
+    } catch {
+      // Last resort: deterministic char mapping to produce visible garbled output
+      return Array.from(ciphertext.slice(0, 300))
+        .map(c => String.fromCharCode((c.charCodeAt(0) * 7 + 13) % 95 + 32))
+        .join("");
+    }
+  }
+}
+
 function PlaintextTipTapEditor({
   value,
   onChange,
@@ -350,15 +407,19 @@ export default function OperationPage() {
     }
 
     try {
-      if (!rsaKeys || !rsaKeys.d) return;
+      if (!rsaKeys || !rsaKeys.d) {
+        // No session yet — show garbled output from raw decode attempt
+        skipNextPlaintextEncryptionRef.current = true;
+        setPlaintext(garbledDecryptAttempt(nextCiphertext, encryptionOption, null));
+        return;
+      }
       const d = BigInt(rsaKeys.d);
       const n = BigInt(rsaKeys.n);
-      
+
       let aesCiphertext = nextCiphertext;
       if (encryptionOption === "rsa_payload") {
         aesCiphertext = rsaDecryptString(nextCiphertext, d, n);
       }
-
       const sessionKey = encryptedSessionKey
         ? rsaDecryptString(encryptedSessionKey, d, n)
         : aesKey;
@@ -369,12 +430,14 @@ export default function OperationPage() {
       setIsDecrypted(true);
 
       if (!hasLoggedCipherRealtimeRef.current) {
-        addLog("Real-time decryption is active. Ciphertext edits now update plaintext instantly.", "info");
+        addLog("Real-time decryption active — ciphertext edits update plaintext instantly.", "info");
         hasLoggedCipherRealtimeRef.current = true;
       }
     } catch {
+      // Decryption failed (corrupted ciphertext) — show actual broken/garbled chars
       skipNextPlaintextEncryptionRef.current = true;
-      setPlaintext("");
+      const garbled = garbledDecryptAttempt(nextCiphertext, encryptionOption, rsaKeys);
+      setPlaintext(garbled);
       setDecryptedText("");
       setIsDecrypted(false);
     }
@@ -660,11 +723,15 @@ export default function OperationPage() {
           </div>
 
           <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+            {/* ── Plaintext Notepad ── */}
             <div className="rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-border/20 pb-3">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-primary" />
                   <span className="text-xs font-bold uppercase tracking-wider text-foreground">Plaintext Document Notepad</span>
+                  {plaintext && (
+                    <span className="text-[9px] text-emerald-400/70 font-mono tracking-widest animate-pulse">↔ LIVE</span>
+                  )}
                 </div>
                 {uploadedFile && (
                   <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary">
@@ -673,16 +740,21 @@ export default function OperationPage() {
                 )}
               </div>
               <PlaintextTipTapEditor value={plaintext} onChange={handlePlaintextChange} />
-              <div className="text-right text-[10px] text-foreground/30">
-                Characters: {plaintext.length} | Lines: {plaintext.split("\n").length}
+              <div className="flex items-center justify-between text-[10px] text-foreground/30">
+                <span>Type here → ciphertext updates live</span>
+                <span>Characters: {plaintext.length} | Lines: {plaintext.split("\n").length}</span>
               </div>
             </div>
 
+            {/* ── Encrypted Workspace ── */}
             <div className="rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
               <div className="flex flex-col sm:flex-row items-start sm:items-center border-b border-border/20 pb-3 gap-2 sm:gap-3">
                 <div className="flex items-center justify-start gap-2">
                   <Lock className="h-4 w-4 text-orange-400" />
                   <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Encrypted Workspace (Ciphertext Notepad)</h3>
+                  {ciphertext && (
+                    <span className="text-[9px] text-orange-400/70 font-mono tracking-widest animate-pulse">↔ LIVE</span>
+                  )}
                 </div>
                 {ciphertext && (
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
