@@ -115,7 +115,7 @@ function rsaDecryptString(cipherText: string, d: bigint, n: bigint): string {
 }
 
 function generateRSAPairSim(bits: number) {
-  // Generates highly realistic RSA Key structures for educational and operational use
+  // Generates RSA Key structures for educational and operational use
   const p = bits === 512 ? 65537 : bits === 1024 ? 104729 : bits === 2048 ? 15485863 : 32452843;
   const q = bits === 512 ? 982451653 : bits === 1024 ? 982451653 : bits === 2048 ? 982451653 : 982451653;
   const n = BigInt(p) * BigInt(q);
@@ -123,9 +123,13 @@ function generateRSAPairSim(bits: number) {
   const e = BigInt(65537);
   const d = modInverse(e, phi);
 
-  // Custom PEM builders - each line is fully base64-encoded to avoid truncation & alignment errors
-  const pubPem = `-----BEGIN PUBLIC KEY-----\n${btoa(n.toString())}\n${btoa(e.toString())}\n-----END PUBLIC KEY-----`;
-  const privPem = `-----BEGIN RSA PRIVATE KEY-----\n${btoa(n.toString())}\n${btoa(d.toString())}\n-----END RSA PRIVATE KEY-----`;
+  // Embed parameters as JSON inside the PEM body so hybrid-lab can parse them deterministically
+  // Format: btoa(JSON.stringify({n, e, d})) — one JSON blob per key
+  const pubParams = JSON.stringify({ n: n.toString(), e: e.toString() });
+  const privParams = JSON.stringify({ n: n.toString(), d: d.toString(), e: e.toString() });
+
+  const pubPem = `-----BEGIN PUBLIC KEY-----\n${btoa(pubParams)}\n-----END PUBLIC KEY-----`;
+  const privPem = `-----BEGIN RSA PRIVATE KEY-----\n${btoa(privParams)}\n-----END RSA PRIVATE KEY-----`;
 
   return {
     p: p.toString(),
@@ -138,6 +142,7 @@ function generateRSAPairSim(bits: number) {
     bits
   };
 }
+
 
 // AES Cipher ECB / CBC / GCM Simulation with real decryption capabilities via salt/base64
 function aesEncryptSim(text: string, keyHex: string, mode: string): { ciphertext: string; iv: string; tag?: string } {

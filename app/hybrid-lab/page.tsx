@@ -74,105 +74,105 @@ function rsaDecryptString(cipherText: string, d: bigint, n: bigint): string {
   return out;
 }
 
-function safeAtob(str: string): string {
+
+// ── Parse our custom PEM format which embeds parameters as base64(JSON) ───────
+// The analyze page generates:
+//   -----BEGIN PUBLIC KEY-----
+//   btoa(JSON.stringify({n, e}))
+//   -----END PUBLIC KEY-----
+// or the legacy line-per-number format:
+//   btoa(n.toString())
+//   btoa(e.toString())
+
+function parsePEMParams(pem: string): Record<string, string> | null {
   try {
-    let clean = str.replace(/[^A-Za-z0-9+/=]/g, "");
-    while (clean.length % 4 !== 0) {
-      clean += "=";
+    const lines = pem.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("---"));
+    if (lines.length === 0) return null;
+
+    // Strategy A: Single line that decodes to JSON
+    for (const line of lines) {
+      try {
+        const decoded = atob(line.replace(/[^A-Za-z0-9+/=]/g, "").padEnd(Math.ceil(line.length / 4) * 4, "="));
+        if (decoded.startsWith("{")) {
+          const obj = JSON.parse(decoded);
+          if (typeof obj === "object") return obj as Record<string, string>;
+        }
+      } catch { /* try next */ }
     }
-    return atob(clean);
+
+    // Strategy B: Each line decodes to a pure digit string (line-per-number format)
+    const numLines: bigint[] = [];
+    for (const line of lines) {
+      try {
+        const clean = line.replace(/[^A-Za-z0-9+/=]/g, "");
+        const padded = clean.padEnd(Math.ceil(clean.length / 4) * 4, "=");
+        const decoded = atob(padded);
+        if (/^\d+$/.test(decoded)) {
+          numLines.push(BigInt(decoded));
+        }
+      } catch { /* ignore */ }
+    }
+    if (numLines.length >= 2) {
+      // Largest is n, second is d (or e)
+      const sorted = [...numLines].sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
+      return { n: sorted[0].toString(), d: sorted[1].toString(), e: sorted[1].toString() };
+    }
+
+    return null;
   } catch {
-    return "";
+    return null;
   }
 }
 
 function extractRSAPublicNumbers(pem: string): { e: bigint; n: bigint } | null {
   try {
-    const lines = pem.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("---"));
-    const decodedLines: string[] = [];
-    for (const line of lines) {
-      const decoded = safeAtob(line);
-      if (decoded && /^\d+$/.test(decoded)) {
-        decodedLines.push(decoded);
-      }
-    }
-    
-    // New format: lines decode to pure digits
-    if (decodedLines.length >= 2) {
-      const numbers = decodedLines.map(BigInt);
-      const sorted = [...numbers].sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
-      return { e: sorted[1], n: sorted[0] };
-    }
-    
-    // Fallback: joined base64 block
-    const b64 = lines.join("");
-    const raw = safeAtob(b64);
-    const nums = raw.match(/\d+/g);
-    if (nums && nums.length >= 2) {
-      const sorted = [...nums].map(BigInt).sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
-      return { e: sorted[1], n: sorted[0] };
-    }
-    
-    // Direct matches in raw text fallback
-    const directNums = pem.match(/\d+/g);
-    if (directNums && directNums.length >= 2) {
-      const sorted = [...directNums].map(BigInt).sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
-      return { e: sorted[1], n: sorted[0] };
-    }
-    return null;
+    const params = parsePEMParams(pem);
+    if (!params) return null;
+    const n = BigInt(params.n ?? "0");
+    const e = BigInt(params.e ?? "65537");
+    if (n <= BigInt(0) || e <= BigInt(0)) return null;
+    return { e, n };
   } catch { return null; }
 }
 
 function extractRSAPrivateNumbers(pem: string): { d: bigint; n: bigint } | null {
   try {
-    const lines = pem.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("---"));
-    const decodedLines: string[] = [];
-    for (const line of lines) {
-      const decoded = safeAtob(line);
-      if (decoded && /^\d+$/.test(decoded)) {
-        decodedLines.push(decoded);
-      }
-    }
-    
-    // New format: lines decode to pure digits
-    if (decodedLines.length >= 2) {
-      const numbers = decodedLines.map(BigInt);
-      const sorted = [...numbers].sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
-      return { d: sorted[1], n: sorted[0] };
-    }
-    
-    // Fallback: joined base64 block
-    const b64 = lines.join("");
-    const raw = safeAtob(b64);
-    const nums = raw.match(/\d+/g);
-    if (nums && nums.length >= 2) {
-      const sorted = [...nums].map(BigInt).sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
-      return { d: sorted[1], n: sorted[0] };
-    }
-    
-    // Direct matches in raw text fallback
-    const directNums = pem.match(/\d+/g);
-    if (directNums && directNums.length >= 2) {
-      const sorted = [...directNums].map(BigInt).sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
-      return { d: sorted[1], n: sorted[0] };
-    }
-    return null;
+    const params = parsePEMParams(pem);
+    if (!params) return null;
+    const n = BigInt(params.n ?? "0");
+    const d = BigInt(params.d ?? "0");
+    if (n <= BigInt(0) || d <= BigInt(0)) return null;
+    return { d, n };
   } catch { return null; }
 }
 
-function aesDecryptSim(ciphertext: string, _keyHex?: string): string {
-  // Just base64-decode and strip the SALT marker - no key validation needed
-  // (the AES simulation in analyze/page.tsx embeds key prefix as SALT marker only for informational purposes)
+// Detect if a string is an RSA-wrapped ciphertext (all chunks are pure decimal numbers)
+function isRsaWrappedCiphertext(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed.includes("-")) return false;
+  const chunks = trimmed.split("-");
+  return chunks.length > 1 && chunks.every(c => /^\d+$/.test(c.trim()));
+}
+
+function aesDecryptSim(ciphertext: string): string {
+  // Base64-decode and strip the SALT marker embedded by aesEncryptSim in analyze/page.tsx
+  // Format: btoa(encodeURIComponent(plaintext + "||SALT||" + keyPrefix))
   try {
-    // Clean up any whitespace
     const cleaned = ciphertext.trim().replace(/\s+/g, "");
-    const dec = decodeURIComponent(atob(cleaned));
-    const parts = dec.split("||SALT||");
-    return parts[0] || "";
+    // Pad to valid base64 length
+    const padded = cleaned + "=".repeat((4 - (cleaned.length % 4)) % 4);
+    const decoded = decodeURIComponent(atob(padded));
+    const saltIdx = decoded.indexOf("||SALT||");
+    if (saltIdx !== -1) {
+      return decoded.substring(0, saltIdx);
+    }
+    // No salt marker - return the full decoded string (might be plaintext directly)
+    return decoded;
   } catch {
     return "";
   }
 }
+
 
 function getFileIcon(name: string) {
   const lower = name.toLowerCase();
@@ -455,50 +455,99 @@ export default function HybridLabPage() {
   };
 
   const handleDecrypt = async () => {
-    if (!privateKeyInput.trim()) { setDecryptError("Please paste the RSA Private Key."); return; }
+    if (!privateKeyInput.trim()) { setDecryptError("Paste the RSA Private Key to proceed."); return; }
     setIsDecrypting(true);
     setDecryptError("");
-    await new Promise(r => setTimeout(r, 900));
+    await new Promise(r => setTimeout(r, 800));
     try {
-      const parsed = extractRSAPrivateNumbers(privateKeyInput);
-      if (!parsed) throw new Error("Could not parse RSA private key. Make sure you copied the full key including the BEGIN/END headers.");
+      // Step 1: Parse the private key from PEM
+      const parsed = extractRSAPrivateNumbers(privateKeyInput.trim());
+      if (!parsed) {
+        throw new Error("Could not read the RSA Private Key. Make sure you copied it completely from the Operation Lab (including the -----BEGIN and -----END lines).");
+      }
       const { d, n } = parsed;
+
+      // Step 2: Get the encrypted AES session key and ciphertext
       const encSessKey = selectedKey?.encryptedSessionKey ?? "";
       let plaintext = "";
 
-      // Strategy 1: We have an encrypted session key stored with the public key record
-      if (encSessKey) {
-        // RSA-decrypt the session key (dash-separated format) to recover AES key hex
-        const sessKey = rsaDecryptString(encSessKey, d, n);
+      // ── Strategy A: Full hybrid decrypt (session key + ciphertext both present) ──────
+      if (encSessKey && ciphertext) {
+        // A1. RSA-decrypt the encrypted session key to recover the original AES key
+        const aesKeyHex = rsaDecryptString(encSessKey, d, n);
 
-        // The ciphertext may be in RSA-wrapped format (dashes) or raw base64 AES
+        // A2. Determine if the ciphertext itself is RSA-wrapped or plain base64 AES
         let aesCiphertext = ciphertext;
-        if (ciphertext.includes("-") && !ciphertext.match(/^[A-Za-z0-9+/=]+$/)) {
-          // RSA-wrapped ciphertext → decrypt RSA layer first to get inner AES base64
-          const rsaDecryptedInner = rsaDecryptString(ciphertext, d, n);
-          aesCiphertext = rsaDecryptedInner;
+        if (isRsaWrappedCiphertext(ciphertext)) {
+          // ciphertext is RSA-encrypted (rsa_payload mode) → decrypt RSA layer first
+          aesCiphertext = rsaDecryptString(ciphertext, d, n);
         }
 
-        // AES-decrypt the ciphertext using the recovered session key
-        plaintext = aesDecryptSim(aesCiphertext, sessKey);
+        // A3. AES-decrypt the inner ciphertext
+        plaintext = aesDecryptSim(aesCiphertext);
 
-        // Fallback: try raw base64 decode if AES layer returned nothing
-        if (!plaintext && aesCiphertext) {
-          plaintext = aesDecryptSim(aesCiphertext);
+        if (plaintext) {
+          setDecryptedText(plaintext);
+          setStage("decrypted");
+          setIsDecrypting(false);
+          return;
         }
-      } else {
-        // Strategy 2: No stored session key - try RSA decrypt if it looks RSA-wrapped, else straight AES
-        if (ciphertext.includes("-") && !ciphertext.match(/^[A-Za-z0-9+/=\n]+$/)) {
-          const inner = rsaDecryptString(ciphertext, d, n);
-          plaintext = aesDecryptSim(inner) || inner;
-        } else {
-          plaintext = aesDecryptSim(ciphertext);
+        
+        // A4. Fallback: try the raw AES key hex as the ciphertext (if the stored payload IS the AES key hex)
+        if (aesKeyHex) {
+          const tryWithHex = aesDecryptSim(aesKeyHex);
+          if (tryWithHex) {
+            plaintext = tryWithHex;
+            setDecryptedText(plaintext);
+            setStage("decrypted");
+            setIsDecrypting(false);
+            return;
+          }
         }
       }
 
-      if (!plaintext || !plaintext.trim()) throw new Error("Decryption returned empty result. Make sure you are using the correct private key paired with the public key that encrypted this document.");
-      setDecryptedText(plaintext);
-      setStage("decrypted");
+      // ── Strategy B: No session key — try direct AES (standard mode) ──────
+      if (!encSessKey && ciphertext) {
+        plaintext = aesDecryptSim(ciphertext);
+        if (plaintext) {
+          setDecryptedText(plaintext);
+          setStage("decrypted");
+          setIsDecrypting(false);
+          return;
+        }
+      }
+
+      // ── Strategy C: Ciphertext is RSA-only wrapped (no AES layer) ──────
+      if (isRsaWrappedCiphertext(ciphertext)) {
+        const inner = rsaDecryptString(ciphertext, d, n);
+        // inner might be plaintext directly or base64 AES
+        const tryAes = aesDecryptSim(inner);
+        plaintext = tryAes || inner;
+        if (plaintext && plaintext.trim()) {
+          setDecryptedText(plaintext);
+          setStage("decrypted");
+          setIsDecrypting(false);
+          return;
+        }
+      }
+
+      // ── Strategy D: Try decrypting the session key as ciphertext (edge case) ──────
+      if (encSessKey && isRsaWrappedCiphertext(encSessKey)) {
+        const inner = rsaDecryptString(encSessKey, d, n);
+        const tryAes = aesDecryptSim(inner);
+        plaintext = tryAes || inner;
+        if (plaintext && plaintext.trim()) {
+          setDecryptedText(plaintext);
+          setStage("decrypted");
+          setIsDecrypting(false);
+          return;
+        }
+      }
+
+      throw new Error(
+        "Decryption returned empty. This usually means the private key doesn't match the one used to encrypt. " +
+        "Go to Operation Lab, re-generate your keys, then copy the Private Key and paste it here."
+      );
     } catch (err) {
       setDecryptError(`Decryption failed: ${err instanceof Error ? err.message : "Invalid key or corrupted ciphertext."}`);
     } finally {
