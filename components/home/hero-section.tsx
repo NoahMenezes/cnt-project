@@ -3,7 +3,7 @@
 import { Instrument_Serif } from "next/font/google";
 import { motion } from "motion/react";
 
-import PlasmaWave from "@/components/ui/PlasmaWave";
+import Beams from "@/components/ui/Beams";
 
 const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
@@ -23,18 +23,18 @@ function HeroSection() {
           backgroundSize: "80px 80px",
         }}
       />
-      
-      {/* Plasma Wave Background */}
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
-        <PlasmaWave
-          colors={["#8b5cf6", "#38bdf8"]} // Violet to Sky Blue to match the theme
-          speed1={0.05}
-          speed2={0.05}
-          focalLength={0.8}
-          bend1={1}
-          bend2={0.5}
-          dir2={1.0}
-          rotationDeg={0}
+
+      {/* Beams Background */}
+      <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[120vw] z-0 pointer-events-none opacity-80">
+        <Beams
+          beamWidth={3}
+          beamHeight={20}
+          beamNumber={18}
+          lightColor="#38bdf8" // Sky blue from your theme
+          speed={1.5}
+          noiseIntensity={1.8}
+          scale={0.2}
+          rotation={15}
         />
       </div>
 

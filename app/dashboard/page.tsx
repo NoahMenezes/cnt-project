@@ -92,7 +92,7 @@ const TOOLTIP_STYLE = {
   color: "#f4f4f5",
 };
 
-function SectionCard({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
+function SectionCard({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
   return (
     <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}
       className="rounded-2xl border border-border/40 bg-background/55 backdrop-blur-md p-6 relative overflow-hidden shadow-sm">
