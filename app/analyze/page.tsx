@@ -597,6 +597,7 @@ export default function OperationPage() {
       reader.readAsText(file);
     } finally {
       setUploadProgress(100);
+      setIsUploading(false);
     }
   }, [addLog, user]);
 
