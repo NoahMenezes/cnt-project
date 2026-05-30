@@ -1,137 +1,128 @@
-# 🛡️ CipherScope — Cryptographic Forensics Lab & SecOps Dashboard
+![CipherScope Banner](./public/banner.png)
 
-![CipherScope Cryptographic Forensics Lab](/public/cipherscope_banner.png)
+# CipherScope — Crypto Forensics Lab 🔐
 
-Welcome to **CipherScope**, an advanced, military-grade Cryptographic Forensics Lab and Security Operations Dashboard. Designed for cryptographers, security engineers, and forensics analysts, CipherScope combines local browser-side hybrid encryption pipelines with deep AI-assisted cryptographic analysis of files and key vaults.
+CipherScope is a state-of-the-art hybrid cryptographic workspace and AI-driven forensics lab. It combines high-performance hybrid encryption (RSA + AES) with cutting-edge real-time AI security assessments to provide a zero-trust, mathematically robust cryptographic pipeline. 
 
----
-
-## 🔐 Key Features & Core Modules
-
-### 1. Document Operation Lab (`/analyze`)
-A secure playground to upload and examine documents (`.pdf`, `.docx`, `.csv`, `.json`, `.txt`) or draft sensitive plaintext in a premium, glassmorphic editor. 
-*   **Tampering Simulators**: Corrupt specific bytes or chunks of ciphertext to test decryption resilience.
-*   **Local Caching**: Robust local state caching with automated `localStorage` limits integration. If an analysis exceeds the 5MB browser quota, the system switches to high-performance in-memory caching to prevent page crashes.
-*   **Analyze & Save**: Compiles and registers forensic file statistics (size, type, metadata) directly into your secure dashboard.
-
-### 2. Live SecOps Dashboard (`/dashboard`)
-Your primary command center for forensic monitoring. Displays live visual statistics, security trend charts, and real-time document analysis reports.
-*   **Average Security Score Trends**: High-performance AreaCharts tracing security patterns.
-*   **RSA Configuration Strength Radar**: A radar chart mapping the mathematical complexity, bits, and vulnerabilities of keys.
-*   **Fail-Safe Sync**: Integrates with Supabase using a silent merge strategy. If Row-Level Security (RLS) policies filter out remote rows, the dashboard falls back to local browser storage, keeping your historical charts populated.
-
-### 3. Hybrid Cryptographic Lab (`/hybrid-lab`)
-A functional end-to-end sandbox representing true hybrid key architectures.
-*   **Key Selection**: Browse and select active RSA and AES keys generated in your Vault.
-*   **Encrypted Package Generator**: Encrypt a document payload using your chosen AES session key, package the AES key using the recipient's RSA Public Key, and download a `.json` transport bundle.
-*   **Private-Key Decryption Console**: Upload an encrypted bundle, load the corresponding RSA Private Key, decrypt the session key, and recover the original plaintext.
-*   **AI Document & Key Analysis**: An API-driven forensic inspector that evaluates the strength of the chosen key parameters (`RSA Key Size`, `AES Mode`) against the decrypted document content to produce an authentic security score (0-100) and actionable mitigations.
-
-### 4. Key Vault (`/vault`)
-Manage your generated cryptographic keypairs. View key bits, registration dates, usage scope (paired document, plaintext snippet context), and export keys safely.
+Designed with a sleek, dark-themed interface, CipherScope offers professionals an intuitive environment to encrypt payloads, analyze cryptographic configurations, evaluate vulnerabilities, and seamlessly track performance metrics through dynamic data visualizations.
 
 ---
 
-## 🛡️ Security Architecture
+## 🌟 Key Features
 
-CipherScope adheres to a strict **Zero-Trust Architecture**:
+1. **Operation Lab (Hybrid RSA-AES Pipeline)**
+   - Upload text, JSON, CSV, or PDF documents, or type raw plaintext directly into the workspace.
+   - Execute secure Hybrid Encryption: Uses **AES-256-GCM** for high-speed payload encryption, and **RSA-2048-OAEP** to securely wrap and transmit the AES session key.
+   - Robust local caching ensures your workspace (keys, plaintext, and ciphertext) persists across navigations without unexpected resets.
 
-| Security Layer | Protocol / Algorithm | Key Dimensions | Key Storage |
-|:---|:---|:---|:---|
-| **Bulk Data Encryption** | AES-GCM (Preferred) / CBC | 128 / 256-bit | Browser Memory / Vault |
-| **Key Exchange (Wrap)** | RSA-OAEP / PKCS1-v1_5 | 2048 / 4096-bit | Client-Side Decrypted |
-| **Authentication Tag** | GCM Auth Tag | 128-bit | Package Payload |
-| **Initialization Vector** | Cryptographically Secure Random | 96-bit / 128-bit | Package Payload |
-| **Server Database Sync** | Supabase REST Client | UUID Hashed | Hashed & Authenticated |
+2. **AI Document & Key Analysis Engine**
+   - Connects directly to the **CipherScope Backend** running a FastAPI server powered by Llama 3 (via Groq/Ollama).
+   - Generates dynamic, context-aware security assessments. It analyzes your chosen encryption parameters (e.g., key sizes, modes) and generates a realistic **Security Score (0-100)**.
+   - Provides actionable feedback and flags potential vulnerabilities in your cryptographic setup.
 
----
+3. **Hybrid Lab Playground**
+   - A step-by-step visual learning environment for manual payload decryption.
+   - Select keys generated in the Operation Lab, decrypt the AES session key using your private RSA key, and finally unlock the ciphertext payload.
 
-## 🚀 Getting Started (Step-by-Step)
+4. **Security Operations Dashboard**
+   - Live, real-time analytics displaying all historical reports.
+   - Evaluates security posture with aggregated metrics, tracking vulnerabilities, file sizes, average security scores, and document patterns.
+   - Fully synchronized with Supabase for cloud-scale, zero-trust telemetry.
 
-### 1. Prerequisites
-Ensure you have the following installed on your system:
-*   [Bun](https://bun.sh/) (Next.js Package Manager & Runtime)
-*   [Python 3.10+](https://www.python.org/) (FastAPI Backend)
-
----
-
-### 2. Frontend Installation & Setup
-
-1.  Clone the repository and navigate to the project directory:
-    ```bash
-    cd cnt-project
-    ```
-2.  Install dependencies using Bun:
-    ```bash
-    bun install
-    ```
-3.  Configure your environment variables. Create a `.env` file in the root directory and add your credentials:
-    ```env
-    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-    CLERK_SECRET_KEY=your_clerk_secret_key
-    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-    ```
+5. **Key Vault**
+   - Persistent management of all RSA and AES keys generated within the platform.
+   - Tracks the lifecycle of keys, alongside the documents and metadata they are associated with.
 
 ---
 
-### 3. Backend Installation & Setup
+## 🛠️ Architecture & Tech Stack
 
-1.  Navigate into the `backend` folder:
-    ```bash
-    cd backend
-    ```
-2.  Create and activate a virtual environment:
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows: venv\Scripts\activate
-    ```
-3.  Install the required packages:
-    ```bash
-    pip install -r requirements.txt
-    ```
-4.  Configure your backend environment variables (Supabase access + Groq Cloud API credentials for AI analysis):
-    ```env
-    SUPABASE_URL=your_supabase_url
-    SUPABASE_KEY=your_supabase_service_role_key
-    GROQ_API_KEY=your_groq_api_key
-    ```
+- **Frontend:** Next.js 16 (App Router), React 19, TypeScript
+- **Styling:** Tailwind CSS (v4), Framer Motion, shadcn/ui components
+- **State & Data:** Supabase (PostgreSQL with RLS), LocalStorage Caching, Clerk Authentication
+- **Backend Analytics Engine:** Python, FastAPI, Pydantic, Groq API (Llama-3-70b), ChromaDB
+- **Package Manager & Runtime:** `bun`
 
 ---
 
-### 4. Running the Development Servers
+## 🚀 Getting Started
 
-To start the full pipeline (Next.js client + Uvicorn FastAPI server) concurrently:
+### Prerequisites
+
+Ensure you have the following installed on your machine:
+- [Bun](https://bun.sh/) (JavaScript runtime and package manager)
+- [Python 3.10+](https://www.python.org/) (For the AI backend agent)
+- A [Supabase](https://supabase.com/) project (with `reports`, `cryptographic_keys_v2`, etc. tables configured)
+- A [Clerk](https://clerk.com/) account for authentication
+
+### 1. Environment Setup
+
+Copy the `.env.example` file to create your local `.env` (if applicable), or configure your `.env` manually:
+```bash
+cp .env.example .env
+```
+Ensure you fill in your Supabase, Clerk, and Groq API keys:
+```env
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+GROQ_API_KEY=gsk_...
+```
+
+### 2. Install Frontend Dependencies
+
+Using `bun`, install the Node modules:
+```bash
+bun install
+```
+
+### 3. Setup Python Backend Environment
+
+Navigate to the `backend/` directory, set up your virtual environment, and install dependencies:
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cd ..
+```
+
+### 4. Run the Full Application
+
+We've bundled the execution into a single command that starts both the Next.js frontend and the Uvicorn FastAPI backend concurrently. The `dev` script is pre-configured to activate your Python environment automatically!
+
+Start the development server:
 ```bash
 bun run dev
 ```
 
-*   **Frontend**: Hosted at `http://localhost:3000`
-*   **FastAPI Backend**: Hosted at `http://localhost:8000`
+The frontend will be available at `http://localhost:3000` and the backend at `http://localhost:8000`.
 
 ---
 
-## 📋 Build & Deployment Commands
+## 💡 How to Use the Project (One-Shot Walkthrough)
 
+1. **Sign In:** Launch `localhost:3000` and sign in using Clerk authentication.
+2. **Encrypt a Payload:** Navigate to the **Operation Lab**. Upload a document or type some text. The system generates fresh RSA/AES keys and displays your ciphertext automatically upon encryption.
+3. **AI Analysis:** Click **Analyze & Save Report**. The backend will analyze the file and chosen key properties, returning an AI assessment and security score. To reset the workspace, click **Analyze New File**.
+4. **View Dashboard:** Navigate to the **Dashboard** to see your global security posture, score, and the newly generated report aggregated in real-time.
+5. **Decrypt the Payload:** Navigate to the **Hybrid Lab**, select the key you just generated from the Vault, and walk through the step-by-step decryption process to recover your original plaintext document.
+
+---
+
+## ✅ Deployment & Production
+
+The application is fully linted, typed, and free of all build errors and warnings. It is production-ready.
+
+**To build the application:**
 ```bash
-# Run linting check (ESLint + TypeScript Compile)
-bun run lint
-
-# Build production Next.js bundle
 bun run build
+```
 
-# Start production server locally
+**To start the production server:**
+```bash
 bun run start
 ```
 
----
-
-## 💡 Troubleshooting & Diagnostics
-
-*   **`QuotaExceededError`**: This occurs if you attempt to save large base64 ciphertext files to `localStorage`. The application has been patched to catch this error automatically. Large payloads will be maintained in the in-memory cache (`OP_CACHE`) instead, keeping the application fast and stable.
-*   **Hydration Mismatch Warnings**: If client-side parameters like timestamp strings or dynamic keys trigger mismatch errors on reload, the page uses an SSR mount blocker (`hasMounted` gate) to render elements only when the DOM is stable.
-*   **Dashboard Empty State**: If your dashboard says "No analyses yet" even after runs, it means Supabase RLS is blocking the query. The application now uses an advanced merging algorithm that prioritizes keeping your local browser history active.
-
----
-
-*Built with 🔐 Hybrid RSA + AES Cryptography — Zero Trust Security Forensics.*
+*Note: In production, ensure your Python backend is hosted separately (e.g., on Render or Railway) and update the API base URL in your frontend API requests accordingly.*
