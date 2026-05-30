@@ -351,6 +351,15 @@ const OP_CACHE = {
   uploadProgress: 0,
 };
 
+const safeSetLocal = (key: string, value: string) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    console.warn(`Could not save ${key} to localStorage (quota exceeded or restricted).`, e);
+  }
+};
+
 export default function OperationPage() {
   const { user } = useUser();
 
@@ -386,6 +395,25 @@ export default function OperationPage() {
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => {
     setHasMounted(true);
+    // Load state from localStorage on mount
+    try {
+      const p = localStorage.getItem("op_plaintext"); if (p !== null) setPlaintext(p);
+      const rsaB = localStorage.getItem("op_rsaBits"); if (rsaB !== null) setRsaBits(Number(rsaB));
+      const rsaK = localStorage.getItem("op_rsaKeys"); if (rsaK !== null) setRsaKeys(JSON.parse(rsaK));
+      const aesB = localStorage.getItem("op_aesBits"); if (aesB !== null) setAesBits(Number(aesB));
+      const aesM = localStorage.getItem("op_aesMode"); if (aesM !== null) setAesMode(aesM);
+      const aesK = localStorage.getItem("op_aesKey"); if (aesK !== null) setAesKey(aesK);
+      const c = localStorage.getItem("op_ciphertext"); if (c !== null) setCiphertext(c);
+      const oc = localStorage.getItem("op_originalCiphertext"); if (oc !== null) setOriginalCiphertext(oc);
+      const esk = localStorage.getItem("op_encryptedSessionKey"); if (esk !== null) setEncryptedSessionKey(esk);
+      const aIV = localStorage.getItem("op_aesIV"); if (aIV !== null) setAesIV(aIV);
+      const dt = localStorage.getItem("op_decryptedText"); if (dt !== null) setDecryptedText(dt);
+      const isD = localStorage.getItem("op_isDecrypted"); if (isD !== null) setIsDecrypted(isD === "true");
+      const eO = localStorage.getItem("op_encryptionOption"); if (eO !== null) setEncryptionOption(eO as "standard" | "rsa_payload");
+      const gKD = localStorage.getItem("op_generatedKeysDisplay"); if (gKD !== null) setGeneratedKeysDisplay(JSON.parse(gKD));
+    } catch (e) {
+      console.warn("Could not parse operation lab local storage", e);
+    }
   }, []);
 
   // ─── Workspace Plaintext Editor ───
@@ -394,6 +422,7 @@ export default function OperationPage() {
 
   useEffect(() => {
     OP_CACHE.plaintext = plaintext;
+    safeSetLocal("op_plaintext", plaintext);
     const handler = setTimeout(() => {
       setDebouncedPlaintext(plaintext);
     }, 400);
@@ -401,26 +430,40 @@ export default function OperationPage() {
   }, [plaintext]);
 
   // ─── Cryptographic Settings & State ───
-  const [rsaBits, setRsaBits] = useState<number>(2048);
-  const [rsaKeys, setRsaKeys] = useState<ReturnType<typeof generateRSAPairSim> | null>(null);
+  const [rsaBits, setRsaBits] = useState<number>(OP_CACHE.rsaBits);
+  const [rsaKeys, setRsaKeys] = useState<ReturnType<typeof generateRSAPairSim> | null>(OP_CACHE.rsaKeys);
 
-  const [aesBits, setAesBits] = useState<number>(256);
-  const [aesMode, setAesMode] = useState<string>("GCM");
-  const [aesKey, setAesKey] = useState<string>("");
+  const [aesBits, setAesBits] = useState<number>(OP_CACHE.aesBits);
+  const [aesMode, setAesMode] = useState<string>(OP_CACHE.aesMode);
+  const [aesKey, setAesKey] = useState<string>(OP_CACHE.aesKey);
 
   // ─── Operational Output States ───
-  const [ciphertext, setCiphertext] = useState<string>("");
-  const [originalCiphertext, setOriginalCiphertext] = useState<string>("");
-  const [encryptedSessionKey, setEncryptedSessionKey] = useState<string>("");
-  const [aesIV, setAesIV] = useState<string>("");
+  const [ciphertext, setCiphertext] = useState<string>(OP_CACHE.ciphertext);
+  const [originalCiphertext, setOriginalCiphertext] = useState<string>(OP_CACHE.originalCiphertext);
+  const [encryptedSessionKey, setEncryptedSessionKey] = useState<string>(OP_CACHE.encryptedSessionKey);
+  const [aesIV, setAesIV] = useState<string>(OP_CACHE.aesIV);
 
   // ─── Decrypted Output ───
-  const [decryptedText, setDecryptedText] = useState<string>("");
-  const [isDecrypted, setIsDecrypted] = useState(false);
-  const [encryptionOption, setEncryptionOption] = useState<"standard" | "rsa_payload">("rsa_payload");
+  const [decryptedText, setDecryptedText] = useState<string>(OP_CACHE.decryptedText);
+  const [isDecrypted, setIsDecrypted] = useState(OP_CACHE.isDecrypted);
+  const [encryptionOption, setEncryptionOption] = useState<"standard" | "rsa_payload">(OP_CACHE.encryptionOption);
+
+  useEffect(() => { OP_CACHE.rsaBits = rsaBits; safeSetLocal("op_rsaBits", String(rsaBits)); }, [rsaBits]);
+  useEffect(() => { OP_CACHE.rsaKeys = rsaKeys; safeSetLocal("op_rsaKeys", JSON.stringify(rsaKeys)); }, [rsaKeys]);
+  useEffect(() => { OP_CACHE.aesBits = aesBits; safeSetLocal("op_aesBits", String(aesBits)); }, [aesBits]);
+  useEffect(() => { OP_CACHE.aesMode = aesMode; safeSetLocal("op_aesMode", aesMode); }, [aesMode]);
+  useEffect(() => { OP_CACHE.aesKey = aesKey; safeSetLocal("op_aesKey", aesKey); }, [aesKey]);
+  useEffect(() => { OP_CACHE.ciphertext = ciphertext; safeSetLocal("op_ciphertext", ciphertext); }, [ciphertext]);
+  useEffect(() => { OP_CACHE.originalCiphertext = originalCiphertext; safeSetLocal("op_originalCiphertext", originalCiphertext); }, [originalCiphertext]);
+  useEffect(() => { OP_CACHE.encryptedSessionKey = encryptedSessionKey; safeSetLocal("op_encryptedSessionKey", encryptedSessionKey); }, [encryptedSessionKey]);
+  useEffect(() => { OP_CACHE.aesIV = aesIV; safeSetLocal("op_aesIV", aesIV); }, [aesIV]);
+  useEffect(() => { OP_CACHE.decryptedText = decryptedText; safeSetLocal("op_decryptedText", decryptedText); }, [decryptedText]);
+  useEffect(() => { OP_CACHE.isDecrypted = isDecrypted; safeSetLocal("op_isDecrypted", String(isDecrypted)); }, [isDecrypted]);
+  useEffect(() => { OP_CACHE.encryptionOption = encryptionOption; safeSetLocal("op_encryptionOption", encryptionOption); }, [encryptionOption]);
 
   // ─── Generated Keys Display ───
   const [generatedKeysDisplay, setGeneratedKeysDisplay] = useState<GeneratedKeyDisplay[]>(OP_CACHE.generatedKeysDisplay);
+  useEffect(() => { OP_CACHE.generatedKeysDisplay = generatedKeysDisplay; safeSetLocal("op_generatedKeysDisplay", JSON.stringify(generatedKeysDisplay)); }, [generatedKeysDisplay]);
 
   const hasLoggedRealtimeRef = useRef(false);
   const hasLoggedCipherRealtimeRef = useRef(false);
@@ -588,7 +631,7 @@ export default function OperationPage() {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [plaintext, addLog, user, router]);
+  }, [plaintext, uploadedFile, addLog, user, router]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -705,10 +748,16 @@ export default function OperationPage() {
             <Button variant="outline" size="sm" onClick={() => {
               setPlaintext("");
               setCiphertext("");
+              setOriginalCiphertext("");
               setDecryptedText("");
               setIsDecrypted(false);
               setUploadedFile(null);
               setUploadProgress(0);
+              setRsaKeys(null);
+              setAesKey("");
+              setEncryptedSessionKey("");
+              setAesIV("");
+              setGeneratedKeysDisplay([]);
               addLog("Workspace ready for new document.", "info");
             }} className="h-8 text-xs border-border/50 hover:bg-foreground/[0.04] shrink-0">
               <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Analyze New File

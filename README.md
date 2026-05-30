@@ -1,111 +1,137 @@
-# SecureEmail — Military-Grade Email Encryption
+# 🛡️ CipherScope — Cryptographic Forensics Lab & SecOps Dashboard
 
-A professional email system with end-to-end hybrid encryption using **RSA-2048** + **AES-256-GCM**.
+![CipherScope Cryptographic Forensics Lab](/public/cipherscope_banner.png)
 
-## 🔐 What It Does
+Welcome to **CipherScope**, an advanced, military-grade Cryptographic Forensics Lab and Security Operations Dashboard. Designed for cryptographers, security engineers, and forensics analysts, CipherScope combines local browser-side hybrid encryption pipelines with deep AI-assisted cryptographic analysis of files and key vaults.
 
-SecureEmail protects your sensitive emails completely:
-- **RSA-2048-OAEP** key pairs generated locally in your browser
-- **AES-256-GCM** encrypts each email with a unique session key
-- **Public keys** registered for secure key exchange
-- **Encrypted emails** stored server-side (ciphertext only)
-- **Private keys** never leave your device
-- **Zero-knowledge architecture** — servers can't read your emails
+---
 
-## 🚀 Getting Started
+## 🔐 Key Features & Core Modules
 
-### 1. Install Dependencies
-```bash
-pnpm install
-```
+### 1. Document Operation Lab (`/analyze`)
+A secure playground to upload and examine documents (`.pdf`, `.docx`, `.csv`, `.json`, `.txt`) or draft sensitive plaintext in a premium, glassmorphic editor. 
+*   **Tampering Simulators**: Corrupt specific bytes or chunks of ciphertext to test decryption resilience.
+*   **Local Caching**: Robust local state caching with automated `localStorage` limits integration. If an analysis exceeds the 5MB browser quota, the system switches to high-performance in-memory caching to prevent page crashes.
+*   **Analyze & Save**: Compiles and registers forensic file statistics (size, type, metadata) directly into your secure dashboard.
 
-### 2. Run Development Server
-```bash
-pnpm dev
-```
+### 2. Live SecOps Dashboard (`/dashboard`)
+Your primary command center for forensic monitoring. Displays live visual statistics, security trend charts, and real-time document analysis reports.
+*   **Average Security Score Trends**: High-performance AreaCharts tracing security patterns.
+*   **RSA Configuration Strength Radar**: A radar chart mapping the mathematical complexity, bits, and vulnerabilities of keys.
+*   **Fail-Safe Sync**: Integrates with Supabase using a silent merge strategy. If Row-Level Security (RLS) policies filter out remote rows, the dashboard falls back to local browser storage, keeping your historical charts populated.
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+### 3. Hybrid Cryptographic Lab (`/hybrid-lab`)
+A functional end-to-end sandbox representing true hybrid key architectures.
+*   **Key Selection**: Browse and select active RSA and AES keys generated in your Vault.
+*   **Encrypted Package Generator**: Encrypt a document payload using your chosen AES session key, package the AES key using the recipient's RSA Public Key, and download a `.json` transport bundle.
+*   **Private-Key Decryption Console**: Upload an encrypted bundle, load the corresponding RSA Private Key, decrypt the session key, and recover the original plaintext.
+*   **AI Document & Key Analysis**: An API-driven forensic inspector that evaluates the strength of the chosen key parameters (`RSA Key Size`, `AES Mode`) against the decrypted document content to produce an authentic security score (0-100) and actionable mitigations.
 
-## 📁 Project Structure
+### 4. Key Vault (`/vault`)
+Manage your generated cryptographic keypairs. View key bits, registration dates, usage scope (paired document, plaintext snippet context), and export keys safely.
 
-- `/app` — Next.js App Router pages
-  - `/` — Landing page with feature showcase
-  - `/dashboard` — Full email client interface
-  - `/sign-in` & `/sign-up` — Authentication pages
-- `/components` — Reusable React components
-  - `EmailComposer.tsx` — Modal for composing encrypted emails
-  - `Inbox.tsx` — Email list view with filtering
-  - `EmailViewer.tsx` — Read and decrypt emails
-  - `KeyManagement.tsx` — Manage RSA keypairs
-  - `EmailEncryptionDemo.tsx` — Interactive encryption workflow
-  - `FAQSection.tsx` — Frequently asked questions
-  - `BlogSection.tsx` — Blog posts
-  - `LandingPage.tsx` — Hero section
-- `/lib` — Utility functions
-  - `supabase.ts` — Database client
-  - `utils.ts` — Helper functions
+---
 
 ## 🛡️ Security Architecture
 
-| Layer | Algorithm | Key Size |
-|-------|-----------|----------|
-| Key Exchange | RSA-OAEP | 2048-bit |
-| Bulk Encryption | AES-GCM | 256-bit |
-| Authentication | GCM Auth Tag | 128-bit |
-| IV | Random | 96-bit |
-| Key Storage | Browser IndexedDB | Encrypted |
+CipherScope adheres to a strict **Zero-Trust Architecture**:
 
-**Zero-Trust Guarantee:**
-- ✅ Private keys never transmitted
-- ✅ Ciphertext-only database
-- ✅ Browser-side encryption
-- ✅ No key escrow
-- ✅ Recipient-only decryption
+| Security Layer | Protocol / Algorithm | Key Dimensions | Key Storage |
+|:---|:---|:---|:---|
+| **Bulk Data Encryption** | AES-GCM (Preferred) / CBC | 128 / 256-bit | Browser Memory / Vault |
+| **Key Exchange (Wrap)** | RSA-OAEP / PKCS1-v1_5 | 2048 / 4096-bit | Client-Side Decrypted |
+| **Authentication Tag** | GCM Auth Tag | 128-bit | Package Payload |
+| **Initialization Vector** | Cryptographically Secure Random | 96-bit / 128-bit | Package Payload |
+| **Server Database Sync** | Supabase REST Client | UUID Hashed | Hashed & Authenticated |
 
-## 📋 Features
+---
 
-- **Email Composition** — Write and encrypt emails locally
-- **Inbox Management** — Organize received encrypted emails
-- **Email Decryption** — View and decrypt messages locally
-- **Key Management** — Generate and manage RSA keypairs
-- **Attachment Support** — Encrypt files before transmission
-- **Search & Filter** — Find emails by sender, subject
-- **Security Dashboard** — Monitor encryption status
-- **Responsive Design** — Beautiful UI on all devices
+## 🚀 Getting Started (Step-by-Step)
 
-## 🎨 Design System
+### 1. Prerequisites
+Ensure you have the following installed on your system:
+*   [Bun](https://bun.sh/) (Next.js Package Manager & Runtime)
+*   [Python 3.10+](https://www.python.org/) (FastAPI Backend)
 
-- **Dark theme** with cyan/blue accents
-- **Glassmorphism** UI components
-- **Smooth animations** with Framer Motion
-- **Professional typography** with Inter + Outfit fonts
-- **Accessibility first** with proper contrast and semantics
+---
 
-## 📚 Tech Stack
+### 2. Frontend Installation & Setup
 
-- **Next.js 16.2.2** — React framework
-- **React 19.2.4** — UI library
-- **TypeScript** — Type safety
-- **Tailwind CSS v4** — Styling
-- **Framer Motion** — Animations
-- **Clerk** — Authentication
-- **Supabase** — Database (optional)
-- **lucide-react** — Icons
+1.  Clone the repository and navigate to the project directory:
+    ```bash
+    cd cnt-project
+    ```
+2.  Install dependencies using Bun:
+    ```bash
+    bun install
+    ```
+3.  Configure your environment variables. Create a `.env` file in the root directory and add your credentials:
+    ```env
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+    CLERK_SECRET_KEY=your_clerk_secret_key
+    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+    ```
 
-## 🚀 Build & Deploy
+---
+
+### 3. Backend Installation & Setup
+
+1.  Navigate into the `backend` folder:
+    ```bash
+    cd backend
+    ```
+2.  Create and activate a virtual environment:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    ```
+3.  Install the required packages:
+    ```bash
+    pip install -r requirements.txt
+    ```
+4.  Configure your backend environment variables (Supabase access + Groq Cloud API credentials for AI analysis):
+    ```env
+    SUPABASE_URL=your_supabase_url
+    SUPABASE_KEY=your_supabase_service_role_key
+    GROQ_API_KEY=your_groq_api_key
+    ```
+
+---
+
+### 4. Running the Development Servers
+
+To start the full pipeline (Next.js client + Uvicorn FastAPI server) concurrently:
+```bash
+bun run dev
+```
+
+*   **Frontend**: Hosted at `http://localhost:3000`
+*   **FastAPI Backend**: Hosted at `http://localhost:8000`
+
+---
+
+## 📋 Build & Deployment Commands
 
 ```bash
-# Production build
-pnpm build
+# Run linting check (ESLint + TypeScript Compile)
+bun run lint
 
-# Start production server
-pnpm start
+# Build production Next.js bundle
+bun run build
 
-# Lint
-pnpm lint
+# Start production server locally
+bun run start
 ```
 
 ---
 
-Built with 🔐 Hybrid RSA-2048 + AES-256-GCM — Zero Trust Email Security
+## 💡 Troubleshooting & Diagnostics
 
+*   **`QuotaExceededError`**: This occurs if you attempt to save large base64 ciphertext files to `localStorage`. The application has been patched to catch this error automatically. Large payloads will be maintained in the in-memory cache (`OP_CACHE`) instead, keeping the application fast and stable.
+*   **Hydration Mismatch Warnings**: If client-side parameters like timestamp strings or dynamic keys trigger mismatch errors on reload, the page uses an SSR mount blocker (`hasMounted` gate) to render elements only when the DOM is stable.
+*   **Dashboard Empty State**: If your dashboard says "No analyses yet" even after runs, it means Supabase RLS is blocking the query. The application now uses an advanced merging algorithm that prioritizes keeping your local browser history active.
+
+---
+
+*Built with 🔐 Hybrid RSA + AES Cryptography — Zero Trust Security Forensics.*
