@@ -3,6 +3,8 @@
 import { Instrument_Serif } from "next/font/google";
 import { motion } from "motion/react";
 
+import PlasmaWave from "@/components/ui/PlasmaWave";
+
 const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
   weight: ["400"],
@@ -14,13 +16,27 @@ function HeroSection() {
     <section className="relative min-h-[calc(100vh-80px)] flex items-center justify-center overflow-hidden">
       {/* Background grid */}
       <div
-        className="absolute inset-0 opacity-[0.04] pointer-events-none"
+        className="absolute inset-0 opacity-[0.04] pointer-events-none z-0"
         style={{
           backgroundImage:
             "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)",
           backgroundSize: "80px 80px",
         }}
       />
+      
+      {/* Plasma Wave Background */}
+      <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
+        <PlasmaWave
+          colors={["#8b5cf6", "#38bdf8"]} // Violet to Sky Blue to match the theme
+          speed1={0.05}
+          speed2={0.05}
+          focalLength={0.8}
+          bend1={1}
+          bend2={0.5}
+          dir2={1.0}
+          rotationDeg={0}
+        />
+      </div>
 
       {/* Glow orb – sky */}
       <motion.div
