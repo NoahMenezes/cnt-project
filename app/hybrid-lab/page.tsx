@@ -9,7 +9,7 @@ import {
   Lock, Unlock, Layers, Copy, Eye, EyeOff,
   Download, CheckCircle, AlertTriangle,
   FileText, RefreshCw, Search, Inbox,
-  Sparkles, Check, Wand2, LayoutDashboard
+  Sparkles, Check, LayoutDashboard, Brain
 } from "lucide-react";
 import { getKeys, CryptographicKey, syncKeysForUser, saveReport } from "@/lib/store";
 import { useUser } from "@clerk/nextjs";
@@ -571,13 +571,20 @@ export default function HybridLabPage() {
     setCorrectedText("");
 
     try {
-      // Trigger a full AI Cryptographic Analysis which will update the Dashboard
-      const res = await fetch("http://localhost:8000/analyze/text", {
+      // Trigger a full AI Cryptographic Analysis using actual vault keys
+      const rsaSize = selectedKey?.keyType.includes("RSA") ? selectedKey.keySize : undefined;
+      const aesMode = selectedKey?.aesMode || "GCM";
+      const aesSize = selectedKey?.keyType === "AES_SESSION" ? selectedKey.keySize : 256;
+      
+      const res = await fetch("http://localhost:8000/analyze/vault", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fileName: selectedKey?.documentName || "Decrypted Document",
           content: decryptedText,
+          rsaKeySize: rsaSize,
+          aesMode: aesMode,
+          aesKeySize: aesSize
         }),
       });
       if (!res.ok) {
@@ -591,7 +598,7 @@ export default function HybridLabPage() {
       saveReport(data, user?.id || "default-local-user");
       
       // We successfully generated a report in the database
-      setCorrectedText("✅ AI Analysis Complete! Head over to the Dashboard to view the full AI-generated Cryptographic Report and Analysis metrics.");
+      setCorrectedText(`✅ AI Analysis Complete! Security Score: ${data.securityScore}/100. Head over to the Dashboard to view the full AI-generated Cryptographic Report and Analysis metrics.`);
     } catch (err) {
       setFixError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1044,8 +1051,8 @@ export default function HybridLabPage() {
                                 disabled={isFixingGarbled}
                                 className="gap-2 rounded-xl text-xs h-9 bg-purple-500 hover:bg-purple-600 text-white"
                               >
-                                {isFixingGarbled ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-                                AI Error Correction
+                                {isFixingGarbled ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
+                                AI Document & Key Analysis
                               </Button>
                               <Button
                                 onClick={() => {
@@ -1082,7 +1089,7 @@ export default function HybridLabPage() {
 
                                 <div className="space-y-1.5">
                                   <div className="flex justify-between items-center text-[10px] text-foreground/45 font-semibold uppercase tracking-wider">
-                                    <span>Corrected Plaintext Content</span>
+                                    <span>Analyzed Document Content</span>
                                     <button
                                       onClick={() => navigator.clipboard.writeText(correctedText)}
                                       className="hover:text-foreground/75 flex items-center gap-1 text-[11px]"

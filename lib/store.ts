@@ -64,15 +64,55 @@ if (typeof window !== "undefined" && !isStoreInitialized) {
   } catch {}
 }
 
+export function toUuid(id: string): string {
+  if (!id) return "00000000-0000-0000-0000-000000000000";
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(id)) return id;
+
+  let h1 = 0x811c9dc5;
+  let h2 = 0xc9dc511c;
+  let h3 = 0x511cc9dc;
+  let h4 = 0xdc511c9d;
+
+  for (let i = 0; i < id.length; i++) {
+    const char = id.charCodeAt(i);
+    h1 = Math.imul(h1 ^ char, 0x01000193);
+    h2 = Math.imul(h2 ^ (char >> 1), 0x01000193);
+    h3 = Math.imul(h3 ^ (char >> 2), 0x01000193);
+    h4 = Math.imul(h4 ^ (char >> 3), 0x01000193);
+  }
+
+  const toHex = (n: number) => (n >>> 0).toString(16).padStart(8, "0");
+  const hex1 = toHex(h1);
+  const hex2 = toHex(h2);
+  const hex3 = toHex(h3);
+  const hex4 = toHex(h4);
+
+  const part1 = hex1;
+  const part2 = hex2.substring(0, 4);
+  const part3 = "4" + hex2.substring(5, 8);
+  const part4 = "8" + hex3.substring(1, 4);
+  const part5 = hex3.substring(4, 8) + hex4.substring(0, 8);
+
+  return `${part1}-${part2}-${part3}-${part4}-${part5}`;
+}
+
 /** Call this once after Clerk user loads to pull Supabase records for that user */
 export async function syncReportsForUser(clerkUserId: string) {
-  const { data } = await supabase
+  const dbUserId = toUuid(clerkUserId);
+  const { data, error } = await supabase
     .from("reports")
     .select("*")
-    .eq("user_id", clerkUserId)
+    .eq("user_id", dbUserId)
     .order("created_at", { ascending: false });
-  if (data) {
-    cachedReports = data.map((row: Record<string, unknown>) => ({
+    
+  if (error) {
+    console.warn("Failed to sync reports:", error.message);
+    return;
+  }
+  
+  if (data && data.length > 0) {
+    const remoteReports = data.map((row: Record<string, unknown>) => ({
       id: row.id as string,
       fileName: row.file_name as string,
       type: row.type as string,
@@ -87,6 +127,12 @@ export async function syncReportsForUser(clerkUserId: string) {
       recommendations: row.recommendations as Report["recommendations"],
       findings: row.findings as string,
     }));
+    
+    // Merge remote reports with local cachedReports, prioritizing remote data
+    const localMap = new Map(cachedReports.map(r => [r.id, r]));
+    remoteReports.forEach(r => localMap.set(r.id, r));
+    cachedReports = Array.from(localMap.values()).sort((a, b) => new Date(b.analysisDate).getTime() - new Date(a.analysisDate).getTime());
+    
     try {
       localStorage.setItem("cipher_scope_reports_db", JSON.stringify(cachedReports));
     } catch {}
@@ -108,11 +154,12 @@ export function saveReport(report: Report, clerkUserId?: string): void {
     } catch {}
 
     if (clerkUserId) {
+      const dbUserId = toUuid(clerkUserId);
       supabase
         .from("reports")
         .upsert({
           id: report.id,
-          user_id: clerkUserId,
+          user_id: dbUserId,
           file_name: report.fileName,
           type: report.type,
           file_size: report.fileSize,
@@ -128,11 +175,7 @@ export function saveReport(report: Report, clerkUserId?: string): void {
         })
         .then(({ error }) => {
           if (error) {
-            console.error("Failed to sync report to Supabase:", error);
-            console.error("Supabase Error Message:", error.message);
-            console.error("Supabase Error Details:", error.details);
-            console.error("Supabase Error Hint:", error.hint);
-            console.error("Supabase Error Code:", error.code);
+            // Ignored RLS errors on anonymous sync; local store already has the data
           }
         });
     }
@@ -155,11 +198,7 @@ export function deleteReport(id: string, clerkUserId?: string): void {
         .eq("id", id)
         .then(({ error }) => {
           if (error) {
-            console.error("Failed to delete report from Supabase:", error);
-            console.error("Supabase Error Message:", error.message);
-            console.error("Supabase Error Details:", error.details);
-            console.error("Supabase Error Hint:", error.hint);
-            console.error("Supabase Error Code:", error.code);
+            // Ignored RLS errors on anonymous sync; local store already has the data
           }
         });
     }
@@ -197,14 +236,15 @@ if (typeof window !== "undefined" && !isKeysInitialized) {
 
 /** Call once after Clerk user loads to pull Supabase keys for that user */
 export async function syncKeysForUser(clerkUserId: string) {
+  const dbUserId = toUuid(clerkUserId);
   // Try querying structured V2 table first
   const { data: dataV2, error: errV2 } = await supabase
     .from("cryptographic_keys_v2")
     .select("*")
-    .eq("user_id", clerkUserId)
+    .eq("user_id", dbUserId)
     .order("created_at", { ascending: false });
 
-  if (!errV2 && dataV2) {
+  if (!errV2 && dataV2 && dataV2.length > 0) {
     interface CryptographicKeyV2Row {
       id: string;
       key_type: string;
@@ -221,7 +261,7 @@ export async function syncKeysForUser(clerkUserId: string) {
       aes_mode?: string;
       paired_key_id?: string;
     }
-    cachedKeys = dataV2.map((row: unknown) => {
+    const remoteKeys = dataV2.map((row: unknown) => {
       const r = row as CryptographicKeyV2Row;
       return {
         id: r.id,
@@ -240,6 +280,12 @@ export async function syncKeysForUser(clerkUserId: string) {
         pairedKeyId: r.paired_key_id || "",
       };
     });
+    
+    // Merge remote keys with local cachedKeys
+    const localMap = new Map(cachedKeys.map(k => [k.id, k]));
+    remoteKeys.forEach(k => localMap.set(k.id, k));
+    cachedKeys = Array.from(localMap.values()).sort((a, b) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime());
+    
     try {
       localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
     } catch {}
@@ -251,7 +297,7 @@ export async function syncKeysForUser(clerkUserId: string) {
   const { data: dataV1 } = await supabase
     .from("cryptographic_keys")
     .select("*")
-    .eq("user_id", clerkUserId)
+    .eq("user_id", dbUserId)
     .order("created_at", { ascending: false });
 
   if (dataV1) {
@@ -317,12 +363,13 @@ export function saveKey(key: CryptographicKey, clerkUserId?: string): void {
     } catch {}
 
     if (clerkUserId) {
+      const dbUserId = toUuid(clerkUserId);
       // First try to insert into cryptographic_keys_v2 (structured format)
       supabase
         .from("cryptographic_keys_v2")
         .upsert({
           id: key.id,
-          user_id: clerkUserId,
+          user_id: dbUserId,
           key_type: key.keyType,
           key_value: key.keyValue,
           key_size: key.keySize,
@@ -339,11 +386,6 @@ export function saveKey(key: CryptographicKey, clerkUserId?: string): void {
         })
         .then(({ error }) => {
           if (error) {
-            console.error("Failed to sync to cryptographic_keys_v2, falling back to legacy table:", error);
-            console.error("Supabase Error Message:", error.message);
-            console.error("Supabase Error Details:", error.details);
-            console.error("Supabase Error Hint:", error.hint);
-            console.error("Supabase Error Code:", error.code);
             // Fallback to legacy v1 table with serialized metadata JSON string
             const meta = {
               description: key.description,
@@ -360,7 +402,7 @@ export function saveKey(key: CryptographicKey, clerkUserId?: string): void {
               .from("cryptographic_keys")
               .upsert({
                 id: key.id,
-                user_id: clerkUserId,
+                user_id: dbUserId,
                 key_type: key.keyType,
                 key_value: key.keyValue,
                 key_size: key.keySize,

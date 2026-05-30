@@ -8,6 +8,7 @@ import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 import chromadb
 from dotenv import load_dotenv
 
@@ -188,6 +189,14 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
     except Exception as e:
         print(f"Failed to parse pdf using pypdf: {e}")
         return ""
+
+def extract_text_from_text_file(file_bytes: bytes) -> str:
+    for encoding in ("utf-8", "utf-16", "latin-1"):
+        try:
+            return file_bytes.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return file_bytes.decode("utf-8", errors="ignore")
 
 
 def get_unstructured_chunks(text: str):
@@ -622,15 +631,11 @@ async def analyze_file(file: UploadFile = File(...)):
         content = extract_text_from_docx(file_bytes)
     elif ext == "pdf":
         content = extract_text_from_pdf(file_bytes)
-    elif ext == "csv":
-        try:
-            content = file_bytes.decode("utf-8", errors="ignore")
-        except Exception as e:
-            print(f"Failed to decode csv: {e}")
-            content = ""
+    elif ext in ["csv", "json", "txt", "tsv", "xml", "yaml", "yml", "md"]:
+        content = extract_text_from_text_file(file_bytes)
     else:
         try:
-            content = file_bytes.decode("utf-8", errors="ignore")
+            content = extract_text_from_text_file(file_bytes)
         except Exception:
             content = f"Binary content of {file_name}"
             
@@ -688,9 +693,17 @@ def fix_garbled_text(req: FixGarbledRequest):
                     "Prefer": "resolution=merge-duplicates"
                 }
                 doc_id = f"corr-{str(uuid.uuid4())[:8]}"
+                
+                # Convert Clerk userId string to a valid UUID v5 format if it's not already a valid UUID
+                db_user_id = req.userId
+                try:
+                    uuid.UUID(db_user_id)
+                except ValueError:
+                    db_user_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, req.userId))
+
                 row = {
                     "id": doc_id,
-                    "user_id": req.userId,
+                    "user_id": db_user_id,
                     "original_text": req.text,
                     "corrected_text": corrected_text,
                     "document_name": req.fileName
@@ -704,3 +717,154 @@ def fix_garbled_text(req: FixGarbledRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class VaultAnalysisRequest(BaseModel):
+    fileName: str
+    content: str
+    rsaKeySize: Optional[int] = None
+    aesMode: Optional[str] = None
+    aesKeySize: Optional[int] = None
+
+@app.post("/analyze/vault")
+async def analyze_vault_document(req: VaultAnalysisRequest):
+    file_name = req.fileName
+    content = req.content
+    
+    # Calculate exact Shannon Entropy
+    entropy_val = calculate_entropy(content)
+    
+    randomness_score = int((entropy_val / 8.0) * 100)
+    
+    rsa_size = req.rsaKeySize or 2048
+    aes_mode = req.aesMode or "GCM"
+    aes_size = req.aesKeySize or 256
+    
+    rsa_score = 95 if rsa_size >= 4096 else (80 if rsa_size >= 2048 else (45 if rsa_size >= 1024 else 12))
+    aes_score = 95 if aes_mode == "GCM" else (70 if aes_mode == "CBC" else 25)
+    entropy_score = randomness_score
+    
+    overall_score = int((rsa_score + aes_score + entropy_score) / 3)
+    
+    status = "Secure"
+    if overall_score < 40:
+        status = "Critical"
+    elif overall_score < 60:
+        status = "Weak"
+    elif overall_score < 80:
+        status = "Moderate"
+        
+    security_assessment = f"RSA config risk is evaluated based on key size {rsa_size}. AES mode is {aes_mode}."
+    findings = ""
+    recommendations_list = []
+    
+    ai_success = False
+    groq_api_key = os.environ.get("GROQ_API_KEY")
+    if groq_api_key:
+        try:
+            print("Attempting analysis using Groq Cloud (Llama 3)...")
+            headers = {
+                "Authorization": f"Bearer {groq_api_key}",
+                "Content-Type": "application/json"
+            }
+            prompt = (
+                f"You are a professional cryptographic security analysis assistant. Analyze the entire text of the document '{file_name}':\n"
+                f"1. Entropy: {entropy_val}/8.0\n"
+                f"2. RSA Parameters: Key size {rsa_size}\n"
+                f"3. AES Parameters: Mode {aes_mode}, Key strength {aes_size}\n"
+                f"4. Document Full Text Content:\n{content}\n\n"
+                f"Based on the keys provided, provide a REAL and CORRECT assessment summary and specific recommendations.\n"
+                f"You MUST return a JSON object exactly formatted as:\n"
+                f'{{\n'
+                f'  "securityAssessment": "Detailed analysis of the configuration vulnerabilities.",\n'
+                f'  "findings": "A summary sentence of the overall file security status.",\n'
+                f'  "securityScore": "An integer between 0 and 100 representing the REAL security score of the document based on the keys and content.",\n'
+                f'  "recommendations": [\n'
+                f'    {{"priority": "Critical"|"High"|"Medium"|"Low", "action": "Specific recommendation description"}}\n'
+                f'  ]\n'
+                f'}}'
+            )
+            payload = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {
+                        "role": "system", 
+                        "content": "You are a professional cryptographic security analysis assistant. You must return only a raw, valid JSON object matching the requested schema. Do not return markdown."
+                    },
+                    {
+                        "role": "user", 
+                        "content": prompt
+                    }
+                ],
+                "response_format": {"type": "json_object"}
+            }
+            response = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=12.0
+            )
+            if response.status_code == 200:
+                res_data = response.json()
+                content_str = res_data["choices"][0]["message"]["content"]
+                import json
+                ai_data = json.loads(content_str)
+                if "securityAssessment" in ai_data:
+                    security_assessment = ai_data["securityAssessment"]
+                if "findings" in ai_data:
+                    findings = ai_data["findings"]
+                if "securityScore" in ai_data:
+                    try:
+                        overall_score = int(ai_data["securityScore"])
+                        if overall_score < 40:
+                            status = "Critical"
+                        elif overall_score < 60:
+                            status = "Weak"
+                        elif overall_score < 80:
+                            status = "Moderate"
+                        else:
+                            status = "Secure"
+                    except ValueError:
+                        pass
+                if "recommendations" in ai_data and isinstance(ai_data["recommendations"], list):
+                    recommendations_list = ai_data["recommendations"]
+                ai_success = True
+                print("Groq analysis succeeded for Vault endpoint!")
+        except Exception as e:
+            print(f"Groq Cloud analysis failed: {e}")
+
+    report_id = f"rpt-{str(uuid.uuid4())[:8]}"
+    return {
+        "id": report_id,
+        "fileName": file_name,
+        "type": "Decrypted Document (Vault Analysis)",
+        "fileSize": len(content),
+        "analysisDate": datetime.datetime.utcnow().isoformat() + "Z",
+        "securityScore": overall_score,
+        "status": status,
+        "entropy": {
+            "value": round(entropy_val, 2),
+            "classification": "Medium",
+            "interpretation": "Analysis from Key Vault"
+        },
+        "rsa": {
+            "keySize": rsa_size,
+            "exponent": 65537,
+            "padding": "OAEP",
+            "riskLevel": "Medium"
+        },
+        "aes": {
+            "mode": aes_mode,
+            "keyStrength": f"{aes_size}-bit",
+            "passwordComplexity": "Medium",
+            "securityRecommendations": []
+        },
+        "patterns": {
+            "hexPatterns": 0,
+            "base64Patterns": 0,
+            "standardEmail": 0,
+            "blockRepetition": False,
+            "unstructuredChunks": [{"id": 1, "text": content, "length": len(content), "type": "Full Text"}]
+        },
+        "findings": findings,
+        "recommendations": recommendations_list
+    }

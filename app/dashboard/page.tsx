@@ -11,10 +11,10 @@ import Link from "next/link";
 import {
   Activity, ChevronRight, Clock, Download,
   Zap, Shield, FileText, AlertTriangle, Lock, Brain, Menu,
-  Copy, Check, TrendingUp, FileSearch, ArrowLeftRight, Compass
+  Copy, Check, TrendingUp, FileSearch, ArrowLeftRight
 } from "lucide-react";
 import {
-  CartesianGrid, Line, LineChart, ResponsiveContainer,
+  CartesianGrid, ResponsiveContainer,
   Tooltip, XAxis, YAxis, BarChart, Bar, RadarChart,
   PolarGrid, PolarAngleAxis, Radar,
   AreaChart, Area, ScatterChart, Scatter, PieChart, Pie, Cell, ReferenceLine, Legend
@@ -307,8 +307,8 @@ export default function Dashboard() {
     ];
 
     const encryptionTimeVsFileSize = reports.map((r) => {
-      let sizeKB = parseFloat(r.fileSize) || 10;
-      if (r.fileSize.includes("MB")) sizeKB *= 1024;
+      let sizeKB = parseFloat(String(r.fileSize)) || 10;
+      if (String(r.fileSize).includes("MB")) sizeKB *= 1024;
       let baseTime = sizeKB * 1.2;
       if (r.aes.mode === "CBC") baseTime *= 1.15;
       if (r.rsa.keySize >= 4096) baseTime += 75;
@@ -510,7 +510,7 @@ export default function Dashboard() {
                         <MetricCard label="Document Type" value={activeReport.type} sub={`File size: ${activeReport.fileSize}`} icon={<FileText className="h-5 w-5" />} color="#6366f1" />
                         <MetricCard label="Security Score" value={`${activeReport.securityScore}/100`} sub={scoreLabel(activeReport.securityScore)} icon={<Shield className="h-5 w-5" />} color={scoreColor(activeReport.securityScore)} />
                         <MetricCard label="RSA Configuration" value={`${activeReport.rsa.keySize}-bit`} sub={activeReport.rsa.riskLevel} icon={<Lock className="h-5 w-5" />} color="#8b5cf6" />
-                        <MetricCard label="Vulnerabilities" value={activeReport.rsa.vulnerabilities.length.toString()} sub="identified weaknesses" icon={<AlertTriangle className="h-5 w-5" />} color={activeReport.rsa.vulnerabilities.length > 0 ? "#ef4444" : "#10b981"} />
+                        <MetricCard label="Vulnerabilities" value={(activeReport.rsa.vulnerabilities?.length || 0).toString()} sub="identified weaknesses" icon={<AlertTriangle className="h-5 w-5" />} color={(activeReport.rsa.vulnerabilities?.length || 0) > 0 ? "#ef4444" : "#10b981"} />
                       </>
                     ) : (
                       <>
@@ -624,8 +624,8 @@ export default function Dashboard() {
                             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">Identified Weaknesses</p>
                             <p className="text-xs text-foreground/40 mb-4">Specific protocol vulnerabilities detected in parsing</p>
                             <div className="space-y-3">
-                              {activeReport.rsa.vulnerabilities.length > 0 ? (
-                                activeReport.rsa.vulnerabilities.map((v, i) => (
+                              {(activeReport.rsa.vulnerabilities?.length || 0) > 0 ? (
+                                activeReport.rsa.vulnerabilities?.map((v, i) => (
                                   <div key={i} className="flex gap-3 items-start text-xs border-b border-border/5 pb-2">
                                     <div className="mt-0.5 h-2 w-2 rounded-full bg-red-500 shrink-0" />
                                     <div>

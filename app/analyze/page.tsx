@@ -12,7 +12,7 @@ import {
   Download, Save, RefreshCw, Trash2, Key,
   Bold, Italic, Code2, Database
 } from "lucide-react";
-import { saveKey, CryptographicKey, syncKeysForUser } from "@/lib/store";
+import { saveKey, CryptographicKey, syncKeysForUser, saveReport } from "@/lib/store";
 import { useUser } from "@clerk/nextjs";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -149,7 +149,7 @@ function aesEncryptSim(text: string, keyHex: string, mode: string): { ciphertext
   // Simple deterministic but high-entropy cipher representation
   const iv = Array.from({ length: 12 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, "0")).join("");
   const tag = mode === "GCM" ? Array.from({ length: 16 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, "0")).join("") : undefined;
-  
+
   // Custom reversible base64 encryption layer
   const salt = keyHex.substring(0, 6);
   const enc = btoa(encodeURIComponent(text + "||SALT||" + salt));
@@ -325,6 +325,31 @@ function PlaintextTipTapEditor({
     </div>
   );
 }
+export interface GeneratedKeyDisplay {
+  type: "RSA_PUBLIC" | "RSA_PRIVATE" | "AES_SESSION";
+  value: string;
+  size: number;
+  label: string;
+}
+
+const OP_CACHE = {
+  plaintext: "",
+  rsaBits: 2048,
+  rsaKeys: null as ReturnType<typeof generateRSAPairSim> | null,
+  aesBits: 256,
+  aesMode: "GCM",
+  aesKey: "",
+  ciphertext: "",
+  originalCiphertext: "",
+  encryptedSessionKey: "",
+  aesIV: "",
+  decryptedText: "",
+  isDecrypted: false,
+  encryptionOption: "rsa_payload" as "standard" | "rsa_payload",
+  generatedKeysDisplay: [] as GeneratedKeyDisplay[],
+  uploadedFile: null as File | null,
+  uploadProgress: 0,
+};
 
 export default function OperationPage() {
   const { user } = useUser();
@@ -343,20 +368,32 @@ export default function OperationPage() {
     { title: "Reports", href: "/reports" },
     { title: "Key Vault", href: "/vault" },
   ];
-
   const router = useRouter();
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Upload State
+  const [uploadedFile, setUploadedFile] = useState<File | null>(
+    OP_CACHE.uploadedFile
+  );
+
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
   // ─── Workspace Plaintext Editor ───
-  const [plaintext, setPlaintext] = useState<string>("");
-  const [debouncedPlaintext, setDebouncedPlaintext] = useState<string>("");
+  const [plaintext, setPlaintext] = useState<string>(OP_CACHE.plaintext);
+  const [debouncedPlaintext, setDebouncedPlaintext] = useState<string>(OP_CACHE.plaintext);
 
   useEffect(() => {
+    OP_CACHE.plaintext = plaintext;
     const handler = setTimeout(() => {
       setDebouncedPlaintext(plaintext);
     }, 400);
@@ -366,31 +403,25 @@ export default function OperationPage() {
   // ─── Cryptographic Settings & State ───
   const [rsaBits, setRsaBits] = useState<number>(2048);
   const [rsaKeys, setRsaKeys] = useState<ReturnType<typeof generateRSAPairSim> | null>(null);
-  
+
   const [aesBits, setAesBits] = useState<number>(256);
   const [aesMode, setAesMode] = useState<string>("GCM");
   const [aesKey, setAesKey] = useState<string>("");
-  
+
   // ─── Operational Output States ───
   const [ciphertext, setCiphertext] = useState<string>("");
   const [originalCiphertext, setOriginalCiphertext] = useState<string>("");
   const [encryptedSessionKey, setEncryptedSessionKey] = useState<string>("");
   const [aesIV, setAesIV] = useState<string>("");
-  
+
   // ─── Decrypted Output ───
   const [decryptedText, setDecryptedText] = useState<string>("");
   const [isDecrypted, setIsDecrypted] = useState(false);
   const [encryptionOption, setEncryptionOption] = useState<"standard" | "rsa_payload">("rsa_payload");
 
   // ─── Generated Keys Display ───
-  interface GeneratedKeyDisplay {
-    type: "RSA_PUBLIC" | "RSA_PRIVATE" | "AES_SESSION";
-    value: string;
-    size: number;
-    label: string;
-  }
-  const [generatedKeysDisplay, setGeneratedKeysDisplay] = useState<GeneratedKeyDisplay[]>([]);
-  
+  const [generatedKeysDisplay, setGeneratedKeysDisplay] = useState<GeneratedKeyDisplay[]>(OP_CACHE.generatedKeysDisplay);
+
   const hasLoggedRealtimeRef = useRef(false);
   const hasLoggedCipherRealtimeRef = useRef(false);
   const skipNextPlaintextEncryptionRef = useRef(false);
@@ -415,6 +446,7 @@ export default function OperationPage() {
 
   const handlePlaintextChange = useCallback((nextPlaintext: string) => {
     setPlaintext(nextPlaintext);
+    OP_CACHE.plaintext = nextPlaintext;
   }, []);
 
   const updatePlaintextFromCiphertext = useCallback((nextCiphertext: string) => {
@@ -469,12 +501,17 @@ export default function OperationPage() {
     const v = validateFile(file);
     if (!v.valid) { addLog(`File error: ${v.error}`, "error"); return; }
     setUploadedFile(file);
+    OP_CACHE.uploadedFile = file;
     setIsUploading(true);
     setUploadProgress(0);
+    OP_CACHE.uploadProgress = 0;
 
-    const iv = setInterval(() => {
-      setUploadProgress(p => {
-        if (p >= 100) { clearInterval(iv); return 100; }
+    const intervalId = setInterval(() => {
+      setUploadProgress((p: number) => {
+        if (p >= 100) {
+          clearInterval(intervalId);
+          return 100;
+        }
         return p + 20;
       });
     }, 80);
@@ -484,15 +521,15 @@ export default function OperationPage() {
       const formData = new FormData();
       formData.append("file", file);
       addLog(`Uploading & extracting unstructured text from ${file.name}...`, "info");
-      
+
       const response = await fetch("http://localhost:8000/analyze/file", {
         method: "POST",
         body: formData,
       });
-      
+
       if (!response.ok) throw new Error("Backend parsing failed");
       const report = await response.json();
-      
+
       const extractedText = report.patterns?.unstructuredChunks?.[0]?.text || "";
       if (extractedText) {
         setPlaintext(extractedText);
@@ -501,6 +538,10 @@ export default function OperationPage() {
         setPlaintext(`// Binary content of ${file.name} could not be fully parsed into text.`);
         addLog(`Successfully processed ${file.name} but found no parseable text chunks.`, "warn");
       }
+
+      // Store analysis report and security score in store (and Supabase)
+      saveReport(report, user?.id || "default-local-user");
+      addLog(`Saved file security analysis report. Security Score: ${report.securityScore}/100.`, "success");
     } catch (err) {
       console.warn("Backend extraction failed, running local browser reader.", err);
       // Fallback local reader for TXT and JSON
@@ -512,9 +553,42 @@ export default function OperationPage() {
       };
       reader.readAsText(file);
     } finally {
-      setIsUploading(false);
+      setUploadProgress(100);
     }
-  }, [addLog]);
+  }, [addLog, user]);
+
+  const handleAnalyzeAndSave = useCallback(async () => {
+    if (!plaintext.trim()) {
+      addLog("Plaintext notepad is empty. Please enter or upload some text to analyze.", "error");
+      return;
+    }
+    setIsAnalyzing(true);
+    addLog("Sending plaintext to AI Cryptographic Analysis engine...", "info");
+    try {
+
+      const docName = uploadedFile ? uploadedFile.name : "Plaintext Notepad Document";
+      const response = await fetch("http://localhost:8000/analyze/text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: docName,
+          content: plaintext,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Analysis failed");
+      const report = await response.json();
+
+      saveReport(report, user?.id || "default-local-user");
+      addLog(`Cryptographic Analysis Report generated successfully for ${docName}!`, "success");
+      addLog(`Saved analysis to Supabase. Security Score: ${report.securityScore}/100.`, "success");
+      router.push("/dashboard");
+    } catch (err) {
+      addLog(`Analysis failed: ${err instanceof Error ? err.message : String(err)}`, "error");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [plaintext, addLog, user, router]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -542,7 +616,7 @@ export default function OperationPage() {
     setDecryptedText("");
     try {
       const encResult = aesEncryptSim(textToEncrypt, activeAesKey, aesMode);
-      
+
       const e = BigInt(activeRsaKeys.e);
       const n = BigInt(activeRsaKeys.n);
 
@@ -582,24 +656,6 @@ export default function OperationPage() {
   }, [runHybridEncryption, debouncedPlaintext]);
 
   // ─── Cryptographic Action: Encrypt ───
-  const handleEncrypt = () => {
-    setIsProcessing(true);
-    addLog("Initiating Secure Hybrid RSA-AES Encryption Pipeline...", "info");
-
-    setTimeout(() => {
-      const encrypted = runHybridEncryption(plaintext, { visiblePipeline: true });
-      if (encrypted) {
-        addLog(`AES symmetric encryption completed using mode: ${aesMode}`, "success");
-        if (encryptionOption === "rsa_payload") {
-          addLog("RSA asymmetric encryption completed on the AES ciphertext payload.", "success");
-        }
-        addLog(`RSA encrypted AES session key securely packaged via modulo exponentiation.`, "success");
-        addLog(`Ciphertext payload loaded successfully into the Encrypted Workspace. Ready for operations.`, "success");
-      }
-      setIsProcessing(false);
-    }, 600);
-  };
-
   const handleTamper = () => {
     if (!ciphertext) return;
     const arr = ciphertext.split("");
@@ -625,13 +681,15 @@ export default function OperationPage() {
     addLog(`Downloaded restored document as '${link.download}'`, "info");
   };
 
+  if (!hasMounted) return null;
+
   return (
     <div className="relative min-h-screen bg-background">
       <Header navigationData={navData} />
 
-    <main className="relative z-10 pt-6 pb-16 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
+      <main className="relative z-10 pt-6 pb-16 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
         <div className="flex flex-col gap-6">
-          
+
           {/* Page Title Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
@@ -649,44 +707,44 @@ export default function OperationPage() {
               setCiphertext("");
               setDecryptedText("");
               setIsDecrypted(false);
-              addLog("Workspace cleared.", "info");
+              setUploadedFile(null);
+              setUploadProgress(0);
+              addLog("Workspace ready for new document.", "info");
             }} className="h-8 text-xs border-border/50 hover:bg-foreground/[0.04] shrink-0">
-              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Clear All
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Analyze New File
             </Button>
           </div>
 
           {/* Encrypt button + mode toggle — compact single row */}
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              onClick={handleEncrypt}
-              disabled={isProcessing}
+              onClick={handleAnalyzeAndSave}
+              disabled={isAnalyzing || !plaintext.trim()}
               size="sm"
-              className="h-8 px-4 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground"
+              className="h-8 px-4 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
             >
-              <Lock className="h-3.5 w-3.5 mr-1.5" />
-              {isProcessing ? "Encrypting…" : "Run Hybrid Encryption"}
+              <Zap className="h-3.5 w-3.5 mr-1.5" />
+              {isAnalyzing ? "Analyzing..." : "Analyze & Save Report"}
             </Button>
 
             <div className="flex items-center gap-1 bg-foreground/[0.03] border border-border/20 rounded-lg p-0.5">
               <button
                 type="button"
                 onClick={() => setEncryptionOption("rsa_payload")}
-                className={`text-[11px] font-medium px-2.5 py-1 rounded-md transition-all ${
-                  encryptionOption === "rsa_payload"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-foreground/50 hover:text-foreground"
-                }`}
+                className={`text-[11px] font-medium px-2.5 py-1 rounded-md transition-all ${encryptionOption === "rsa_payload"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-foreground/50 hover:text-foreground"
+                  }`}
               >
                 RSA+AES (Double)
               </button>
               <button
                 type="button"
                 onClick={() => setEncryptionOption("standard")}
-                className={`text-[11px] font-medium px-2.5 py-1 rounded-md transition-all ${
-                  encryptionOption === "standard"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-foreground/50 hover:text-foreground"
-                }`}
+                className={`text-[11px] font-medium px-2.5 py-1 rounded-md transition-all ${encryptionOption === "standard"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-foreground/50 hover:text-foreground"
+                  }`}
               >
                 AES Only
               </button>
@@ -698,11 +756,10 @@ export default function OperationPage() {
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`group relative mx-auto w-full rounded-xl border-2 border-dashed p-4 text-center cursor-pointer transition-all duration-300 ${
-              isDragging
-                ? "border-primary bg-primary/[0.04]"
-                : "border-border/30 bg-background/30 hover:border-border/60 hover:bg-foreground/[0.02]"
-            }`}
+            className={`group relative mx-auto w-full rounded-xl border-2 border-dashed p-4 text-center cursor-pointer transition-all duration-300 ${isDragging
+              ? "border-primary bg-primary/[0.04]"
+              : "border-border/30 bg-background/30 hover:border-border/60 hover:bg-foreground/[0.02]"
+              }`}
           >
             <input
               type="file"
@@ -848,7 +905,7 @@ export default function OperationPage() {
                     </h3>
                     <p className="text-xs text-foreground/40 mt-1">Successfully decrypted back to standard plaintext payload. Verify document contents below.</p>
                   </div>
-                  
+
                   <div className="flex items-center gap-3 self-end sm:self-auto">
                     <Button onClick={handleDownloadDecrypted} size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold flex items-center gap-2">
                       <Download className="h-4 w-4" /> Download Restored File
@@ -876,7 +933,7 @@ export default function OperationPage() {
             <p className="text-xs text-foreground/50 mb-3">
               Generate RSA public/private keypair and AES session key. Keys are stored in your Vault.
             </p>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3 bg-foreground/[0.02] border border-border/10 rounded-lg p-3">
               <div>
                 <label className="block text-[10px] font-semibold text-foreground/60 uppercase tracking-wider mb-2">RSA Modulus Size</label>
@@ -932,7 +989,7 @@ export default function OperationPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Generate RSA Key Pair */}
-              <Button 
+              <Button
                 disabled={!plaintext.trim()}
                 title={!plaintext.trim() ? "Add plaintext content first before generating keys" : undefined}
                 onClick={() => {
@@ -995,7 +1052,7 @@ export default function OperationPage() {
               </Button>
 
               {/* Generate AES Session Key */}
-              <Button 
+              <Button
                 disabled={!plaintext.trim()}
                 title={!plaintext.trim() ? "Add plaintext content first before generating keys" : undefined}
                 onClick={() => {
@@ -1050,7 +1107,7 @@ export default function OperationPage() {
                     Clear Display
                   </button>
                 </div>
-                
+
                 <div className="rounded-2xl border border-border/30 bg-background/40 p-5 space-y-4 shadow-sm backdrop-blur">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/10 pb-3 gap-3">
                     <div className="flex items-center gap-2.5">
