@@ -241,7 +241,18 @@ function TimelineSection() {
   return (
     <section className="relative px-4 sm:px-6 py-16 sm:py-24 lg:py-32">
       {/* faint vertical center line */}
-      <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/5 -translate-x-1/2 hidden lg:block pointer-events-none" />
+      <div className="absolute left-1/2 top-48 bottom-48 w-[2px] -translate-x-1/2 hidden lg:block pointer-events-none">
+        {/* Static track */}
+        <div className="absolute inset-0 bg-white/[0.03]" />
+        {/* Animated glow overlay */}
+        <motion.div 
+          className="absolute inset-0 bg-gradient-to-b from-sky-500 via-violet-500 via-amber-500 via-emerald-500 via-rose-500 to-cyan-500 origin-top"
+          initial={{ scaleY: 0 }}
+          whileInView={{ scaleY: 1 }}
+          viewport={{ once: true, amount: 0.1 }}
+          transition={{ duration: 1.5, ease: "easeInOut" }}
+        />
+      </div>
 
       <div className="mx-auto max-w-6xl">
         <motion.div

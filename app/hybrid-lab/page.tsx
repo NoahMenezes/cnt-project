@@ -154,7 +154,7 @@ function isRsaWrappedCiphertext(text: string): boolean {
   return chunks.length > 1 && chunks.every(c => /^\d+$/.test(c.trim()));
 }
 
-function aesDecryptSim(ciphertext: string): string {
+function aesDecryptSim(ciphertext: string, keyHex?: string): string {
   // Base64-decode and strip the SALT marker embedded by aesEncryptSim in analyze/page.tsx
   // Format: btoa(encodeURIComponent(plaintext + "||SALT||" + keyPrefix))
   try {
@@ -162,13 +162,21 @@ function aesDecryptSim(ciphertext: string): string {
     // Pad to valid base64 length
     const padded = cleaned + "=".repeat((4 - (cleaned.length % 4)) % 4);
     const decoded = decodeURIComponent(atob(padded));
-    const saltIdx = decoded.indexOf("||SALT||");
-    if (saltIdx !== -1) {
-      return decoded.substring(0, saltIdx);
+    const parts = decoded.split("||SALT||");
+    if (parts.length > 1) {
+      if (keyHex) {
+        const expectedSalt = keyHex.substring(0, 6);
+        if (parts[1] !== expectedSalt) {
+          throw new Error("Mismatched Key Error: The decrypted session key does not match this ciphertext. Each document requires its specific key.");
+        }
+      }
+      return parts[0];
     }
-    // No salt marker - return the full decoded string (might be plaintext directly)
     return decoded;
-  } catch {
+  } catch (e: any) {
+    if (e.message && e.message.includes("Mismatched Key Error")) {
+      throw e;
+    }
     return "";
   }
 }
@@ -206,6 +214,12 @@ export default function HybridLabPage() {
   const [isFixingGarbled, setIsFixingGarbled] = useState(false);
   const [correctedText, setCorrectedText] = useState("");
   const [fixError, setFixError] = useState("");
+
+  // --- Audio Preview States ---
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [audioPrompt, setAudioPrompt] = useState("");
+  const [audioObj, setAudioObj] = useState<HTMLAudioElement | null>(null);
 
   // --- Playground State ---
   const [pgAesKey, setPgAesKey] = useState("");
@@ -494,7 +508,7 @@ export default function HybridLabPage() {
         }
 
         // A3. AES-decrypt the inner ciphertext
-        plaintext = aesDecryptSim(aesCiphertext);
+        plaintext = aesDecryptSim(aesCiphertext, aesKeyHex);
 
         if (plaintext) {
           setDecryptedText(cleanCorruptedText(plaintext));
@@ -505,7 +519,7 @@ export default function HybridLabPage() {
         
         // A4. Fallback: try the raw AES key hex as the ciphertext (if the stored payload IS the AES key hex)
         if (aesKeyHex) {
-          const tryWithHex = aesDecryptSim(aesKeyHex);
+          const tryWithHex = aesDecryptSim(aesKeyHex, aesKeyHex);
           if (tryWithHex) {
             plaintext = tryWithHex;
             setDecryptedText(cleanCorruptedText(plaintext));
@@ -518,7 +532,7 @@ export default function HybridLabPage() {
 
       // ── Strategy B: No session key — try direct AES (standard mode) ──────
       if (!encSessKey && ciphertext) {
-        plaintext = aesDecryptSim(ciphertext);
+        plaintext = aesDecryptSim(ciphertext, selectedKey?.keyValue);
         if (plaintext) {
           setDecryptedText(cleanCorruptedText(plaintext));
           setStage("decrypted");
@@ -615,6 +629,130 @@ export default function HybridLabPage() {
     setDecryptError("");
     setPrivateKeyInput("");
     setKeyInputValue("");
+    if (audioObj) {
+      audioObj.pause();
+    }
+    setIsPlayingAudio(false);
+    setAudioPrompt("");
+  };
+
+  // --- Audio Preview Handlers ---
+  useEffect(() => {
+    return () => {
+      if (audioObj) {
+        audioObj.pause();
+      }
+    };
+  }, [audioObj]);
+
+  const isAudioAvailable = stage === "decrypted" ? !!decryptedText : (activeTab === "playground" && !!pgPlaintext);
+
+  const handleAudioPreviewClick = async () => {
+    if (isPlayingAudio) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      if (audioObj) {
+        audioObj.pause();
+      }
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    // Pre-create Audio context object to register user click interaction
+    const audio = audioObj || new Audio();
+    try {
+      audio.play().catch(() => {});
+      audio.pause();
+    } catch {}
+
+    const docContent = stage === "decrypted" ? decryptedText : pgPlaintext;
+    const docName = stage === "decrypted" ? (selectedKey?.documentName || "Decrypted Document") : "Playground Document";
+
+    setIsGeneratingAudio(true);
+    try {
+      const res = await fetch("http://localhost:8000/generate/audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user?.id || "default-local-user",
+          documentName: docName,
+          content: docContent,
+          associatedKeyId: selectedKey?.id || null,
+          rsaKeySize: selectedKey?.keyType?.includes("RSA") ? selectedKey.keySize : 2048,
+          aesKeySize: selectedKey?.keyType === "AES_SESSION" ? selectedKey.keySize : 256,
+          aesMode: selectedKey?.aesMode || "GCM"
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to generate audio preview.");
+      }
+
+      const data = await res.json();
+      setAudioPrompt(data.prompt);
+      
+      if (data.isFallback) {
+        console.log("Using browser text-to-speech fallback...");
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(data.prompt);
+          
+          // Select a premium/clear human voice
+          const voices = window.speechSynthesis.getVoices();
+          const preferredVoice = voices.find(v => 
+            v.lang.startsWith("en") && 
+            (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Premium") || v.name.includes("Neural") || v.name.includes("Samantha") || v.name.includes("Daniel") || v.name.includes("David"))
+          ) || voices.find(v => v.lang.startsWith("en"));
+          
+          if (preferredVoice) {
+            utterance.voice = preferredVoice;
+          }
+          
+          utterance.rate = 0.95; // Slightly slower for an articulate, professional auditor feel
+          utterance.pitch = 1.0;
+          utterance.onend = () => {
+            setIsPlayingAudio(false);
+          };
+          utterance.onerror = (e) => {
+            console.error("Speech synthesis error:", e);
+            setIsPlayingAudio(false);
+          };
+          window.speechSynthesis.speak(utterance);
+          setIsPlayingAudio(true);
+        } else {
+          // Play the synthesized wav fallback
+          const audioUrl = `data:audio/wav;base64,${data.audioBase64}`;
+          audio.src = audioUrl;
+          audio.onended = () => {
+            setIsPlayingAudio(false);
+          };
+          setAudioObj(audio);
+          audio.play().then(() => {
+            setIsPlayingAudio(true);
+          }).catch(err => {
+            console.error("Playback failed:", err);
+          });
+        }
+      } else {
+        const audioUrl = `data:audio/wav;base64,${data.audioBase64}`;
+        audio.src = audioUrl;
+        audio.onended = () => {
+          setIsPlayingAudio(false);
+        };
+        setAudioObj(audio);
+        audio.play().then(() => {
+          setIsPlayingAudio(true);
+        }).catch(err => {
+          console.error("Playback failed:", err);
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error generating audio preview. Please make sure the backend server is running.");
+    } finally {
+      setIsGeneratingAudio(false);
+    }
   };
 
   // --- Real-time Playground Computations ---
@@ -693,6 +831,16 @@ export default function HybridLabPage() {
         const dec = decodeURIComponent(atob(padded));
         const parts = dec.split("||SALT||");
         const recovered = parts[0];
+
+        if (parts.length > 1 && aesKeyValue) {
+          const expectedSalt = aesKeyValue.substring(0, 6);
+          if (parts[1] !== expectedSalt) {
+            setPgPlaintext("");
+            setPgDecryptError("Mismatched Key Error: The pasted AES Session Key does not match the encrypted document payload. Each key pair is unique to its document.");
+            return;
+          }
+        }
+
         if (recovered && recovered.trim()) {
           setPgPlaintext(recovered);
           setPgDecryptError("");
@@ -1432,6 +1580,41 @@ export default function HybridLabPage() {
                 </motion.div>
 
               </div>
+            </div>
+          )}
+
+          {/* Floating Audio Preview Button */}
+          {isAudioAvailable && (
+            <div className="fixed bottom-6 left-6 z-50 flex items-center gap-3">
+              <button
+                onClick={handleAudioPreviewClick}
+                disabled={isGeneratingAudio}
+                className="flex items-center gap-2 px-6 py-3.5 rounded-full border border-primary/30 bg-black/95 backdrop-blur text-primary hover:bg-primary/10 hover:border-primary/50 hover:scale-105 transition-all shadow-[0_8px_30px_rgb(0,0,0,0.5)] active:scale-95 disabled:opacity-50 font-semibold"
+              >
+                {isGeneratingAudio ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : isPlayingAudio ? (
+                  <>
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-450 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                    </span>
+                    <span>Stop Preview</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <span>Audio Preview</span>
+                  </>
+                )}
+              </button>
+              
+              {audioPrompt && (
+                <div className="hidden md:block max-w-xs bg-black/95 border border-border/40 rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.5)] backdrop-blur text-[10px] text-foreground/70 font-mono leading-relaxed line-clamp-3">
+                  <span className="text-primary font-bold block mb-1">AI Narrator Summary:</span>
+                  {audioPrompt}
+                </div>
+              )}
             </div>
           )}
 

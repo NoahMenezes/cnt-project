@@ -2,37 +2,46 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { useGLTF, Environment, Float, PresentationControls, useTexture } from '@react-three/drei';
+import { useGLTF, Environment, Float, PresentationControls } from '@react-three/drei';
 import * as THREE from 'three';
 
 function Model() {
   const { scene } = useGLTF('/iphone_17_pro_max.glb');
-  const texture = useTexture('/Pastedimage.png');
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
 
-  // Configure texture properties for GLTF/three.js compatibility
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.flipY = false;
-  texture.rotation = Math.PI;
-  texture.center.set(0.5, 0.5);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.repeat.x = -1;
+  useEffect(() => {
+    const loader = new THREE.TextureLoader();
+    loader.load('/Pastedimage.png', (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.flipY = false;
+      tex.rotation = Math.PI;
+      tex.center.set(0.5, 0.5);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.repeat.x = -1;
+      setTexture(tex);
+    });
+  }, []);
 
-  scene.traverse((child) => {
-    if (child instanceof THREE.Mesh) {
-      const material = child.material as THREE.MeshStandardMaterial;
+  useEffect(() => {
+    if (!texture || !scene) return;
 
-      if (material && (material.name === "Material.001" || material.name === "Material.019" || material.name === "Material.023")) {
-        material.map = texture;
-        material.emissiveMap = texture;
-        material.emissive = new THREE.Color(0xffffff);
-        material.emissiveIntensity = 1.0;
-        material.roughness = 0.1;
-        material.metalness = 0.1;
-        material.visible = true;
-        material.needsUpdate = true;
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const material = child.material as THREE.MeshStandardMaterial;
+
+        if (material && (material.name === "Material.001" || material.name === "Material.019" || material.name === "Material.023")) {
+          material.map = texture;
+          material.emissiveMap = texture;
+          material.emissive = new THREE.Color(0xffffff);
+          material.emissiveIntensity = 1.0;
+          material.roughness = 0.1;
+          material.metalness = 0.1;
+          material.visible = true;
+          material.needsUpdate = true;
+        }
       }
-    }
-  });
+    });
+  }, [scene, texture]);
 
   return <primitive object={scene} scale={1.25} position={[0, -1.2, 0]} />;
 }

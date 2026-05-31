@@ -94,7 +94,7 @@ const TOOLTIP_STYLE = {
   color: "#f4f4f5",
 };
 
-function SectionCard({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
+function SectionCard({ title, icon: Icon, children }: { title: string; icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
     <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}
       className="rounded-2xl border border-border/40 bg-background/55 backdrop-blur-md p-6 relative overflow-hidden shadow-sm">
@@ -876,7 +876,7 @@ export default function Dashboard() {
                                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.2} vertical={false} />
                                   <XAxis dataKey="name" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} />
                                   <YAxis domain={[0, 100]} stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} width={30} />
-                                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [`Score: ${v}/100`, "Assessment"]} />
+                                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v, _, p) => [`Score: ${v}/100 (${(p.payload as any)?.fileName || ""})`, "Assessment"]} />
                                   <ReferenceLine y={60} stroke="#f97316" strokeDasharray="4 4" label={{ value: "Target", fill: "#f97316", fontSize: 9, position: "insideBottomRight" }} />
                                   <Area type="monotone" dataKey="score" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#scoreGrad)" />
                                 </AreaChart>
@@ -938,17 +938,19 @@ export default function Dashboard() {
                             <p className="text-xs text-foreground/40 mb-4">Randomness scores representing plaintext obfuscation quality (ideal: ~8.0)</p>
                             <div className="h-60">
                               <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={stats.entropyDistribution} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                                <AreaChart data={stats.entropyDistribution} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                                  <defs>
+                                    <linearGradient id="entropySpreadGrad" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.25}/>
+                                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.01}/>
+                                    </linearGradient>
+                                  </defs>
                                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.2} vertical={false} />
                                   <XAxis dataKey="range" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 9 }} />
                                   <YAxis stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} width={30} allowDecimals={false} />
                                   <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [v, "Documents"]} />
-                                  <Bar dataKey="count" fill="#06b6d4" radius={[4, 4, 0, 0]}>
-                                    {stats.entropyDistribution.map((_, idx) => (
-                                      <Cell key={idx} fill={ENTROPY_COLORS[idx % ENTROPY_COLORS.length]} />
-                                    ))}
-                                  </Bar>
-                                </BarChart>
+                                  <Area type="monotone" dataKey="count" stroke="#06b6d4" strokeWidth={2} fillOpacity={1} fill="url(#entropySpreadGrad)" />
+                                </AreaChart>
                               </ResponsiveContainer>
                             </div>
                           </SectionCard>

@@ -10,7 +10,7 @@ import {
   Upload, FileText, AlertTriangle, CheckCircle, Shield,
   Copy, Lock, Zap,
   Download, Save, RefreshCw, Trash2, Key,
-  Bold, Italic, Code2, Database
+  Bold, Italic, Code2, Database, LayoutDashboard
 } from "lucide-react";
 import { BorderBeam } from "@/components/ui/border-beam";
 import { saveKey, CryptographicKey, syncKeysForUser, saveReport } from "@/lib/store";
@@ -776,6 +776,16 @@ export default function OperationPage() {
             >
               <Zap className="h-3.5 w-3.5 mr-1.5" />
               {isAnalyzing ? "Analyzing..." : "Analyze & Save Report"}
+            </Button>
+
+            <Button
+              onClick={() => router.push("/dashboard")}
+              variant="outline"
+              size="sm"
+              className="h-8 px-4 text-xs font-semibold border-border/50 hover:bg-foreground/[0.04] text-foreground"
+            >
+              <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" />
+              Go to Dashboard
             </Button>
 
             <div className="flex items-center gap-1 bg-foreground/[0.03] border border-border/20 rounded-lg p-0.5">

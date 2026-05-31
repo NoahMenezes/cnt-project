@@ -868,3 +868,271 @@ async def analyze_vault_document(req: VaultAnalysisRequest):
         "findings": findings,
         "recommendations": recommendations_list
     }
+
+class AudioPreviewRequest(BaseModel):
+    userId: str
+    documentName: str
+    content: str
+    associatedKeyId: Optional[str] = None
+    rsaKeySize: Optional[int] = None
+    aesKeySize: Optional[int] = None
+    aesMode: Optional[str] = None
+
+@app.post("/generate/audio")
+def generate_audio_preview(req: AudioPreviewRequest):
+    entropy_val = calculate_entropy(req.content)
+    
+    # Check if the decrypted content is just a placeholder about binary data or is empty
+    is_binary_notice = "binary content" in req.content.lower() or "could not be fully parsed" in req.content.lower()
+    
+    # Build details about cryptographic settings
+    rsa_size_val = req.rsaKeySize or 2048
+    aes_size_val = req.aesKeySize or 256
+    aes_mode_val = req.aesMode or "GCM"
+    
+    # 1. Base fallback narration script (fully detailed as requested)
+    if is_binary_notice:
+        summary_script = (
+            f"This is a detailed security audit narration for document: {req.documentName}. "
+            f"The forensic engine verified that this document was successfully decrypted using an RSA key modulus size of {rsa_size_val} bits, "
+            f"combined with an AES session key strength of {aes_size_val} bits, running in the {aes_mode_val} block cipher mode. "
+            f"The decrypted document contains binary archive assets and structured data. "
+            f"Analyzing the security posture, there is an exceptionally low risk of this document being decoded or compromised by unauthorized parties, "
+            f"as the key lengths and block mode comply with high military-grade security standards. "
+            f"However, as a best practice to maintain confidentiality and mitigate future vulnerabilities, we recommend rotating the keys periodically. "
+            f"Key rotation limits the volume of data encrypted under a single key and is a highly recommended practice."
+        )
+    else:
+        summary_script = (
+            f"This is a detailed security audit narration for document: {req.documentName}. "
+            f"This plaintext file has been decrypted using an RSA key with a modulus size of {rsa_size_val} bits, "
+            f"paired with an AES session key strength of {aes_size_val} bits running in the {aes_mode_val} block cipher mode. "
+            f"Based on our entropy analysis score of {entropy_val:.2f}, the document contains readable plain text. "
+            f"Evaluating the security posture, because you used a key size of {aes_size_val} bits and the robust {aes_mode_val} block cipher mode, "
+            f"the content is completely safe and there is absolutely no risk of it being decoded or cracked by modern adversaries. "
+            f"To keep this document secure, we advise rotating these keys as a security best practice. Changing keys regularly ensures "
+            f"that even if a single key is ever compromised, the rest of your archives remain completely protected."
+        )
+
+    ai_success = False
+    
+    # 2. Try Groq (Llama 3.3)
+    groq_api_key = os.environ.get("GROQ_API_KEY")
+    if groq_api_key:
+        try:
+            print("Generating narration prompt using Groq...")
+            headers = {
+                "Authorization": f"Bearer {groq_api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            system_prompt = (
+                "You are an articulate, professional, and reassuring AI cryptographic security auditor. "
+                "You output ONLY the raw spoken narration script. "
+                "Do not include any headers, markdown, section labels, or parenthetical remarks. Just output the clean speech text."
+            )
+            
+            llm_prompt = (
+                f"Generate a professional spoken-audio narration script for the decrypted document '{req.documentName}'.\n"
+                f"Make sure to explain in detail so that the speech takes over a minute to read (aim for about 180 to 220 words).\n\n"
+                f"The cryptographic settings used for this document are:\n"
+                f"- RSA Modulus Size: {rsa_size_val} bits\n"
+                f"- AES Session Key Strength: {aes_size_val} bits\n"
+                f"- AES Block Cipher Mode: {aes_mode_val}\n\n"
+                f"Please cover the following points in your speech:\n"
+                f"1. Explain what context the document contains (if it's binary content like .docx, explain that it contains structured binary assets).\n"
+                f"2. Explicitly state the cryptographic parameters: the RSA Modulus Size, the AES Session Key Strength, and the AES Block Cipher Mode.\n"
+                f"3. Summarize the security posture: analyze whether the document is at risk of being decoded or not, and reassure the user that these parameters are extremely strong.\n"
+                f"4. Address whether they should change or rotate the keys, and explain why key rotation is a recommended security practice.\n\n"
+                f"Document Content Preview:\n{req.content[:3000]}"
+            )
+            
+            payload = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": llm_prompt}
+                ]
+            }
+            res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=12.0
+            )
+            if res.status_code == 200:
+                summary_script = res.json()["choices"][0]["message"]["content"].strip()
+                ai_success = True
+                print("Generated script with Groq:", summary_script)
+            else:
+                print(f"Groq API call returned code {res.status_code}: {res.text}")
+        except Exception as e:
+            print(f"Failed to generate script using Groq: {e}")
+
+    # 3. Try OpenRouter (Llama 3 Instruct Free fallback)
+    openrouter_api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not ai_success and openrouter_api_key:
+        try:
+            print("Generating narration prompt using OpenRouter...")
+            headers = {
+                "Authorization": f"Bearer {openrouter_api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "http://localhost:3000",
+                "X-Title": "CipherScope"
+            }
+            llm_prompt = (
+                f"Generate a detailed cryptographic narration script (aim for 180 to 220 words, explaining for over a minute) "
+                f"about the decrypted document '{req.documentName}' which contains {'binary assets' if is_binary_notice else 'plaintext'}.\n"
+                f"You MUST explicitly speak about:\n"
+                f"- RSA Modulus Size of {rsa_size_val} bits\n"
+                f"- AES Session Key Strength of {aes_size_val} bits\n"
+                f"- AES Block Cipher Mode of {aes_mode_val}\n"
+                f"Analyze if the document is at risk of being decoded or not, and explain that key rotation is recommended practice. "
+                f"Output only the spoken narration text."
+            )
+            payload = {
+                "model": "meta-llama/llama-3-8b-instruct:free",
+                "messages": [
+                    {"role": "user", "content": llm_prompt}
+                ]
+            }
+            res = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=12.0
+            )
+            if res.status_code == 200:
+                summary_script = res.json()["choices"][0]["message"]["content"].strip()
+                ai_success = True
+                print("Generated script with OpenRouter:", summary_script)
+            else:
+                print(f"OpenRouter API call returned code {res.status_code}: {res.text}")
+        except Exception as e:
+            print(f"Failed to generate script using OpenRouter: {e}")
+
+    # 4. Local text parsing summarizer fallback
+    if not ai_success and not is_binary_notice and len(req.content.strip()) > 30:
+        try:
+            print("Generating local sentence-based summary...")
+            import re
+            sentences = re.split(r'(?<=[.!?])\s+', req.content.strip())
+            clean_sentences = [s.strip() for s in sentences if len(s.strip()) > 8]
+            if clean_sentences:
+                # Get up to 3 non-empty sentences
+                local_sum = " ".join(clean_sentences[:3])
+                if len(local_sum.split()) > 5:
+                    summary_script = f"Here is an audio summary of the decrypted content: {local_sum}"
+                    ai_success = True
+                    print("Generated script locally:", summary_script)
+        except Exception as e:
+            print(f"Failed to generate local summary: {e}")
+
+    # Clean markdown, backticks, asterisks, hashes, etc. to prevent TTS spelling them out
+    summary_script = summary_script.replace("`", "").replace("*", "").replace("#", "").replace("_", "")
+
+    hf_token = os.environ.get("HUGGINGFACE_ACCESS_TOKEN") or os.environ.get("HF_API_TOKEN")
+    audio_base64 = ""
+    hf_success = False
+    
+    if hf_token:
+        try:
+            print("Generating audio using Hugging Face facebook/mms-tts-eng...")
+            hf_headers = {
+                "Authorization": f"Bearer {hf_token}",
+                "Content-Type": "application/json"
+            }
+            hf_payload = {"inputs": summary_script}
+            hf_res = requests.post(
+                "https://api-inference.huggingface.co/models/facebook/mms-tts-eng",
+                headers=hf_headers,
+                json=hf_payload,
+                timeout=15.0
+            )
+            if hf_res.status_code == 200:
+                import base64
+                audio_base64 = base64.b64encode(hf_res.content).decode("utf-8")
+                hf_success = True
+                print("Hugging Face audio generation successful!")
+            else:
+                print(f"Hugging Face status {hf_res.status_code}: {hf_res.text}")
+        except Exception as e:
+            print(f"Failed to call Hugging Face: {e}")
+            
+    if not hf_success:
+        try:
+            print("Generating fallback synthesized audio file...")
+            import io
+            import wave
+            import struct
+            
+            sample_rate = 8000
+            num_samples = sample_rate * 10
+            audio_buffer = io.BytesIO()
+            
+            with wave.open(audio_buffer, 'wb') as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(sample_rate)
+                
+                for i in range(num_samples):
+                    t = i / sample_rate
+                    freq1 = 220 + 50 * math.sin(2 * math.pi * 0.5 * t)
+                    freq2 = 440 + 100 * math.cos(2 * math.pi * 0.2 * t)
+                    
+                    val = 0.5 * math.sin(2 * math.pi * freq1 * t) + 0.3 * math.sin(2 * math.pi * freq2 * t)
+                    if int(t * 2) % 2 == 0:
+                        val += 0.2 * math.sin(2 * math.pi * 880 * t)
+                        
+                    if t < 0.5:
+                        val *= (t / 0.5)
+                    elif t > 9.5:
+                        val *= ((10.0 - t) / 0.5)
+                        
+                    val = max(-1.0, min(1.0, val))
+                    sample = int(val * 32767)
+                    wav.writeframesraw(struct.pack('<h', sample))
+            
+            import base64
+            audio_base64 = base64.b64encode(audio_buffer.getvalue()).decode("utf-8")
+            print("Fallback synthesized audio generated successfully!")
+        except Exception as e:
+            print(f"Fallback audio generation failed: {e}")
+
+    supabase_url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if supabase_url and service_key:
+        try:
+            print("Saving audio preview to Supabase table...")
+            headers = {
+                "apikey": service_key,
+                "Authorization": f"Bearer {service_key}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates"
+            }
+            
+            db_user_id = req.userId
+            try:
+                uuid.UUID(db_user_id)
+            except ValueError:
+                db_user_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, req.userId))
+                
+            row = {
+                "user_id": db_user_id,
+                "document_name": req.documentName,
+                "associated_key_id": req.associatedKeyId or "",
+                "prompt": summary_script,
+                "audio_base64": audio_base64
+            }
+            res = requests.post(f"{supabase_url}/rest/v1/audio_previews", json=row, headers=headers)
+            print(f"Supabase response code: {res.status_code}")
+        except Exception as e:
+            print(f"Failed to save audio to Supabase: {e}")
+            
+    return {
+        "status": "success",
+        "prompt": summary_script,
+        "audioBase64": audio_base64,
+        "isFallback": not hf_success
+    }
+

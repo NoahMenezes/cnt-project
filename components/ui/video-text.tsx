@@ -67,7 +67,7 @@ export interface VideoTextProps {
    * The element type to render for the text
    * @default "div"
    */
-  as?: any
+  as?: ElementType<{ children?: ReactNode; className?: string }>
 }
 
 export function VideoText({
