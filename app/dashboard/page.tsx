@@ -1159,6 +1159,15 @@ export default function Dashboard() {
               )}
             </div>
           </div>
+          {/* Floating Audio Prompt Popup – matches Hybrid Lab style */}
+          {audioPrompt && (
+            <div className="fixed bottom-6 left-6 z-50 flex items-end gap-3">
+              <div className="max-w-sm bg-black/95 border border-border/40 rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.5)] backdrop-blur text-[10px] text-foreground/70 font-mono leading-relaxed">
+                <span className="text-primary font-bold block mb-1 text-xs">🎙 AI Security Briefing:</span>
+                <p className="line-clamp-5">{audioPrompt}</p>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     </div>
