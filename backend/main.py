@@ -1031,11 +1031,25 @@ def generate_audio_preview(req: AudioPreviewRequest):
     # Clean markdown, backticks, asterisks, hashes, etc. to prevent TTS spelling them out
     summary_script = summary_script.replace("`", "").replace("*", "").replace("#", "").replace("_", "")
 
-    hf_token = os.environ.get("HUGGINGFACE_ACCESS_TOKEN") or os.environ.get("HF_API_TOKEN")
     audio_base64 = ""
     hf_success = False
-    
-    if hf_token:
+    mime_type = "audio/wav"
+
+    # Prioritize loading the custom project voice (Julien) if provided
+    project_voice_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "public", "projectvoice.mp3")
+    if os.path.exists(project_voice_path):
+        try:
+            print("Loading custom project voice from public/projectvoice.mp3...")
+            with open(project_voice_path, "rb") as f:
+                import base64
+                audio_base64 = base64.b64encode(f.read()).decode("utf-8")
+            hf_success = True
+            mime_type = "audio/mpeg"
+            print("Custom project voice loaded successfully!")
+        except Exception as e:
+            print(f"Failed to load custom project voice: {e}")
+
+    if not hf_success and hf_token:
         try:
             print("Generating audio using Hugging Face facebook/mms-tts-eng...")
             hf_headers = {
@@ -1053,6 +1067,7 @@ def generate_audio_preview(req: AudioPreviewRequest):
                 import base64
                 audio_base64 = base64.b64encode(hf_res.content).decode("utf-8")
                 hf_success = True
+                mime_type = "audio/wav"
                 print("Hugging Face audio generation successful!")
             else:
                 print(f"Hugging Face status {hf_res.status_code}: {hf_res.text}")
@@ -1095,6 +1110,7 @@ def generate_audio_preview(req: AudioPreviewRequest):
             
             import base64
             audio_base64 = base64.b64encode(audio_buffer.getvalue()).decode("utf-8")
+            mime_type = "audio/wav"
             print("Fallback synthesized audio generated successfully!")
         except Exception as e:
             print(f"Fallback audio generation failed: {e}")
@@ -1133,6 +1149,7 @@ def generate_audio_preview(req: AudioPreviewRequest):
         "status": "success",
         "prompt": summary_script,
         "audioBase64": audio_base64,
+        "mimeType": mime_type,
         "isFallback": not hf_success
     }
 

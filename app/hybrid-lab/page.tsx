@@ -721,8 +721,9 @@ export default function HybridLabPage() {
           window.speechSynthesis.speak(utterance);
           setIsPlayingAudio(true);
         } else {
-          // Play the synthesized wav fallback
-          const audioUrl = `data:audio/wav;base64,${data.audioBase64}`;
+          // Play the synthesized wav/mp3 fallback
+          const mime = data.mimeType || "audio/wav";
+          const audioUrl = `data:${mime};base64,${data.audioBase64}`;
           audio.src = audioUrl;
           audio.onended = () => {
             setIsPlayingAudio(false);
@@ -735,7 +736,8 @@ export default function HybridLabPage() {
           });
         }
       } else {
-        const audioUrl = `data:audio/wav;base64,${data.audioBase64}`;
+        const mime = data.mimeType || "audio/wav";
+        const audioUrl = `data:${mime};base64,${data.audioBase64}`;
         audio.src = audioUrl;
         audio.onended = () => {
           setIsPlayingAudio(false);
