@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently --kill-others \"next dev\" \"bash -c 'source backend/venv/bin/activate && uvicorn backend.main:app --port 8000 --reload'\"",
-    "build": "next build",
+    "dev": "concurrently --kill-others \"NODE_OPTIONS='--max-old-space-size=4096' next dev\" \"bash -c 'source backend/venv/bin/activate && uvicorn backend.main:app --port 8000 --reload'\"",
+    "build": "NODE_OPTIONS='--max-old-space-size=4096' next build",
     "start": "next start",
     "lint": "eslint"
   },
