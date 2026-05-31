@@ -1035,21 +1035,7 @@ def generate_audio_preview(req: AudioPreviewRequest):
     hf_success = False
     mime_type = "audio/wav"
 
-    # Prioritize loading the custom project voice (Julien) if provided
-    project_voice_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "public", "projectvoice.mp3")
-    if os.path.exists(project_voice_path):
-        try:
-            print("Loading custom project voice from public/projectvoice.mp3...")
-            with open(project_voice_path, "rb") as f:
-                import base64
-                audio_base64 = base64.b64encode(f.read()).decode("utf-8")
-            hf_success = True
-            mime_type = "audio/mpeg"
-            print("Custom project voice loaded successfully!")
-        except Exception as e:
-            print(f"Failed to load custom project voice: {e}")
-
-    if not hf_success and hf_token:
+    if hf_token:
         try:
             print("Generating audio using Hugging Face facebook/mms-tts-eng...")
             hf_headers = {

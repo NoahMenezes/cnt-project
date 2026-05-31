@@ -698,11 +698,16 @@ export default function HybridLabPage() {
           window.speechSynthesis.cancel();
           const utterance = new SpeechSynthesisUtterance(data.prompt);
           
-          // Select a premium/clear human voice
+          // Select a premium/clear human voice (prioritizing Julien/Julian or other clear male voices)
           const voices = window.speechSynthesis.getVoices();
           const preferredVoice = voices.find(v => 
+            v.name.includes("Julien") || v.name.includes("Julian")
+          ) || voices.find(v => 
             v.lang.startsWith("en") && 
-            (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Premium") || v.name.includes("Neural") || v.name.includes("Samantha") || v.name.includes("Daniel") || v.name.includes("David"))
+            (v.name.includes("Daniel") || v.name.includes("David") || v.name.includes("Microsoft David") || v.name.includes("Male") || v.name.includes("Guy"))
+          ) || voices.find(v => 
+            v.lang.startsWith("en") && 
+            (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Premium") || v.name.includes("Neural"))
           ) || voices.find(v => v.lang.startsWith("en"));
           
           if (preferredVoice) {
