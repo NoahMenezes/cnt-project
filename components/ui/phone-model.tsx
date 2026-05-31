@@ -7,30 +7,29 @@ import * as THREE from 'three';
 
 function Model() {
   const { scene } = useGLTF('/iphone_17_pro_max.glb');
-  const texture = useTexture('/cipherscope_banner.png');
+  const texture = useTexture('/Pastedimage.png');
 
   // Configure texture properties for GLTF/three.js compatibility
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.flipY = false;
+  texture.rotation = Math.PI;
+  texture.center.set(0.5, 0.5);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.repeat.x = -1;
 
   scene.traverse((child) => {
     if (child instanceof THREE.Mesh) {
       const material = child.material as THREE.MeshStandardMaterial;
-      
-      // Target the screen mesh material
-      if (material && material.name === "Material.001") {
+
+      if (material && (material.name === "Material.001" || material.name === "Material.019" || material.name === "Material.023")) {
         material.map = texture;
         material.emissiveMap = texture;
         material.emissive = new THREE.Color(0xffffff);
         material.emissiveIntensity = 1.0;
         material.roughness = 0.1;
         material.metalness = 0.1;
+        material.visible = true;
         material.needsUpdate = true;
-      }
-      
-      // Hide the glass/cover mesh
-      if (material && material.name === "Material.019") {
-        material.visible = false;
       }
     }
   });
@@ -54,11 +53,11 @@ export default function PhoneModel() {
         <Suspense fallback={null}>
           <ambientLight intensity={1.5} />
           <Environment preset="city" />
-          <PresentationControls 
-            global 
-            rotation={[0.1, 0.1, 0]} 
-            polar={[-0.4, 0.4]} 
-            azimuth={[-1, 1]} 
+          <PresentationControls
+            global
+            rotation={[0.1, 0.1, 0]}
+            polar={[-0.4, 0.4]}
+            azimuth={[-1, 1]}
             snap
           >
             <Float rotationIntensity={0.3} floatIntensity={0.5} speed={1.5}>

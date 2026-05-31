@@ -19,6 +19,7 @@ import {
   PolarGrid, PolarAngleAxis, Radar,
   AreaChart, Area, ScatterChart, Scatter, PieChart, Pie, Cell, ReferenceLine, Legend
 } from "recharts";
+import { BorderBeam } from "@/components/ui/border-beam";
 
 
 // ─── Animations ──────────────────────────────────────────────────────────────
@@ -59,6 +60,7 @@ function MetricCard({ label, value, sub, icon, color }: { label: string; value: 
   return (
     <motion.div variants={item} whileHover={{ y: -4 }} transition={{ duration: 0.2 }}
       className="relative overflow-hidden rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur hover:border-border/60 hover:shadow-lg">
+      <BorderBeam size={100} duration={8} colorFrom={color} colorTo={`${color}80`} />
       <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.03] to-transparent -z-10" />
       <div className="flex items-center justify-between mb-4">
         <div className="p-2 rounded-xl" style={{ backgroundColor: color + "20" }}>
@@ -96,6 +98,7 @@ function SectionCard({ title, icon: Icon, children }: { title: string; icon: any
   return (
     <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}
       className="rounded-2xl border border-border/40 bg-background/55 backdrop-blur-md p-6 relative overflow-hidden shadow-sm">
+      <BorderBeam size={180} duration={12} colorFrom="#8b5cf6" colorTo="#6366f1" />
       <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.015] to-transparent pointer-events-none" />
       <div className="flex items-center gap-2 mb-4 border-b border-border/10 pb-3">
         <Icon className="h-4 w-4 text-primary" />
@@ -528,7 +531,8 @@ export default function Dashboard() {
                       {/* AI Spotlight */}
                       <div>
                         <SectionTitle>AI Forensic Analysis Spotlight</SectionTitle>
-                        <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-5">
+                        <motion.div variants={item} className="relative overflow-hidden rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-5">
+                          <BorderBeam size={200} duration={10} colorFrom="#10b981" colorTo="#3b82f6" />
                           <div className="flex flex-wrap gap-3 items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div className="relative flex h-2.5 w-2.5">
@@ -604,7 +608,8 @@ export default function Dashboard() {
                       <div className="grid gap-6 md:grid-cols-5">
                         {/* Radar Profile */}
                         {rsaRadar.length > 0 && (
-                          <motion.div variants={item} className="md:col-span-2 rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
+                          <motion.div variants={item} className="md:col-span-2 relative overflow-hidden rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
+                            <BorderBeam size={150} duration={8} colorFrom="#8b5cf6" colorTo="#3b82f6" />
                             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">Document Profile</p>
                             <p className="text-xs text-foreground/40 mb-4">Cryptographic configuration strength mapping</p>
                             <ResponsiveContainer width="100%" height={220}>
@@ -619,7 +624,8 @@ export default function Dashboard() {
                         )}
 
                         {/* Actionable Vulnerabilities Inspector */}
-                        <motion.div variants={item} className="md:col-span-3 rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur flex flex-col justify-between">
+                        <motion.div variants={item} className="md:col-span-3 relative overflow-hidden rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur flex flex-col justify-between">
+                          <BorderBeam size={150} duration={8} colorFrom="#ef4444" colorTo="#f59e0b" />
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">Identified Weaknesses</p>
                             <p className="text-xs text-foreground/40 mb-4">Specific protocol vulnerabilities detected in parsing</p>
@@ -655,6 +661,7 @@ export default function Dashboard() {
                       <div>
                         <SectionTitle>Corrected Plaintext Output (English)</SectionTitle>
                         <motion.div variants={item} className="rounded-2xl border border-border/40 bg-zinc-950 p-6 font-mono text-xs relative overflow-hidden">
+                          <BorderBeam size={150} duration={8} colorFrom="#ffffff" colorTo="#ffffff20" />
                           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/10 pointer-events-none" />
                           <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-4">
                             <span className="text-[10px] tracking-wider text-zinc-500 uppercase">Extracted Plaintext Payload</span>
@@ -764,7 +771,8 @@ export default function Dashboard() {
                         {/* Bottom row: File bar + Recent */}
                         <div className="grid gap-6 lg:grid-cols-2">
                           {/* File type distribution bar */}
-                          <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
+                          <motion.div variants={item} className="relative overflow-hidden rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
+                            <BorderBeam size={150} duration={10} colorFrom="#6366f1" colorTo="#3b82f6" />
                             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-1">File Type Distribution</p>
                             <p className="text-xs text-foreground/40 mb-4">Analyzed document types</p>
                             {fileTypeBar.length > 0 ? (
@@ -783,7 +791,8 @@ export default function Dashboard() {
                           </motion.div>
 
                           {/* Recent reports list */}
-                          <motion.div variants={item} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
+                          <motion.div variants={item} className="relative overflow-hidden rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur">
+                            <BorderBeam size={150} duration={10} colorFrom="#10b981" colorTo="#8b5cf6" />
                             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-foreground mb-4">Recent Analyses</p>
                             <div className="space-y-2">
                               {reports.slice(0, 5).map((r) => (
@@ -804,7 +813,8 @@ export default function Dashboard() {
 
                         {/* Redirect Banner */}
                         <motion.div variants={item} whileHover={{ y: -3 }}
-                          className="rounded-2xl border border-primary/20 bg-primary/5 p-6 backdrop-blur flex flex-col md:flex-row items-center justify-between gap-6">
+                          className="relative overflow-hidden rounded-2xl border border-primary/20 bg-primary/5 p-6 backdrop-blur flex flex-col md:flex-row items-center justify-between gap-6">
+                          <BorderBeam size={180} duration={8} colorFrom="#3b82f6" colorTo="#8b5cf6" />
                           <div className="space-y-1.5 max-w-2xl text-left">
                             <div className="flex items-center gap-2 text-primary">
                               <TrendingUp className="h-4 w-4" />
@@ -836,6 +846,7 @@ export default function Dashboard() {
                           ].map(({ label, value, sub, icon: Icon, color }) => (
                             <motion.div key={label} variants={item} whileHover={{ y: -3 }}
                               className="rounded-2xl border border-border/40 bg-background/50 p-5 backdrop-blur-sm relative overflow-hidden text-left">
+                              <BorderBeam size={100} duration={8} colorFrom={color} colorTo={`${color}80`} />
                               <div className="flex items-center justify-between mb-2">
                                 <span className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/45">{label}</span>
                                 <div className="p-1.5 rounded-lg" style={{ backgroundColor: color + "15", color }}>

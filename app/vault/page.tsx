@@ -5,6 +5,7 @@ import Header from "@/components/layout/header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { BorderBeam } from "@/components/ui/border-beam";
 import {
   Key, Shield, Copy, Trash2, Search, ArrowLeft, Eye, EyeOff, Database, FileText, LockKeyhole
 } from "lucide-react";
@@ -206,8 +207,9 @@ export default function KeyVaultPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: docIdx * 0.05 }}
-                    className="rounded-2xl border border-border/30 bg-background/40 p-6 space-y-4 shadow-sm backdrop-blur"
+                    className="relative overflow-hidden rounded-2xl border border-border/30 bg-background/40 p-6 space-y-4 shadow-sm backdrop-blur"
                   >
+                    <BorderBeam size={150} duration={8} colorFrom="#3b82f6" colorTo="#8b5cf6" />
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/10 pb-4 gap-4">
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">

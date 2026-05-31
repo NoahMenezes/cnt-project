@@ -5,6 +5,7 @@ import Header from "@/components/layout/header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import { BorderBeam } from "@/components/ui/border-beam";
 import {
   FileText, Search, ChevronUp, ChevronDown, Eye, Download, Trash2,
   X, ChevronLeft, ChevronRight, AlertTriangle, FileSearch,
@@ -60,7 +61,8 @@ function ScoreMiniBar({ score }: { score: number }) {
 function DetailPanel({ report, onClose }: { report: Report; onClose: () => void }) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-      className="rounded-2xl border border-border/40 bg-background/80 backdrop-blur p-6 space-y-5">
+      className="relative overflow-hidden rounded-2xl border border-border/40 bg-background/80 backdrop-blur p-6 space-y-5">
+      <BorderBeam size={180} duration={8} colorFrom="#6366f1" colorTo="#3b82f6" />
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-1">
@@ -283,7 +285,8 @@ export default function ReportsPage() {
 
               {/* Table */}
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.15 }}
-                className="rounded-2xl border border-border/40 bg-background/60 backdrop-blur overflow-hidden">
+                className="relative overflow-hidden rounded-2xl border border-border/40 bg-background/60 backdrop-blur">
+                <BorderBeam size={200} duration={10} colorFrom="#6366f1" colorTo="#3b82f6" />
                 {paged.length === 0 ? (
                   <div className="flex flex-col items-center gap-4 py-20">
                     <FileSearch className="h-12 w-12 text-foreground/20" />
@@ -398,7 +401,8 @@ export default function ReportsPage() {
 
               {/* Cryptographic Keys Section */}
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
-                className="rounded-2xl border border-primary/30 bg-primary/[0.03] backdrop-blur p-6">
+                className="relative overflow-hidden rounded-2xl border border-primary/30 bg-primary/[0.03] backdrop-blur p-6">
+                <BorderBeam size={180} duration={8} colorFrom="#3b82f6" colorTo="#8b5cf6" />
                 <div className="flex items-center gap-3 mb-4">
                   <Key className="h-5 w-5 text-primary" />
                   <h2 className="text-xl font-semibold text-foreground">Stored Cryptographic Keys</h2>

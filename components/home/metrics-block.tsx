@@ -4,12 +4,21 @@ import { motion, type Variants } from "framer-motion";
 import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/card";
 import { FlaskConical, FileSearch, Key, FileDown, ArrowUpRight } from "lucide-react";
+import { BorderBeam } from "@/components/ui/border-beam";
 
 const PhoneModel = dynamic(() => import("@/components/ui/phone-model"), { ssr: false });
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 16 },
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
+};
+
+const getBeamColors = (accent: string) => {
+  if (accent.includes("sky")) return { from: "#38bdf8", to: "#818cf8" };
+  if (accent.includes("violet")) return { from: "#a78bfa", to: "#c084fc" };
+  if (accent.includes("amber")) return { from: "#fbbf24", to: "#f59e0b" };
+  if (accent.includes("emerald")) return { from: "#34d399", to: "#10b981" };
+  return { from: "#38bdf8", to: "#818cf8" };
 };
 
 const infoCards = [
@@ -63,9 +72,16 @@ export function GlassmorphismMinimalMetricsBlock() {
           <div className="space-y-6 flex flex-col justify-center order-2 lg:order-1">
             {infoCards.slice(0, 2).map((card) => {
               const Icon = card.icon;
+              const colors = getBeamColors(card.accent);
               return (
                 <motion.div key={card.title} variants={fadeUp}>
                   <Card className="group relative overflow-hidden rounded-3xl border border-white/5 bg-white/[0.01] p-8 backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:border-white/10 hover:bg-white/[0.02]">
+                    <BorderBeam
+                      size={150}
+                      duration={8}
+                      colorFrom={colors.from}
+                      colorTo={colors.to}
+                    />
                     <div className={`absolute inset-0 bg-gradient-to-br ${card.accent} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`} />
                     <div className="relative z-10 space-y-4">
                       <div className="flex items-center justify-between">
@@ -96,9 +112,16 @@ export function GlassmorphismMinimalMetricsBlock() {
           <div className="space-y-6 flex flex-col justify-center order-3">
             {infoCards.slice(2, 4).map((card) => {
               const Icon = card.icon;
+              const colors = getBeamColors(card.accent);
               return (
                 <motion.div key={card.title} variants={fadeUp}>
                   <Card className="group relative overflow-hidden rounded-3xl border border-white/5 bg-white/[0.01] p-8 backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:border-white/10 hover:bg-white/[0.02]">
+                    <BorderBeam
+                      size={150}
+                      duration={8}
+                      colorFrom={colors.from}
+                      colorTo={colors.to}
+                    />
                     <div className={`absolute inset-0 bg-gradient-to-br ${card.accent} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`} />
                     <div className="relative z-10 space-y-4">
                       <div className="flex items-center justify-between">

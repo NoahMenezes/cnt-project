@@ -5,6 +5,7 @@ import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
+import { BorderBeam } from "@/components/ui/border-beam";
 import {
   Lock, Unlock, Layers, Copy, Eye, EyeOff,
   Download, CheckCircle, AlertTriangle,
@@ -780,8 +781,9 @@ export default function HybridLabPage() {
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur space-y-4"
+                    className="relative overflow-hidden rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur space-y-4"
                   >
+                    <BorderBeam size={150} duration={10} colorFrom="#3b82f6" colorTo="#8b5cf6" />
                     <div>
                       <h2 className="text-sm font-bold text-foreground">Vault Documents</h2>
                       <p className="text-[10px] text-foreground/45 mt-0.5">Select an encrypted document payload to decrypt</p>
@@ -886,7 +888,8 @@ export default function HybridLabPage() {
                       </div>
 
                       {/* Ciphertext Box */}
-                      <div className="rounded-2xl border border-orange-500/20 bg-background/60 p-5 backdrop-blur space-y-3">
+                      <div className="relative overflow-hidden rounded-2xl border border-orange-500/20 bg-background/60 p-5 backdrop-blur space-y-3">
+                        <BorderBeam size={150} duration={8} colorFrom="#f97316" colorTo="#f59e0b" />
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Lock className="h-3.5 w-3.5 text-orange-400" />
@@ -942,7 +945,8 @@ export default function HybridLabPage() {
                       </div>
 
                       {/* Decryption Chamber */}
-                      <div className="rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur space-y-4">
+                      <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-background/60 p-5 backdrop-blur space-y-4">
+                        <BorderBeam size={180} duration={8} colorFrom="#10b981" colorTo="#3b82f6" />
                         <div className="flex items-center justify-between border-b border-border/10 pb-2">
                           <div className="flex items-center gap-2">
                             <Unlock className="h-4 w-4 text-primary" />
@@ -1141,8 +1145,9 @@ export default function HybridLabPage() {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="rounded-2xl border border-primary/25 bg-primary/5 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 backdrop-blur"
+                  className="relative overflow-hidden rounded-2xl border border-primary/25 bg-primary/5 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 backdrop-blur"
                 >
+                  <BorderBeam size={180} duration={8} colorFrom="#3b82f6" colorTo="#8b5cf6" />
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-4.5 w-4.5 text-primary animate-pulse" />
@@ -1174,7 +1179,8 @@ export default function HybridLabPage() {
                 <div className="grid gap-6 lg:grid-cols-2">
 
                   {/* Left Card: Key Wrapping Sandbox */}
-                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-5">
+                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="relative overflow-hidden rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-5">
+                    <BorderBeam size={150} duration={8} colorFrom="#3b82f6" colorTo="#8b5cf6" />
                     <div className="flex items-center justify-between border-b border-border/10 pb-3">
                       <div className="flex items-center gap-2">
                         <Layers className="h-5 w-5 text-blue-400" />
@@ -1276,7 +1282,8 @@ export default function HybridLabPage() {
                 </motion.div>
 
                 {/* Right Card: Hybrid Decryption Sandbox */}
-                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-5">
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="relative overflow-hidden rounded-2xl border border-border/40 bg-background/60 p-6 backdrop-blur space-y-5">
+                  <BorderBeam size={150} duration={8} colorFrom="#10b981" colorTo="#3b82f6" />
                   <div className="flex items-center justify-between border-b border-border/10 pb-3">
                     <div className="flex items-center gap-2">
                       <Unlock className="h-5 w-5 text-emerald-400" />

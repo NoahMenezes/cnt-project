@@ -12,6 +12,7 @@ import {
   Download, Save, RefreshCw, Trash2, Key,
   Bold, Italic, Code2, Database
 } from "lucide-react";
+import { BorderBeam } from "@/components/ui/border-beam";
 import { saveKey, CryptographicKey, syncKeysForUser, saveReport } from "@/lib/store";
 import { useUser } from "@clerk/nextjs";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -806,11 +807,12 @@ export default function OperationPage() {
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`group relative mx-auto w-full rounded-xl border-2 border-dashed p-4 text-center cursor-pointer transition-all duration-300 ${isDragging
+            className={`group relative overflow-hidden mx-auto w-full rounded-xl border-2 border-dashed p-4 text-center cursor-pointer transition-all duration-300 ${isDragging
               ? "border-primary bg-primary/[0.04]"
               : "border-border/30 bg-background/30 hover:border-border/60 hover:bg-foreground/[0.02]"
               }`}
           >
+            <BorderBeam size={100} duration={6} colorFrom="#6366f1" colorTo="#3b82f6" />
             <input
               type="file"
               ref={fileInputRef}
@@ -853,7 +855,8 @@ export default function OperationPage() {
 
           <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
             {/* ── Plaintext Notepad ── */}
-            <div className="rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
+            <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
+              <BorderBeam size={150} duration={8} colorFrom="#6366f1" colorTo="#3b82f6" />
               <div className="flex items-center justify-between border-b border-border/20 pb-3">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-primary" />
@@ -876,7 +879,8 @@ export default function OperationPage() {
             </div>
 
             {/* ── Encrypted Workspace ── */}
-            <div className="rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
+            <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-background/60 p-4 backdrop-blur flex flex-col gap-3">
+              <BorderBeam size={150} duration={8} colorFrom="#f97316" colorTo="#f59e0b" />
               <div className="flex flex-col sm:flex-row items-start sm:items-center border-b border-border/20 pb-3 gap-2 sm:gap-3">
                 <div className="flex items-center justify-start gap-2">
                   <Lock className="h-4 w-4 text-orange-400" />
@@ -946,8 +950,9 @@ export default function OperationPage() {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 30 }}
-                className="rounded-2xl border border-emerald-500/20 bg-background/60 p-6 backdrop-blur flex flex-col gap-4 mt-2"
+                className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-background/60 p-6 backdrop-blur flex flex-col gap-4 mt-2"
               >
+                <BorderBeam size={180} duration={8} colorFrom="#10b981" colorTo="#34d399" />
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-border/15 pb-4 gap-3">
                   <div>
                     <h3 className="text-base font-bold text-foreground flex items-center gap-2">
@@ -975,7 +980,8 @@ export default function OperationPage() {
           </AnimatePresence>
 
           {/* Key Generation Section */}
-          <div className="rounded-xl border border-border/30 bg-foreground/[0.02] p-4 backdrop-blur">
+          <div className="relative overflow-hidden rounded-xl border border-border/30 bg-foreground/[0.02] p-4 backdrop-blur">
+            <BorderBeam size={150} duration={8} colorFrom="#a78bfa" colorTo="#3b82f6" />
             <div className="flex items-center gap-2 mb-3">
               <Key className="h-4 w-4 text-primary" />
               <h2 className="text-sm font-semibold text-foreground">Generate & Store Cryptographic Keys</h2>
@@ -1158,7 +1164,8 @@ export default function OperationPage() {
                   </button>
                 </div>
 
-                <div className="rounded-2xl border border-border/30 bg-background/40 p-5 space-y-4 shadow-sm backdrop-blur">
+                <div className="relative overflow-hidden rounded-2xl border border-border/30 bg-background/40 p-5 space-y-4 shadow-sm backdrop-blur">
+                  <BorderBeam size={150} duration={8} colorFrom="#3b82f6" colorTo="#8b5cf6" />
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/10 pb-3 gap-3">
                     <div className="flex items-center gap-2.5">
                       <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">

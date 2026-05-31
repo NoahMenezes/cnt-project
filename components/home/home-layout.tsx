@@ -13,10 +13,22 @@ import {
   Cpu, Download,
 } from "lucide-react";
 
+import { BorderBeam } from "@/components/ui/border-beam";
+
 // ─── Shared fade-up variant ───────────────────────────────────
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 28 },
   show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" as const } },
+};
+
+const getBeamColors = (accent: string) => {
+  if (accent.includes("sky")) return { from: "#38bdf8", to: "#818cf8" };
+  if (accent.includes("violet")) return { from: "#a78bfa", to: "#c084fc" };
+  if (accent.includes("emerald")) return { from: "#34d399", to: "#10b981" };
+  if (accent.includes("amber")) return { from: "#fbbf24", to: "#f59e0b" };
+  if (accent.includes("rose")) return { from: "#f43f5e", to: "#fda4af" };
+  if (accent.includes("cyan")) return { from: "#06b6d4", to: "#22d3ee" };
+  return { from: "#38bdf8", to: "#818cf8" };
 };
 
 // ─── Feature Cards ────────────────────────────────────────────
@@ -186,10 +198,17 @@ function FeaturesSection() {
         >
           {features.map((f) => {
             const Icon = f.icon;
+            const colors = getBeamColors(f.accent);
             return (
               <motion.div key={f.title} variants={fadeUp}>
                 <Link href={f.href} className="group block h-full">
                   <div className="relative h-full rounded-2xl border border-white/8 bg-white/[0.02] p-6 overflow-hidden transition-all duration-300 hover:border-white/20 hover:bg-white/[0.04] hover:-translate-y-1">
+                    <BorderBeam
+                      size={150}
+                      duration={8}
+                      colorFrom={colors.from}
+                      colorTo={colors.to}
+                    />
                     {/* accent glow */}
                     <div
                       className={`absolute inset-0 bg-gradient-to-br ${f.accent} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
@@ -257,8 +276,14 @@ function TimelineSection() {
                 {/* Card */}
                 <div className="flex-1">
                   <div
-                    className={`rounded-2xl border p-6 transition-all duration-300 hover:-translate-y-1 ${step.color}`}
+                    className={`relative overflow-hidden rounded-2xl border p-6 transition-all duration-300 hover:-translate-y-1 ${step.color}`}
                   >
+                    <BorderBeam
+                      size={150}
+                      duration={8}
+                      colorFrom={getBeamColors(step.color).from}
+                      colorTo={getBeamColors(step.color).to}
+                    />
                     <div className="flex items-center gap-3 mb-3">
                       <div
                         className={`w-9 h-9 rounded-lg border border-white/10 bg-white/5 flex items-center justify-center ${step.iconColor}`}
