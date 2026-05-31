@@ -220,6 +220,7 @@ export default function HybridLabPage() {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [audioPrompt, setAudioPrompt] = useState("");
   const [audioObj, setAudioObj] = useState<HTMLAudioElement | null>(null);
+  const [latestAudioBase64, setLatestAudioBase64] = useState("");
 
   // --- Playground State ---
   const [pgAesKey, setPgAesKey] = useState("");
@@ -691,6 +692,9 @@ export default function HybridLabPage() {
 
       const data = await res.json();
       setAudioPrompt(data.prompt);
+      if (data.audioBase64) {
+        setLatestAudioBase64(data.audioBase64);
+      }
       
       if (data.isFallback) {
         console.log("Using browser text-to-speech fallback...");
@@ -698,16 +702,11 @@ export default function HybridLabPage() {
           window.speechSynthesis.cancel();
           const utterance = new SpeechSynthesisUtterance(data.prompt);
           
-          // Select a premium/clear human voice (prioritizing Julien/Julian or other clear male voices)
+          // Select a premium/clear human voice
           const voices = window.speechSynthesis.getVoices();
           const preferredVoice = voices.find(v => 
-            v.name.includes("Julien") || v.name.includes("Julian")
-          ) || voices.find(v => 
             v.lang.startsWith("en") && 
-            (v.name.includes("Daniel") || v.name.includes("David") || v.name.includes("Microsoft David") || v.name.includes("Male") || v.name.includes("Guy"))
-          ) || voices.find(v => 
-            v.lang.startsWith("en") && 
-            (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Premium") || v.name.includes("Neural"))
+            (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Premium") || v.name.includes("Neural") || v.name.includes("Samantha") || v.name.includes("Daniel") || v.name.includes("David"))
           ) || voices.find(v => v.lang.startsWith("en"));
           
           if (preferredVoice) {
@@ -726,9 +725,8 @@ export default function HybridLabPage() {
           window.speechSynthesis.speak(utterance);
           setIsPlayingAudio(true);
         } else {
-          // Play the synthesized wav/mp3 fallback
-          const mime = data.mimeType || "audio/wav";
-          const audioUrl = `data:${mime};base64,${data.audioBase64}`;
+          // Play the synthesized wav fallback
+          const audioUrl = `data:audio/wav;base64,${data.audioBase64}`;
           audio.src = audioUrl;
           audio.onended = () => {
             setIsPlayingAudio(false);
@@ -741,8 +739,7 @@ export default function HybridLabPage() {
           });
         }
       } else {
-        const mime = data.mimeType || "audio/wav";
-        const audioUrl = `data:${mime};base64,${data.audioBase64}`;
+        const audioUrl = `data:audio/wav;base64,${data.audioBase64}`;
         audio.src = audioUrl;
         audio.onended = () => {
           setIsPlayingAudio(false);
@@ -1615,6 +1612,23 @@ export default function HybridLabPage() {
                   </>
                 )}
               </button>
+
+              {latestAudioBase64 && (
+                <button
+                  onClick={() => {
+                    const link = document.createElement("a");
+                    link.href = `data:audio/wav;base64,${latestAudioBase64}`;
+                    link.download = `${selectedKey?.documentName || "document"}_audio_preview.wav`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  title="Download Audio Preview"
+                  className="flex items-center justify-center p-3.5 rounded-full border border-emerald-500/30 bg-black/95 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50 hover:scale-105 transition-all shadow-[0_8px_30px_rgb(0,0,0,0.5)] active:scale-95"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+              )}
               
               {audioPrompt && (
                 <div className="hidden md:block max-w-xs bg-black/95 border border-border/40 rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.5)] backdrop-blur text-[10px] text-foreground/70 font-mono leading-relaxed line-clamp-3">

@@ -11,7 +11,7 @@ import Link from "next/link";
 import {
   Activity, ChevronRight, Clock, Download,
   Zap, Shield, FileText, AlertTriangle, Lock, Brain, Menu,
-  Copy, Check, TrendingUp, FileSearch, ArrowLeftRight
+  Copy, Check, TrendingUp, FileSearch, ArrowLeftRight, Sparkles, RefreshCw
 } from "lucide-react";
 import {
   CartesianGrid, ResponsiveContainer,
@@ -130,6 +130,108 @@ export default function Dashboard() {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<"summary" | "visualizations">("summary");
   const { user } = useUser();
+
+  // --- Audio Preview States ---
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [audioPrompt, setAudioPrompt] = useState("");
+  const [audioObj, setAudioObj] = useState<HTMLAudioElement | null>(null);
+  const [latestAudioBase64, setLatestAudioBase64] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (audioObj) {
+        audioObj.pause();
+      }
+    };
+  }, [audioObj]);
+
+  const handleDashboardAudioClick = async () => {
+    if (isPlayingAudio) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      if (audioObj) {
+        audioObj.pause();
+      }
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    // Pre-create Audio context object to register user click interaction
+    const audio = audioObj || new Audio();
+    try {
+      audio.play().catch(() => {});
+      audio.pause();
+    } catch {}
+
+    setIsGeneratingAudio(true);
+    try {
+      const res = await fetch("http://localhost:8000/generate/dashboard-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user?.id || "default-local-user",
+          totalDocuments: reports.length,
+          avgSecurityScore: avgScore,
+          totalVulnerabilities: vulnCount,
+          recentDocuments: reports.map(r => r.fileName)
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to generate dashboard audio preview.");
+      }
+
+      const data = await res.json();
+      setAudioPrompt(data.prompt);
+      if (data.audioBase64) {
+        setLatestAudioBase64(data.audioBase64);
+      }
+
+      if (data.isFallback) {
+        console.log("Using browser text-to-speech fallback...");
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(data.prompt);
+          
+          const voices = window.speechSynthesis.getVoices();
+          const preferredVoice = voices.find(v => 
+            v.lang.startsWith("en") && 
+            (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Premium") || v.name.includes("Neural") || v.name.includes("Samantha") || v.name.includes("Daniel") || v.name.includes("David"))
+          ) || voices.find(v => v.lang.startsWith("en"));
+          
+          if (preferredVoice) utterance.voice = preferredVoice;
+          utterance.rate = 0.95;
+          utterance.pitch = 1.0;
+          utterance.onend = () => setIsPlayingAudio(false);
+          utterance.onerror = (e) => {
+            console.error("Speech synthesis error:", e);
+            setIsPlayingAudio(false);
+          };
+          window.speechSynthesis.speak(utterance);
+          setIsPlayingAudio(true);
+        } else {
+          const audioUrl = `data:audio/wav;base64,${data.audioBase64}`;
+          audio.src = audioUrl;
+          audio.onended = () => setIsPlayingAudio(false);
+          setAudioObj(audio);
+          audio.play().then(() => setIsPlayingAudio(true)).catch(console.error);
+        }
+      } else {
+        const audioUrl = `data:audio/wav;base64,${data.audioBase64}`;
+        audio.src = audioUrl;
+        audio.onended = () => setIsPlayingAudio(false);
+        setAudioObj(audio);
+        audio.play().then(() => setIsPlayingAudio(true)).catch(console.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error generating audio preview. Please make sure the backend server is running.");
+    } finally {
+      setIsGeneratingAudio(false);
+    }
+  };
 
   useEffect(() => {
     if (user?.id) {
@@ -461,7 +563,50 @@ export default function Dashboard() {
                       : `Monitoring ${reports.length} document${reports.length > 1 ? "s" : ""} — avg security score ${avgScore}% · Last analysis: ${relTime(reports[0].analysisDate)}`}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    onClick={handleDashboardAudioClick}
+                    disabled={isGeneratingAudio}
+                    variant="outline"
+                    className="rounded-full gap-2 border-primary/30 hover:border-primary/50 text-primary bg-background/60 backdrop-blur h-10 px-4 text-xs font-semibold"
+                  >
+                    {isGeneratingAudio ? (
+                      <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+                    ) : isPlayingAudio ? (
+                      <>
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                        <span>Stop Briefing</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+                        <span>Audio Dashboard Overview</span>
+                      </>
+                    )}
+                  </Button>
+
+                  {latestAudioBase64 && (
+                    <Button
+                      onClick={() => {
+                        const link = document.createElement("a");
+                        link.href = `data:audio/wav;base64,${latestAudioBase64}`;
+                        link.download = `dashboard_security_briefing_${Date.now()}.wav`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      title="Download Dashboard Audio Overview"
+                      variant="outline"
+                      size="icon"
+                      className="rounded-full border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50 bg-background/60 backdrop-blur h-10 w-10"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  )}
+
                   <Button variant="outline" size="icon" className="rounded-full border-border/40 bg-background/60 backdrop-blur" aria-label="Download">
                     <Download className="h-4 w-4" />
                   </Button>

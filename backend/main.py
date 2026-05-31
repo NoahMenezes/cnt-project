@@ -8,7 +8,7 @@ import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import chromadb
 from dotenv import load_dotenv
 
@@ -1031,20 +1031,20 @@ def generate_audio_preview(req: AudioPreviewRequest):
     # Clean markdown, backticks, asterisks, hashes, etc. to prevent TTS spelling them out
     summary_script = summary_script.replace("`", "").replace("*", "").replace("#", "").replace("_", "")
 
+    hf_token = os.environ.get("HUGGINGFACE_ACCESS_TOKEN") or os.environ.get("HF_API_TOKEN")
     audio_base64 = ""
     hf_success = False
-    mime_type = "audio/wav"
-
+    
     if hf_token:
         try:
-            print("Generating audio using Hugging Face facebook/mms-tts-eng...")
+            print("Generating audio using Hugging Face espnet/kan-bayashi_ljspeech_vits...")
             hf_headers = {
                 "Authorization": f"Bearer {hf_token}",
                 "Content-Type": "application/json"
             }
             hf_payload = {"inputs": summary_script}
             hf_res = requests.post(
-                "https://api-inference.huggingface.co/models/facebook/mms-tts-eng",
+                "https://api-inference.huggingface.co/models/espnet/kan-bayashi_ljspeech_vits",
                 headers=hf_headers,
                 json=hf_payload,
                 timeout=15.0
@@ -1053,7 +1053,6 @@ def generate_audio_preview(req: AudioPreviewRequest):
                 import base64
                 audio_base64 = base64.b64encode(hf_res.content).decode("utf-8")
                 hf_success = True
-                mime_type = "audio/wav"
                 print("Hugging Face audio generation successful!")
             else:
                 print(f"Hugging Face status {hf_res.status_code}: {hf_res.text}")
@@ -1096,7 +1095,6 @@ def generate_audio_preview(req: AudioPreviewRequest):
             
             import base64
             audio_base64 = base64.b64encode(audio_buffer.getvalue()).decode("utf-8")
-            mime_type = "audio/wav"
             print("Fallback synthesized audio generated successfully!")
         except Exception as e:
             print(f"Fallback audio generation failed: {e}")
@@ -1135,7 +1133,211 @@ def generate_audio_preview(req: AudioPreviewRequest):
         "status": "success",
         "prompt": summary_script,
         "audioBase64": audio_base64,
-        "mimeType": mime_type,
+        "isFallback": not hf_success
+    }
+
+class DashboardAudioRequest(BaseModel):
+    userId: str
+    totalDocuments: int
+    avgSecurityScore: int
+    totalVulnerabilities: int
+    recentDocuments: List[str]
+
+@app.post("/generate/dashboard-audio")
+def generate_dashboard_audio_preview(req: DashboardAudioRequest):
+    # Construct base summary script locally in case AI is offline or has fallbacks
+    recent_docs_str = ", ".join(req.recentDocuments[:3]) if req.recentDocuments else "none"
+    
+    if req.totalDocuments == 0:
+        summary_script = (
+            "Welcome to the Crypto Forensics Lab. Currently, your dashboard is waiting for security telemetry data. "
+            "To generate a complete cryptographic audio overview, please navigate to the Operation Lab, "
+            "upload and analyze a document, and save your keys. Once your first forensic audit report is logged, "
+            "we will present a comprehensive real-time analysis of your environment's protection standards."
+        )
+    else:
+        status_eval = "excellent" if req.avgSecurityScore >= 80 else ("moderate" if req.avgSecurityScore >= 60 else "weak")
+        summary_script = (
+            f"This is your live Crypto Forensics Lab dashboard security briefing. "
+            f"We are currently monitoring a total of {req.totalDocuments} documents. "
+            f"Your laboratory average security score stands at a {status_eval} {req.avgSecurityScore} percent. "
+            f"Across these files, a total of {req.totalVulnerabilities} cryptographic vulnerabilities or warning flags have been identified. "
+            f"Your most recent analyses include {recent_docs_str}. "
+            f"To maintain a highly resilient security posture, we recommend rotating symmetric AES session keys regularly "
+            f"and ensuring all active keys are securely recorded to the local Vault."
+        )
+
+    ai_success = False
+    
+    # 1. Try Groq (Llama 3.3)
+    groq_api_key = os.environ.get("GROQ_API_KEY")
+    if groq_api_key:
+        try:
+            print("Generating dashboard narration prompt using Groq...")
+            headers = {
+                "Authorization": f"Bearer {groq_api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            system_prompt = (
+                "You are an articulate, professional, and reassuring AI cryptographic security auditor. "
+                "You output ONLY the raw spoken security briefing narration. "
+                "Do not include any headers, markdown, section labels, or parenthetical remarks. Just output the clean speech text."
+            )
+            
+            llm_prompt = (
+                f"Generate a professional, encouraging spoken security briefing for the dashboard telemetry.\n"
+                f"Make sure to explain in detail so that the speech takes about 1 minute to read (aim for about 150 to 180 words).\n\n"
+                f"The real-time metrics of the dashboard are:\n"
+                f"- Total Documents Analyzed: {req.totalDocuments}\n"
+                f"- Average Laboratory Security Score: {req.avgSecurityScore}%\n"
+                f"- Total Identified Vulnerabilities: {req.totalVulnerabilities}\n"
+                f"- Recent Documents: {recent_docs_str}\n\n"
+                f"Please cover the following points in your briefing:\n"
+                f"1. A welcoming professional introduction stating the purpose of the security briefing.\n"
+                f"2. Present the key metrics clearly (total documents, average score, and number of vulnerabilities).\n"
+                f"3. Evaluate the active risk profile (e.g. if the average score is over 80, praise the excellent security posture; if lower, advise caution and key rotation).\n"
+                f"4. Give professional recommendations to further harden the systems, such as implementing hybrid RSA-AES encryption and maintaining strict key Vault hygiene."
+            )
+            
+            payload = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": llm_prompt}
+                ]
+            }
+            res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=12.0
+            )
+            if res.status_code == 200:
+                summary_script = res.json()["choices"][0]["message"]["content"].strip()
+                ai_success = True
+                print("Generated dashboard script with Groq:", summary_script)
+            else:
+                print(f"Groq API call returned code {res.status_code}: {res.text}")
+        except Exception as e:
+            print(f"Failed to generate dashboard script using Groq: {e}")
+
+    # 2. Try OpenRouter (Llama 3 Instruct Free fallback)
+    openrouter_api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not ai_success and openrouter_api_key:
+        try:
+            print("Generating dashboard narration prompt using OpenRouter...")
+            headers = {
+                "Authorization": f"Bearer {openrouter_api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "http://localhost:3000",
+                "X-Title": "CipherScope"
+            }
+            llm_prompt = (
+                f"Generate a professional, encouraging spoken security briefing for the dashboard telemetry (aim for 150 to 180 words).\n"
+                f"Key metrics:\n"
+                f"- Total Documents: {req.totalDocuments}\n"
+                f"- Average Security Score: {req.avgSecurityScore}%\n"
+                f"- Total Vulnerabilities: {req.totalVulnerabilities}\n"
+                f"- Recent Documents: {recent_docs_str}\n"
+                f"Analyze the risk profile and recommend key rotation. Output only the spoken narration text."
+            )
+            payload = {
+                "model": "meta-llama/llama-3-8b-instruct:free",
+                "messages": [
+                    {"role": "user", "content": llm_prompt}
+                ]
+            }
+            res = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=12.0
+            )
+            if res.status_code == 200:
+                summary_script = res.json()["choices"][0]["message"]["content"].strip()
+                ai_success = True
+                print("Generated dashboard script with OpenRouter:", summary_script)
+            else:
+                print(f"OpenRouter API call returned code {res.status_code}: {res.text}")
+        except Exception as e:
+            print(f"Failed to generate dashboard script using OpenRouter: {e}")
+
+    # Clean markdown, backticks, asterisks, hashes, etc. to prevent TTS spelling them out
+    summary_script = summary_script.replace("`", "").replace("*", "").replace("#", "").replace("_", "")
+
+    hf_token = os.environ.get("HUGGINGFACE_ACCESS_TOKEN") or os.environ.get("HF_API_TOKEN")
+    audio_base64 = ""
+    hf_success = False
+    
+    if hf_token:
+        try:
+            print("Generating dashboard audio using Hugging Face espnet/kan-bayashi_ljspeech_vits...")
+            hf_headers = {
+                "Authorization": f"Bearer {hf_token}",
+                "Content-Type": "application/json"
+            }
+            hf_payload = {"inputs": summary_script}
+            hf_res = requests.post(
+                "https://api-inference.huggingface.co/models/espnet/kan-bayashi_ljspeech_vits",
+                headers=hf_headers,
+                json=hf_payload,
+                timeout=15.0
+            )
+            if hf_res.status_code == 200:
+                import base64
+                audio_base64 = base64.b64encode(hf_res.content).decode("utf-8")
+                hf_success = True
+                print("Hugging Face dashboard audio generation successful!")
+            else:
+                print(f"Hugging Face status {hf_res.status_code}: {hf_res.text}")
+        except Exception as e:
+            print(f"Failed to call Hugging Face: {e}")
+            
+    if not hf_success:
+        try:
+            print("Generating fallback synthesized audio file...")
+            import io
+            import wave
+            import struct
+            
+            sample_rate = 8000
+            num_samples = sample_rate * 10
+            audio_buffer = io.BytesIO()
+            
+            with wave.open(audio_buffer, 'wb') as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(sample_rate)
+                
+                for i in range(num_samples):
+                    t = i / sample_rate
+                    freq1 = 220 + 50 * math.sin(2 * math.pi * 0.5 * t)
+                    freq2 = 440 + 100 * math.cos(2 * math.pi * 0.2 * t)
+                    
+                    val = 0.5 * math.sin(2 * math.pi * freq1 * t) + 0.3 * math.sin(2 * math.pi * freq2 * t)
+                    if int(t * 2) % 2 == 0:
+                        val += 0.2 * math.sin(2 * math.pi * 880 * t)
+                        
+                    if t < 0.5:
+                        val *= (t / 0.5)
+                    elif t > 9.5:
+                        val *= ((10.0 - t) / 0.5)
+                        
+                    val = max(-1.0, min(1.0, val))
+                    sample = int(val * 32767)
+                    wav.writeframesraw(struct.pack('<h', sample))
+            
+            import base64
+            audio_base64 = base64.b64encode(audio_buffer.getvalue()).decode("utf-8")
+            print("Fallback synthesized audio generated successfully!")
+        except Exception as e:
+            print(f"Fallback audio generation failed: {e}")
+
+    return {
+        "status": "success",
+        "prompt": summary_script,
+        "audioBase64": audio_base64,
         "isFallback": not hf_success
     }
 
