@@ -1,152 +1,121 @@
 "use client";
 
 import { motion, type Variants } from "framer-motion";
-
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { ArrowUpRight, Users, Zap } from "lucide-react";
 import dynamic from "next/dynamic";
+import { Card } from "@/components/ui/card";
+import { FlaskConical, FileSearch, Key, FileDown, ArrowUpRight } from "lucide-react";
 
 const PhoneModel = dynamic(() => import("@/components/ui/phone-model"), { ssr: false });
-
-const metrics = [
-  {
-    label: "Analyses Performed",
-    value: "1.2k+",
-    delta: "Active",
-    description: "files securely analyzed for encryption configuration strengths",
-  },
-  {
-    label: "Weak Keys Flagged",
-    value: "142",
-    delta: "Critical",
-    description: "deprecated RSA moduli and ECB block ciphers identified",
-  },
-  {
-    label: "Average Security Score",
-    value: "71.4%",
-    delta: "Moderate",
-    description: "overall strength of Hybrid RSA-AES setups evaluated",
-  },
-  {
-    label: "Analysis Processing Time",
-    value: "<1.2s",
-    delta: "Optimal",
-    description: "average duration to parse entropy and detect file patterns",
-  },
-];
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 16 },
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
 };
 
+const infoCards = [
+  {
+    title: "Interactive Hybrid Lab",
+    description: "Explore cryptographic workflows in real-time. Generate public/private keys, encrypt payloads, transmit securely, and log modular arithmetic details.",
+    icon: FlaskConical,
+    accent: "from-sky-500/10 to-transparent",
+    iconColor: "text-sky-400",
+  },
+  {
+    title: "Entropy & Audit Engine",
+    description: "Analyze uploaded documents to calculate Shannon entropy, identify repeated byte ciphers, and flag deprecated RSA public modulus sizes.",
+    icon: FileSearch,
+    accent: "from-violet-500/10 to-transparent",
+    iconColor: "text-violet-400",
+  },
+  {
+    title: "Secure Key Vault",
+    description: "Inspect and manage your active AES session keys and RSA pairs. Securely browse stored keys and their corresponding encryption context.",
+    icon: Key,
+    accent: "from-amber-500/10 to-transparent",
+    iconColor: "text-amber-400",
+  },
+  {
+    title: "Forensic Reporting",
+    description: "Download comprehensive security audit reports in JSON or print-ready PDF formats. Summarize entropy scores and recommendations instantly.",
+    icon: FileDown,
+    accent: "from-emerald-500/10 to-transparent",
+    iconColor: "text-emerald-400",
+  },
+];
+
 export function GlassmorphismMinimalMetricsBlock() {
   return (
-    <section className="relative overflow-hidden px-6 py-24 lg:py-32">
+    <section className="relative overflow-hidden px-6 pt-12 lg:pt-16 pb-0 flex flex-col items-center justify-center">
+      {/* Background glow orbs */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute left-0 top-0 h-[380px] w-[380px] rounded-full bg-foreground/[0.03] blur-[120px]" />
-        <div className="absolute right-0 top-1/2 h-[420px] w-[420px] -translate-y-1/2 rounded-full bg-foreground/[0.025] blur-[140px]" />
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-foreground/[0.02] blur-[120px] opacity-40" />
       </div>
 
-      <div className="mx-auto max-w-7xl space-y-16">
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, amount: 0.3 }}
-          className="mx-auto max-w-3xl text-center"
-        >
-          <Badge
-            variant="outline"
-            className="mb-4 inline-flex items-center gap-2 rounded-full border-border/50 bg-background/55 px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-foreground/70 backdrop-blur"
-          >
-            <Zap className="h-3.5 w-3.5" />
-            cryptographic audit
-          </Badge>
-          <h2 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
-            Real-time security analytics and forensic insights
-          </h2>
-          <p className="mt-5 text-base leading-relaxed text-foreground/70 md:text-lg">
-            Monitor file entropy, inspect RSA configurations, and analyze key derivation complexities on one unified interface.
-          </p>
-        </motion.div>
-
+      <div className="mx-auto w-full max-w-7xl">
         <motion.div
           initial="hidden"
           whileInView="show"
-          viewport={{ once: true, amount: 0.2 }}
+          viewport={{ once: true, amount: 0.1 }}
           transition={{ staggerChildren: 0.08 }}
-          className="grid gap-8 lg:grid-cols-3 items-center py-10"
+          className="grid gap-8 grid-cols-1 lg:grid-cols-3 items-center py-10"
         >
-          {/* Left Column */}
-          <div className="space-y-6">
-            {metrics.slice(0, 2).map((metric) => (
-              <motion.div key={metric.label} variants={fadeUp}>
-                <Card className="group relative overflow-hidden rounded-3xl border border-border/50 bg-background/45 p-8 backdrop-blur-2xl transition-transform duration-300 hover:-translate-y-1">
-                  <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.04] via-transparent to-transparent" />
-                  <div className="relative z-10 space-y-5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium uppercase tracking-[0.25em] text-foreground/60">
-                        {metric.label}
-                      </span>
-                      <ArrowUpRight className="h-4 w-4 text-foreground/40 transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1" />
+          {/* Left Column - Information Cards */}
+          <div className="space-y-6 flex flex-col justify-center order-2 lg:order-1">
+            {infoCards.slice(0, 2).map((card) => {
+              const Icon = card.icon;
+              return (
+                <motion.div key={card.title} variants={fadeUp}>
+                  <Card className="group relative overflow-hidden rounded-3xl border border-white/5 bg-white/[0.01] p-8 backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:border-white/10 hover:bg-white/[0.02]">
+                    <div className={`absolute inset-0 bg-gradient-to-br ${card.accent} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`} />
+                    <div className="relative z-10 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className={`w-10 h-10 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center ${card.iconColor}`}>
+                          <Icon size={18} />
+                        </div>
+                        <ArrowUpRight className="h-4 w-4 text-white/20 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white/60" />
+                      </div>
+                      <h3 className="text-white font-semibold text-lg">{card.title}</h3>
+                      <p className="text-slate-400 text-sm leading-relaxed">{card.description}</p>
                     </div>
-                    <div className="flex items-end gap-3">
-                      <span className="text-5xl font-semibold tracking-tight text-foreground">
-                        {metric.value}
-                      </span>
-                      <span className="rounded-full border border-border/40 bg-background/60 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-foreground/60 backdrop-blur">
-                        {metric.delta}
-                      </span>
-                    </div>
-                    <p className="text-sm leading-relaxed text-foreground/70">
-                      {metric.description}
-                    </p>
-                  </div>
-                </Card>
-              </motion.div>
-            ))}
+                  </Card>
+                </motion.div>
+              );
+            })}
           </div>
 
-          {/* Center Column: 3D Phone Model */}
-          <motion.div variants={fadeUp} className="relative h-[650px] w-full hidden lg:flex items-center justify-center">
+          {/* Center Column - 3D Phone Model */}
+          <motion.div
+            variants={fadeUp}
+            className="relative h-[600px] w-full flex items-center justify-center order-1 lg:order-2"
+          >
             <div className="absolute inset-0 rounded-[4rem] bg-gradient-to-b from-primary/5 to-transparent blur-3xl -z-10" />
             <PhoneModel />
           </motion.div>
 
-          {/* Right Column */}
-          <div className="space-y-4">
-            {metrics.slice(2, 4).map((metric) => (
-              <motion.div key={metric.label} variants={fadeUp}>
-                <Card className="group relative overflow-hidden rounded-3xl border border-border/50 bg-background/45 p-8 backdrop-blur-2xl transition-transform duration-300 hover:-translate-y-1">
-                  <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.04] via-transparent to-transparent" />
-                  <div className="relative z-10 space-y-5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium uppercase tracking-[0.25em] text-foreground/60">
-                        {metric.label}
-                      </span>
-                      <ArrowUpRight className="h-4 w-4 text-foreground/40 transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1" />
+          {/* Right Column - Information Cards */}
+          <div className="space-y-6 flex flex-col justify-center order-3">
+            {infoCards.slice(2, 4).map((card) => {
+              const Icon = card.icon;
+              return (
+                <motion.div key={card.title} variants={fadeUp}>
+                  <Card className="group relative overflow-hidden rounded-3xl border border-white/5 bg-white/[0.01] p-8 backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:border-white/10 hover:bg-white/[0.02]">
+                    <div className={`absolute inset-0 bg-gradient-to-br ${card.accent} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`} />
+                    <div className="relative z-10 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className={`w-10 h-10 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center ${card.iconColor}`}>
+                          <Icon size={18} />
+                        </div>
+                        <ArrowUpRight className="h-4 w-4 text-white/20 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white/60" />
+                      </div>
+                      <h3 className="text-white font-semibold text-lg">{card.title}</h3>
+                      <p className="text-slate-400 text-sm leading-relaxed">{card.description}</p>
                     </div>
-                    <div className="flex items-end gap-3">
-                      <span className="text-5xl font-semibold tracking-tight text-foreground">
-                        {metric.value}
-                      </span>
-                      <span className="rounded-full border border-border/40 bg-background/60 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-foreground/60 backdrop-blur">
-                        {metric.delta}
-                      </span>
-                    </div>
-                    <p className="text-sm leading-relaxed text-foreground/70">
-                      {metric.description}
-                    </p>
-                  </div>
-                </Card>
-              </motion.div>
-            ))}
+                  </Card>
+                </motion.div>
+              );
+            })}
           </div>
         </motion.div>
-
       </div>
     </section>
   );

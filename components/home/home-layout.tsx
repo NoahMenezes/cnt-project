@@ -8,9 +8,9 @@ import { motion, type Variants } from "motion/react";
 import Link from "next/link";
 import {
   Lock, FileSearch, FlaskConical, BarChart3,
-  BookOpen, ShieldCheck, Key, Layers, Zap,
-  ArrowRight, CheckCircle, GitBranch, Upload,
-  Cpu, Download, Eye,
+  BookOpen, Key, Layers,
+  ArrowRight, CheckCircle, Upload,
+  Cpu, Download,
 } from "lucide-react";
 
 // ─── Shared fade-up variant ───────────────────────────────────
@@ -141,17 +141,7 @@ const timelineSteps = [
   },
 ];
 
-// ─── Technology Pillars ────────────────────────────────────────
-const pillars = [
-  {
-    icon: ShieldCheck,
-    label: "RSA Public-Key Cryptography",
-    sub: "Secure key exchange",
-  },
-  { icon: Zap, label: "AES Symmetric Encryption", sub: "High-speed data encryption" },
-  { icon: GitBranch, label: "Hybrid Encryption Model", sub: "Best of both worlds" },
-  { icon: Eye, label: "Entropy Analysis Engine", sub: "Randomness & pattern detection" },
-];
+
 
 // ─── Section wrapper helpers ───────────────────────────────────
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -165,7 +155,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // ─── Features Section ──────────────────────────────────────────
 function FeaturesSection() {
   return (
-    <section className="relative px-4 sm:px-6 py-16 sm:py-24 lg:py-32">
+    <section className="relative px-4 sm:px-6 pt-12 sm:pt-16 lg:pt-20 pb-16 sm:pb-24 lg:pb-32">
       <div className="mx-auto max-w-6xl">
         <motion.div
           variants={fadeUp}
@@ -300,35 +290,7 @@ function TimelineSection() {
   );
 }
 
-// ─── Tech Pillars Strip ────────────────────────────────────────
-function PillarsStrip() {
-  return (
-    <section className="relative px-4 sm:px-6 py-12 sm:py-16 border-y border-white/5">
-      <div className="mx-auto max-w-5xl">
-        <motion.div
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ staggerChildren: 0.1 }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6"
-        >
-          {pillars.map((p) => {
-            const Icon = p.icon;
-            return (
-              <motion.div key={p.label} variants={fadeUp} className="text-center">
-                <div className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center mx-auto mb-3 text-white/60">
-                  <Icon size={18} />
-                </div>
-                <p className="text-white text-sm font-medium">{p.label}</p>
-                <p className="text-white/40 text-xs mt-0.5">{p.sub}</p>
-              </motion.div>
-            );
-          })}
-        </motion.div>
-      </div>
-    </section>
-  );
-}
+
 
 // ─── About / Project Section ───────────────────────────────────
 function AboutSection() {
@@ -470,9 +432,8 @@ export default function AgencyHeroSection() {
         </div>
 
         {/* Scrollable content stacks over hero */}
-        <div className="relative z-10 bg-zinc-950 shadow-[0_-40px_80px_rgba(0,0,0,0.9)] rounded-t-[3rem] border-t border-zinc-900">
+        <div className="relative z-10 mt-[100px] bg-zinc-950 shadow-[0_-40px_80px_rgba(0,0,0,0.9)] rounded-t-[3rem] border-t border-zinc-900">
           <GlassmorphismMinimalMetricsBlock />
-          <PillarsStrip />
           <FeaturesSection />
           <TimelineSection />
           <AboutSection />
