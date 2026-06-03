@@ -82,5 +82,21 @@
   }
   body {
     @apply bg-background text-foreground antialiased font-sans;
+    background-color: #030712 !important; /* Deep dark cosmic background */
   }
+}
+
+/* --- Particles Visibility & Glassmorphism System --- */
+
+/* Completely transparent main wrappers so the particle canvas is fully visible */
+.min-h-screen.bg-background,
+.min-h-screen.bg-black,
+main.bg-background,
+div.sticky.bg-black {
+  background-color: transparent !important;
+}
+
+/* Force the scrollable content wrapper to be a solid dark color to cover sticky backgrounds */
+.bg-zinc-950 {
+  background-color: #09090b !important;
 }

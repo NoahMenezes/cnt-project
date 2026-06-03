@@ -173,8 +173,8 @@ function aesDecryptSim(ciphertext: string, keyHex?: string): string {
       return parts[0];
     }
     return decoded;
-  } catch (e: any) {
-    if (e.message && e.message.includes("Mismatched Key Error")) {
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message && e.message.includes("Mismatched Key Error")) {
       throw e;
     }
     return "";

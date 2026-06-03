@@ -84,7 +84,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 const DONUT_COLORS = ["#ef4444", "#f97316", "#f59e0b", "#3b82f6", "#10b981"];
-const ENTROPY_COLORS = ["#ef4444", "#f97316", "#f59e0b", "#10b981", "#06b6d4"];
+
 const TOOLTIP_STYLE = {
   backgroundColor: "rgba(9, 9, 11, 0.9)",
   border: "1px solid rgba(255, 255, 255, 0.1)",
@@ -1021,7 +1021,7 @@ export default function Dashboard() {
                                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.2} vertical={false} />
                                   <XAxis dataKey="name" stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} />
                                   <YAxis domain={[0, 100]} stroke="var(--foreground)" opacity={0.4} style={{ fontSize: 10 }} width={30} />
-                                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v, _, p) => [`Score: ${v}/100 (${(p.payload as any)?.fileName || ""})`, "Assessment"]} />
+                                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v, _, p) => [`Score: ${v}/100 (${(p.payload as { fileName?: string })?.fileName || ""})`, "Assessment"]} />
                                   <ReferenceLine y={60} stroke="#f97316" strokeDasharray="4 4" label={{ value: "Target", fill: "#f97316", fontSize: 9, position: "insideBottomRight" }} />
                                   <Area type="monotone" dataKey="score" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#scoreGrad)" />
                                 </AreaChart>
