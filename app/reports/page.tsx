@@ -238,10 +238,10 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-background">
+    <div className="relative min-h-screen bg-transparent">
       <Header navigationData={NAV} />
       <div className="pt-20">
-        <main className="relative min-h-[calc(100vh-80px)] bg-background">
+        <main className="relative min-h-[calc(100vh-80px)] bg-transparent">
           <div className="absolute inset-0 -z-10 pointer-events-none">
             <div className="absolute left-1/2 top-0 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-primary/[0.03] blur-[140px]" />
           </div>

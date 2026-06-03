@@ -117,7 +117,7 @@ export default function KeyVaultPage() {
   const aesKeysCount = keys.filter(k => k.keyType === "AES_SESSION").length;
 
   return (
-    <div className="relative min-h-screen bg-background">
+    <div className="relative min-h-screen bg-transparent">
       <Header navigationData={NAV} />
 
       <main className="relative z-10 pt-20 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">

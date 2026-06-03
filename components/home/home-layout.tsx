@@ -459,16 +459,16 @@ export default function AgencyHeroSection() {
   ];
 
   return (
-    <div className="relative min-h-screen bg-black">
+    <div className="relative min-h-screen bg-transparent">
       <Header navigationData={navigationData} />
       <main className="relative">
-        {/* Sticky hero */}
-        <div className="sticky top-0 h-screen w-full flex items-center justify-center z-0 overflow-hidden bg-black">
+        {/* Hero */}
+        <div className="relative min-h-screen w-full flex items-center justify-center z-10 overflow-hidden bg-transparent">
           <HeroSection />
         </div>
 
-        {/* Scrollable content stacks over hero */}
-        <div className="relative z-10 mt-[100px] bg-zinc-950 shadow-[0_-40px_80px_rgba(0,0,0,0.9)] rounded-t-[3rem] border-t border-zinc-900">
+        {/* Scrollable content follows hero normally */}
+        <div className="relative z-10 bg-transparent rounded-t-[3rem] border-t border-zinc-900/50 backdrop-blur-sm">
           <GlassmorphismMinimalMetricsBlock />
           <FeaturesSection />
           <TimelineSection />

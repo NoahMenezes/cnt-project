@@ -460,7 +460,7 @@ export default function Dashboard() {
 
   if (!hasMounted) {
     return (
-      <div className="relative min-h-screen bg-background">
+      <div className="relative min-h-screen bg-transparent">
         <Header navigationData={navData} />
         <div className="pt-20 flex items-center justify-center min-h-[calc(100vh-80px)]">
           <div className="animate-pulse text-foreground/40 text-sm">Loading dashboard…</div>
@@ -472,10 +472,10 @@ export default function Dashboard() {
   const isEmpty = reports.length === 0;
 
   return (
-    <div className="relative min-h-screen bg-background">
+    <div className="relative min-h-screen bg-transparent">
       <Header navigationData={navData} />
       <div className="pt-20">
-        <main className="relative min-h-[calc(100vh-80px)] bg-background overflow-hidden">
+        <main className="relative min-h-[calc(100vh-80px)] bg-transparent overflow-hidden">
           {/* Background blobs */}
           <div className="absolute inset-0 -z-10 pointer-events-none">
             <div className="absolute left-1/2 top-0 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-foreground/[0.03] blur-[140px]" />

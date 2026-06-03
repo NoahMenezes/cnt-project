@@ -2,7 +2,7 @@ import { SignIn } from "@clerk/nextjs";
 
 export default function AuthPage() {
   return (
-    <div className="flex items-center justify-center min-h-screen bg-black">
+    <div className="flex items-center justify-center min-h-screen bg-transparent">
       <SignIn
         routing="hash"
         forceRedirectUrl="/"

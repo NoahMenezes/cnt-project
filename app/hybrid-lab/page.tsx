@@ -890,7 +890,7 @@ export default function HybridLabPage() {
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-background">
+    <div className="relative min-h-screen bg-transparent">
       <Header navigationData={NAV} />
       <div className="pt-20">
         <main className="relative min-h-[calc(100vh-80px)]">

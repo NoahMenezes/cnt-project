@@ -729,7 +729,7 @@ export default function OperationPage() {
   if (!hasMounted) return null;
 
   return (
-    <div className="relative min-h-screen bg-background">
+    <div className="relative min-h-screen bg-transparent">
       <Header navigationData={navData} />
 
       <main className="relative z-10 pt-6 pb-16 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
