@@ -12,8 +12,8 @@ export default function ScanScreen() {
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
-    Camera.requestCameraPermissionsAsync().then(({ status }: { status: string }) => {
-      setHasPermission(status === "granted");
+    Camera.requestCameraPermissionsAsync().then((response) => {
+      setHasPermission(response.status === "granted");
     });
   }, []);
 
