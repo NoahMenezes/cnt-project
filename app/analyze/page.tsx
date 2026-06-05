@@ -10,8 +10,9 @@ import {
   Upload, FileText, AlertTriangle, CheckCircle, Shield,
   Copy, Lock, Zap,
   Download, Save, RefreshCw, Trash2, Key,
-  Bold, Italic, Code2, Database, LayoutDashboard
+  Bold, Italic, Code2, Database, LayoutDashboard, Smartphone
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import { BorderBeam } from "@/components/ui/border-beam";
 import { saveKey, CryptographicKey, syncKeysForUser, saveReport } from "@/lib/store";
 import { useUser } from "@clerk/nextjs";
@@ -363,6 +364,7 @@ const safeSetLocal = (key: string, value: string) => {
 
 export default function OperationPage() {
   const { user } = useUser();
+  const router = useRouter();
 
   useEffect(() => {
     if (user?.id) {
@@ -377,8 +379,30 @@ export default function OperationPage() {
     { title: "Hybrid Lab", href: "/hybrid-lab" },
     { title: "Reports", href: "/reports" },
     { title: "Key Vault", href: "/vault" },
+    { title: "Mobile Pair", href: "/mobile-pair" },
   ];
-  const router = useRouter();
+
+  // ─── Send to Mobile State ───
+  const [mobileDevices, setMobileDevices] = useState<{id: string; device_name: string}[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+  const [isSendingToMobile, setIsSendingToMobile] = useState(false);
+  const [sendMobileStatus, setSendMobileStatus] = useState<"idle" | "success" | "error">("idle");
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from("user_devices")
+      .select("id, device_name")
+      .eq("user_id", user.id)
+      .then(({ data }) => {
+        if (data) {
+          setMobileDevices(data);
+          if (data.length > 0) setSelectedDeviceId(data[0].id);
+        }
+      });
+  }, [user?.id]);
+
+
 
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -473,6 +497,41 @@ export default function OperationPage() {
   const addLog = useCallback((msg: string, type: "info" | "success" | "warn" | "error" = "info") => {
     console.log(`[${type}] ${msg}`);
   }, []);
+
+  const handleSendToMobile = useCallback(async () => {
+    if (!ciphertext || !selectedDeviceId) return;
+    setIsSendingToMobile(true);
+    setSendMobileStatus("idle");
+    try {
+      const res = await fetch("/api/send-to-mobile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deviceId: selectedDeviceId,
+          encryptedPayload: ciphertext,
+          encryptedSessionKey: encryptedSessionKey ?? "",
+          aesIV: aesIV ?? "",
+          aesMode: aesMode,
+          documentName: uploadedFile ? uploadedFile.name : "Operation Lab Document",
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSendMobileStatus("success");
+        addLog(`Payload sent to "${data.deviceName}" — real-time delivery in progress.`, "success");
+        setTimeout(() => setSendMobileStatus("idle"), 4000);
+      } else {
+        setSendMobileStatus("error");
+        addLog(data.error || "Failed to send to mobile.", "error");
+        setTimeout(() => setSendMobileStatus("idle"), 4000);
+      }
+    } catch {
+      setSendMobileStatus("error");
+      setTimeout(() => setSendMobileStatus("idle"), 4000);
+    } finally {
+      setIsSendingToMobile(false);
+    }
+  }, [ciphertext, selectedDeviceId, encryptedSessionKey, aesIV, aesMode, uploadedFile, addLog]);
 
   const createRSAKeyPair = useCallback(() => {
     const pair = generateRSAPairSim(rsaBits);
@@ -923,6 +982,52 @@ export default function OperationPage() {
                     }} className="border-red-500/20 hover:bg-red-500/10 text-red-400 text-xs h-8 flex-1 sm:flex-initial">
                       <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Clear
                     </Button>
+                    {/* ── Send to Mobile ── */}
+                    {mobileDevices.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+                        <select
+                          value={selectedDeviceId}
+                          onChange={(e) => setSelectedDeviceId(e.target.value)}
+                          className="bg-background border border-border/40 rounded-lg px-2 py-1 text-[11px] text-foreground focus:outline-none focus:border-primary h-8 max-w-[120px]"
+                        >
+                          {mobileDevices.map((d) => (
+                            <option key={d.id} value={d.id}>{d.device_name}</option>
+                          ))}
+                        </select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSendToMobile}
+                          disabled={isSendingToMobile}
+                          className={`text-xs h-8 flex-1 sm:flex-initial transition-all ${
+                            sendMobileStatus === "success"
+                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                              : sendMobileStatus === "error"
+                              ? "border-red-500/30 bg-red-500/10 text-red-400"
+                              : "border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20"
+                          }`}
+                        >
+                          {isSendingToMobile ? (
+                            <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                          ) : sendMobileStatus === "success" ? (
+                            <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+                          ) : (
+                            <Smartphone className="h-3.5 w-3.5 mr-1.5" />
+                          )}
+                          {sendMobileStatus === "success" ? "Sent!" : sendMobileStatus === "error" ? "Failed" : "Send"}
+                        </Button>
+                      </div>
+                    )}
+                    {mobileDevices.length === 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push("/mobile-pair")}
+                        className="border-indigo-500/20 text-indigo-400/60 text-xs h-8 flex-1 sm:flex-initial hover:bg-indigo-500/10"
+                      >
+                        <Smartphone className="h-3.5 w-3.5 mr-1.5" /> Pair Mobile
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>

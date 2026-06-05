@@ -55,3 +55,15 @@ venv/
 # Local database ignore
 backend/chroma_db/
 backend/__pycache__/
+
+# Expo/React Native mobile project ignore
+cipher-vault-mobile/node_modules/
+cipher-vault-mobile/.expo/
+cipher-vault-mobile/dist/
+cipher-vault-mobile/npm-debug.log*
+cipher-vault-mobile/yarn-debug.log*
+cipher-vault-mobile/yarn-error.log*
+cipher-vault-mobile/.env
+cipher-vault-mobile/.env.local
+cipher-vault-mobile/.env.*.local
+
