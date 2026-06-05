@@ -28,7 +28,6 @@ export default function ScanScreen() {
     setProcessing(true);
 
     try {
-      // QR payload format: { deviceId, deviceName, userId }
       const payload = JSON.parse(data) as {
         deviceId: string;
         deviceName: string;
@@ -43,7 +42,6 @@ export default function ScanScreen() {
         return;
       }
 
-      // Verify the device exists in Supabase
       const { data: device, error } = await supabase
         .from("user_devices")
         .select("id, device_name")
@@ -60,19 +58,18 @@ export default function ScanScreen() {
         return;
       }
 
-      // Save device info locally
       await saveDeviceId(device.id);
       await saveDeviceName(device.device_name);
 
       Alert.alert(
         "✅ Device Paired!",
-        `This phone is now linked as "${device.device_name}". Encrypted payloads from the web app will appear in your Secure Inbox.`,
+        `This phone is now linked as "${device.device_name}". Encrypted payloads will appear in your Secure Inbox.`,
         [{ text: "Go to Inbox", onPress: () => router.replace("/inbox") }]
       );
     } catch {
       Alert.alert(
         "Scan Error",
-        "Could not read QR code. Please make sure you are scanning the CipherVault pairing QR code.",
+        "Could not read QR code. Please scan the CipherVault pairing QR code.",
         [{ text: "Try Again", onPress: () => setScanned(false) }]
       );
     } finally {
@@ -103,7 +100,7 @@ export default function ScanScreen() {
 
   return (
     <View className="flex-1 bg-[#0a0a0f]">
-      {/* Blue glow accent */}
+      {/* Blue glow */}
       <View
         className="absolute bottom-0 right-0 w-56 h-56 rounded-full opacity-15"
         style={{
@@ -121,14 +118,16 @@ export default function ScanScreen() {
           Scan Pairing QR Code
         </Text>
         <Text className="text-slate-500 text-xs">
-          Open the web app → Operation Lab → "Pair Mobile Device" and scan the QR code shown.
+          Go to the web app → Mobile Pair → Generate QR Code, then scan it here.
         </Text>
       </View>
 
-      {/* Camera Viewfinder */}
-      <View className="mx-5 rounded-2xl overflow-hidden border border-[#1e1e2e]" style={{ height: 340 }}>
+      <View
+        className="mx-5 rounded-2xl overflow-hidden border border-[#1e1e2e]"
+        style={{ height: 340 }}
+      >
         <CameraView
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           facing="back"
           onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}

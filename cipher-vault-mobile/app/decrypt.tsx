@@ -11,16 +11,7 @@ import {
   Clipboard,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-  Key,
-  Eye,
-  EyeOff,
-  Unlock,
-  CheckCircle,
-  Copy,
-  Download,
-  Trash2,
-} from "lucide-react-native";
+import { Key, Eye, EyeOff, Unlock, CheckCircle, Copy, Download, Trash2 } from "lucide-react-native";
 import { supabase } from "@/lib/supabase";
 import type { EphemeralTransfer } from "@/lib/supabase";
 import { getPrivateKey, savePrivateKey } from "@/lib/secureStore";
@@ -32,7 +23,6 @@ export default function DecryptScreen() {
 
   const [transfer, setTransfer] = useState<EphemeralTransfer | null>(null);
   const [loadingTransfer, setLoadingTransfer] = useState(!!transferId);
-
   const [privateKey, setPrivateKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
@@ -75,15 +65,12 @@ export default function DecryptScreen() {
     setDecrypting(true);
     setDecryptError("");
     setDecryptedText("");
-
     await new Promise((r) => setTimeout(r, 600));
-
     const result = hybridDecrypt(
       transfer.encrypted_payload,
       transfer.encrypted_session_key,
       privateKey
     );
-
     if (result.success) {
       setDecryptedText(result.plaintext);
     } else {
@@ -100,14 +87,13 @@ export default function DecryptScreen() {
     Alert.alert("✅ Saved", "RSA Private Key securely stored on this device.");
   }
 
-  async function handleShare() {
-    if (!decryptedText) return;
-    await Share.share({ message: decryptedText });
-  }
-
   async function handleCopy() {
     Clipboard.setString(decryptedText);
     Alert.alert("Copied", "Decrypted text copied to clipboard.");
+  }
+
+  async function handleShare() {
+    await Share.share({ message: decryptedText });
   }
 
   async function handleBurnAfterReading() {
@@ -121,10 +107,7 @@ export default function DecryptScreen() {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            await supabase
-              .from("ephemeral_transfers")
-              .delete()
-              .eq("id", transfer.id);
+            await supabase.from("ephemeral_transfers").delete().eq("id", transfer.id);
             router.replace("/inbox");
           },
         },
@@ -142,7 +125,6 @@ export default function DecryptScreen() {
 
   return (
     <View className="flex-1 bg-[#0a0a0f]">
-      {/* Blue glow accent */}
       <View
         className="absolute top-0 right-0 w-56 h-56 rounded-full opacity-15"
         style={{
@@ -177,16 +159,11 @@ export default function DecryptScreen() {
                 </Text>
               </View>
               <View className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20">
-                <Text className="text-[10px] font-mono text-blue-400">
-                  RSA-WRAPPED
-                </Text>
+                <Text className="text-[10px] font-mono text-blue-400">RSA-WRAPPED</Text>
               </View>
             </View>
             <View className="mt-3 p-3 rounded-xl bg-orange-500/5 border border-orange-500/10">
-              <Text
-                className="text-[10px] font-mono text-orange-400/60"
-                numberOfLines={3}
-              >
+              <Text className="text-[10px] font-mono text-orange-400/60" numberOfLines={3}>
                 {transfer.encrypted_payload.substring(0, 120)}…
               </Text>
             </View>
@@ -207,9 +184,7 @@ export default function DecryptScreen() {
                 onPress={() => setKeyImportMode(true)}
                 className="px-2 py-1 rounded-lg bg-indigo-500/10"
               >
-                <Text className="text-[11px] text-indigo-400 font-semibold">
-                  Update Key
-                </Text>
+                <Text className="text-[11px] text-indigo-400 font-semibold">Update Key</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -232,7 +207,7 @@ export default function DecryptScreen() {
                   placeholder="-----BEGIN PRIVATE KEY-----"
                   placeholderTextColor="#334155"
                   secureTextEntry={!showKey}
-                  className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-xl p-3 font-mono text-[11px] text-orange-400 leading-5"
+                  className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-xl p-3 font-mono text-[11px] text-orange-400"
                   style={{ minHeight: 120, textAlignVertical: "top" }}
                 />
                 <TouchableOpacity
@@ -271,16 +246,12 @@ export default function DecryptScreen() {
             {decrypting ? (
               <View className="flex-row items-center gap-2">
                 <ActivityIndicator color="white" size="small" />
-                <Text className="text-white font-bold text-sm">
-                  Decrypting…
-                </Text>
+                <Text className="text-white font-bold text-sm">Decrypting…</Text>
               </View>
             ) : (
               <View className="flex-row items-center gap-2">
                 <Unlock size={18} color="white" />
-                <Text className="text-white font-bold text-sm">
-                  Decrypt Payload
-                </Text>
+                <Text className="text-white font-bold text-sm">Decrypt Payload</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -293,7 +264,7 @@ export default function DecryptScreen() {
           </View>
         )}
 
-        {/* Decrypted Output */}
+        {/* Result */}
         {decryptedText !== "" && (
           <View className="rounded-2xl border border-emerald-500/30 bg-[#111118] p-4 mb-4">
             <View className="flex-row items-center gap-2 mb-3">
@@ -333,7 +304,6 @@ export default function DecryptScreen() {
           </View>
         )}
 
-        {/* Standalone key management when no transfer */}
         {!transfer && (
           <View className="rounded-2xl border border-[#1e1e2e] bg-[#111118] p-4">
             <Text className="text-xs text-slate-500 text-center leading-5">
@@ -343,9 +313,7 @@ export default function DecryptScreen() {
               onPress={() => router.push("/inbox")}
               className="mt-3 py-2.5 px-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 items-center"
             >
-              <Text className="text-indigo-400 text-sm font-semibold">
-                Open Inbox
-              </Text>
+              <Text className="text-indigo-400 text-sm font-semibold">Open Inbox</Text>
             </TouchableOpacity>
           </View>
         )}

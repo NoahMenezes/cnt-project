@@ -1,13 +1,8 @@
 /**
- * Crypto utilities for CipherVault Mobile
- *
- * Strategy: RSA-AES Hybrid (simulated, matching the web app)
- * - RSA: modular exponentiation over BigInt (same as web)
- * - AES: base64 + SALT verification (same as web)
- * - Private keys stored in SecureStore
+ * CipherVault Mobile — Hybrid RSA-AES Decryption
+ * Mirrors web app's crypto.ts for cross-platform consistency.
  */
 
-// ── BigInt RSA helpers (mirror of web app) ────────────────────────────────────
 function modPow(base: bigint, exp: bigint, mod: bigint): bigint {
   let res = BigInt(1);
   base = base % mod;
@@ -39,7 +34,6 @@ function parsePEMParams(pem: string): Record<string, string> | null {
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => l && !l.startsWith("---"));
-    if (lines.length === 0) return null;
     for (const line of lines) {
       try {
         const decoded = atob(
@@ -76,7 +70,6 @@ export function extractRSAPrivateNumbers(
   }
 }
 
-// ── AES Decryption (mirror of web app's aesDecryptSim) ─────────────────────
 export function aesDecryptSim(ciphertext: string, keyHex?: string): string {
   try {
     const cleaned = ciphertext.trim().replace(/\s+/g, "");
@@ -87,9 +80,7 @@ export function aesDecryptSim(ciphertext: string, keyHex?: string): string {
       if (keyHex) {
         const expectedSalt = keyHex.substring(0, 6);
         if (parts[1] !== expectedSalt) {
-          throw new Error(
-            "Key mismatch: The session key does not match this ciphertext."
-          );
+          throw new Error("Key mismatch: The session key does not match.");
         }
       }
       return parts[0];
@@ -108,7 +99,6 @@ function isRsaWrappedCiphertext(text: string): boolean {
   return chunks.length > 1 && chunks.every((c) => /^\d+$/.test(c.trim()));
 }
 
-// ── Full Hybrid Decrypt (RSA unwrap AES key → AES decrypt payload) ──────────
 export function hybridDecrypt(
   ciphertext: string,
   encryptedSessionKey: string,
@@ -120,12 +110,10 @@ export function hybridDecrypt(
       return {
         success: false,
         plaintext: "",
-        error:
-          "Could not read the RSA Private Key. Make sure you copied it completely.",
+        error: "Could not read the RSA Private Key. Make sure you copied it completely.",
       };
     }
     const { d, n } = parsed;
-
     const cleanText = (text: string) =>
       text.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "");
 
@@ -136,32 +124,25 @@ export function hybridDecrypt(
         aesCiphertext = rsaDecryptString(ciphertext, d, n);
       }
       const plaintext = aesDecryptSim(aesCiphertext, aesKeyHex);
-      if (plaintext) {
-        return { success: true, plaintext: cleanText(plaintext) };
-      }
+      if (plaintext) return { success: true, plaintext: cleanText(plaintext) };
     }
 
     if (!encryptedSessionKey && ciphertext) {
       const plaintext = aesDecryptSim(ciphertext);
-      if (plaintext) {
-        return { success: true, plaintext: cleanText(plaintext) };
-      }
+      if (plaintext) return { success: true, plaintext: cleanText(plaintext) };
     }
 
     if (isRsaWrappedCiphertext(ciphertext)) {
       const inner = rsaDecryptString(ciphertext, d, n);
       const tryAes = aesDecryptSim(inner);
       const plaintext = tryAes || inner;
-      if (plaintext.trim()) {
-        return { success: true, plaintext: cleanText(plaintext) };
-      }
+      if (plaintext.trim()) return { success: true, plaintext: cleanText(plaintext) };
     }
 
     return {
       success: false,
       plaintext: "",
-      error:
-        "Decryption returned empty. The private key may not match the encryption key.",
+      error: "Decryption returned empty. The private key may not match.",
     };
   } catch (err) {
     return {

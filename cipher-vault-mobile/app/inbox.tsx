@@ -63,19 +63,17 @@ export default function InboxScreen() {
           filter: `device_id=eq.${deviceId}`,
         },
         (payload) => {
-          setTransfers((prev) => prev.filter((t) => t.id !== payload.old.id));
+          setTransfers((prev) => prev.filter((t) => t.id !== (payload.old as { id: string }).id));
         }
       )
       .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [deviceId]);
 
   async function handleDelete(id: string) {
     Alert.alert(
       "Delete Payload",
-      "This will permanently delete this encrypted payload from the server.",
+      "Permanently delete this encrypted payload from the server?",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -90,8 +88,7 @@ export default function InboxScreen() {
   }
 
   function formatDate(iso: string) {
-    const d = new Date(iso);
-    return d.toLocaleDateString("en-IN", {
+    return new Date(iso).toLocaleDateString("en-IN", {
       day: "numeric",
       month: "short",
       hour: "2-digit",
@@ -121,9 +118,7 @@ export default function InboxScreen() {
           onPress={() => router.push("/scan")}
           className="mt-6 px-6 py-3 rounded-xl bg-indigo-500/20 border border-indigo-500/30"
         >
-          <Text className="text-indigo-400 font-semibold text-sm">
-            Scan QR Code
-          </Text>
+          <Text className="text-indigo-400 font-semibold text-sm">Scan QR Code</Text>
         </TouchableOpacity>
       </View>
     );
@@ -131,7 +126,6 @@ export default function InboxScreen() {
 
   return (
     <View className="flex-1 bg-[#0a0a0f]">
-      {/* Blue glow */}
       <View
         className="absolute top-0 left-0 w-48 h-48 rounded-full opacity-10"
         style={{
@@ -149,7 +143,6 @@ export default function InboxScreen() {
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Row */}
         <View className="flex-row items-center justify-between mb-4">
           <View className="flex-row items-center gap-2">
             <Inbox size={16} color="#6366f1" />
@@ -158,7 +151,7 @@ export default function InboxScreen() {
             </Text>
           </View>
           <TouchableOpacity
-            onPress={() => fetchTransfers(deviceId!)}
+            onPress={() => fetchTransfers(deviceId)}
             className="p-2 rounded-lg bg-[#111118] border border-[#1e1e2e]"
           >
             <RefreshCw size={14} color="#94a3b8" />
@@ -194,7 +187,10 @@ export default function InboxScreen() {
                       <Lock size={18} color="#6366f1" />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-semibold text-white mb-0.5" numberOfLines={1}>
+                      <Text
+                        className="text-sm font-semibold text-white mb-0.5"
+                        numberOfLines={1}
+                      >
                         {transfer.document_name || "Encrypted Payload"}
                       </Text>
                       <Text className="text-[11px] text-slate-600">
@@ -204,7 +200,6 @@ export default function InboxScreen() {
                     <ChevronRight size={16} color="#475569" />
                   </View>
                 </TouchableOpacity>
-                {/* Cipher preview */}
                 <View className="mx-4 mb-3 p-2.5 rounded-lg bg-orange-500/5 border border-orange-500/10">
                   <Text
                     className="text-[10px] font-mono text-orange-400/60"
@@ -213,7 +208,6 @@ export default function InboxScreen() {
                     {transfer.encrypted_payload.substring(0, 80)}…
                   </Text>
                 </View>
-                {/* Delete button */}
                 <TouchableOpacity
                   onPress={() => handleDelete(transfer.id)}
                   className="flex-row items-center justify-center gap-2 py-2.5 border-t border-[#1e1e2e] active:opacity-70"

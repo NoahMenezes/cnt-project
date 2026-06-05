@@ -16,18 +16,9 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="scan"
-          options={{ title: "Scan QR Code", headerShown: true }}
-        />
-        <Stack.Screen
-          name="decrypt"
-          options={{ title: "Decrypt Payload", headerShown: true }}
-        />
-        <Stack.Screen
-          name="inbox"
-          options={{ title: "Secure Inbox", headerShown: true }}
-        />
+        <Stack.Screen name="scan" options={{ title: "Scan QR Code" }} />
+        <Stack.Screen name="inbox" options={{ title: "Secure Inbox" }} />
+        <Stack.Screen name="decrypt" options={{ title: "Decrypt Payload" }} />
       </Stack>
     </>
   );
