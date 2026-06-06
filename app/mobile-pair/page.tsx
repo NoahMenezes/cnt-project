@@ -23,8 +23,6 @@ const NAV = [
   { title: "Dashboard", href: "/dashboard" },
   { title: "Operation Lab", href: "/analyze" },
   { title: "Hybrid Lab", href: "/hybrid-lab" },
-  { title: "Reports", href: "/reports" },
-  { title: "Key Vault", href: "/vault" },
   { title: "Mobile Pair", href: "/mobile-pair", isActive: true },
 ];
 

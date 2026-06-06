@@ -12,13 +12,14 @@ import {
   Download, Save, RefreshCw, Trash2, Key,
   Bold, Italic, Code2, Database, LayoutDashboard, Smartphone
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { BorderBeam } from "@/components/ui/border-beam";
+import { supabase } from "@/lib/supabase";
 import { saveKey, CryptographicKey, syncKeysForUser, saveReport } from "@/lib/store";
 import { useUser } from "@clerk/nextjs";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import { QRCodeSVG } from "qrcode.react";
 
 const SUPPORTED_FORMATS = [".txt", ".pdf", ".docx", ".json", ".csv"];
 
@@ -377,30 +378,51 @@ export default function OperationPage() {
     { title: "Dashboard", href: "/dashboard" },
     { title: "Operation Lab", href: "/analyze", isActive: true },
     { title: "Hybrid Lab", href: "/hybrid-lab" },
-    { title: "Reports", href: "/reports" },
-    { title: "Key Vault", href: "/vault" },
     { title: "Mobile Pair", href: "/mobile-pair" },
   ];
 
-  // ─── Send to Mobile State ───
-  const [mobileDevices, setMobileDevices] = useState<{id: string; device_name: string}[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
-  const [isSendingToMobile, setIsSendingToMobile] = useState(false);
-  const [sendMobileStatus, setSendMobileStatus] = useState<"idle" | "success" | "error">("idle");
+  // ─── Direct Mobile Sync State ───
+  const [localIP, setLocalIP] = useState("localhost");
+  const [syncDevice, setSyncDevice] = useState<{ id: string; device_name: string } | null>(null);
+  const [transferId, setTransferId] = useState<string>("");
+  const [syncingTransfer, setSyncingTransfer] = useState(false);
 
   useEffect(() => {
-    if (!user?.id) return;
+    fetch("/api/local-ip")
+      .then((res) => res.json())
+      .then((data) => setLocalIP(data.ip || "localhost"))
+      .catch(() => {});
+  }, []);
+
+  // Fetch or auto-create a default device for the user to support direct QR sync
+  useEffect(() => {
+    const userId = user?.id || "default-local-user";
     supabase
       .from("user_devices")
       .select("id, device_name")
-      .eq("user_id", user.id)
-      .then(({ data }) => {
-        if (data) {
-          setMobileDevices(data);
-          if (data.length > 0) setSelectedDeviceId(data[0].id);
+      .eq("user_id", userId)
+      .then(async ({ data, error }) => {
+        if (!error && data && data.length > 0) {
+          setSyncDevice(data[0]);
+        } else {
+          // Auto-create a default sync device
+          const { data: newDev, error: createError } = await supabase
+            .from("user_devices")
+            .insert({
+              user_id: userId,
+              device_name: "Direct Sync Device",
+              public_key: "pending",
+            })
+            .select()
+            .single();
+          if (!createError && newDev) {
+            setSyncDevice(newDev);
+          }
         }
       });
   }, [user?.id]);
+
+
 
 
 
@@ -490,6 +512,38 @@ export default function OperationPage() {
   const [generatedKeysDisplay, setGeneratedKeysDisplay] = useState<GeneratedKeyDisplay[]>(OP_CACHE.generatedKeysDisplay);
   useEffect(() => { OP_CACHE.generatedKeysDisplay = generatedKeysDisplay; safeSetLocal("op_generatedKeysDisplay", JSON.stringify(generatedKeysDisplay)); }, [generatedKeysDisplay]);
 
+  // Sync encrypted payload to Supabase database when it changes
+  useEffect(() => {
+    if (!ciphertext || !syncDevice?.id) {
+      setTransferId("");
+      return;
+    }
+
+    setSyncingTransfer(true);
+    const payload = {
+      device_id: syncDevice.id,
+      encrypted_payload: ciphertext,
+      encrypted_session_key: encryptedSessionKey || "",
+      aes_iv: aesIV || "",
+      aes_mode: aesMode,
+      document_name: uploadedFile ? uploadedFile.name : "Encrypted Document",
+    };
+
+    supabase
+      .from("ephemeral_transfers")
+      .insert(payload)
+      .select("id")
+      .single()
+      .then(({ data, error }) => {
+        if (!error && data) {
+          setTransferId(data.id);
+        } else {
+          console.error("Failed to sync ephemeral transfer to database:", error);
+        }
+        setSyncingTransfer(false);
+      });
+  }, [ciphertext, encryptedSessionKey, aesIV, aesMode, uploadedFile, syncDevice?.id]);
+
   const hasLoggedRealtimeRef = useRef(false);
   const hasLoggedCipherRealtimeRef = useRef(false);
   const skipNextPlaintextEncryptionRef = useRef(false);
@@ -498,40 +552,7 @@ export default function OperationPage() {
     console.log(`[${type}] ${msg}`);
   }, []);
 
-  const handleSendToMobile = useCallback(async () => {
-    if (!ciphertext || !selectedDeviceId) return;
-    setIsSendingToMobile(true);
-    setSendMobileStatus("idle");
-    try {
-      const res = await fetch("/api/send-to-mobile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          deviceId: selectedDeviceId,
-          encryptedPayload: ciphertext,
-          encryptedSessionKey: encryptedSessionKey ?? "",
-          aesIV: aesIV ?? "",
-          aesMode: aesMode,
-          documentName: uploadedFile ? uploadedFile.name : "Operation Lab Document",
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setSendMobileStatus("success");
-        addLog(`Payload sent to "${data.deviceName}" — real-time delivery in progress.`, "success");
-        setTimeout(() => setSendMobileStatus("idle"), 4000);
-      } else {
-        setSendMobileStatus("error");
-        addLog(data.error || "Failed to send to mobile.", "error");
-        setTimeout(() => setSendMobileStatus("idle"), 4000);
-      }
-    } catch {
-      setSendMobileStatus("error");
-      setTimeout(() => setSendMobileStatus("idle"), 4000);
-    } finally {
-      setIsSendingToMobile(false);
-    }
-  }, [ciphertext, selectedDeviceId, encryptedSessionKey, aesIV, aesMode, uploadedFile, addLog]);
+
 
   const createRSAKeyPair = useCallback(() => {
     const pair = generateRSAPairSim(rsaBits);
@@ -982,52 +1003,6 @@ export default function OperationPage() {
                     }} className="border-red-500/20 hover:bg-red-500/10 text-red-400 text-xs h-8 flex-1 sm:flex-initial">
                       <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Clear
                     </Button>
-                    {/* ── Send to Mobile ── */}
-                    {mobileDevices.length > 0 && (
-                      <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
-                        <select
-                          value={selectedDeviceId}
-                          onChange={(e) => setSelectedDeviceId(e.target.value)}
-                          className="bg-background border border-border/40 rounded-lg px-2 py-1 text-[11px] text-foreground focus:outline-none focus:border-primary h-8 max-w-[120px]"
-                        >
-                          {mobileDevices.map((d) => (
-                            <option key={d.id} value={d.id}>{d.device_name}</option>
-                          ))}
-                        </select>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleSendToMobile}
-                          disabled={isSendingToMobile}
-                          className={`text-xs h-8 flex-1 sm:flex-initial transition-all ${
-                            sendMobileStatus === "success"
-                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
-                              : sendMobileStatus === "error"
-                              ? "border-red-500/30 bg-red-500/10 text-red-400"
-                              : "border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20"
-                          }`}
-                        >
-                          {isSendingToMobile ? (
-                            <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                          ) : sendMobileStatus === "success" ? (
-                            <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
-                          ) : (
-                            <Smartphone className="h-3.5 w-3.5 mr-1.5" />
-                          )}
-                          {sendMobileStatus === "success" ? "Sent!" : sendMobileStatus === "error" ? "Failed" : "Send"}
-                        </Button>
-                      </div>
-                    )}
-                    {mobileDevices.length === 0 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push("/mobile-pair")}
-                        className="border-indigo-500/20 text-indigo-400/60 text-xs h-8 flex-1 sm:flex-initial hover:bg-indigo-500/10"
-                      >
-                        <Smartphone className="h-3.5 w-3.5 mr-1.5" /> Pair Mobile
-                      </Button>
-                    )}
                   </div>
                 )}
               </div>
@@ -1429,13 +1404,65 @@ export default function OperationPage() {
                   saveKey(aesKeyObj, user?.id || "default-local-user");
                 }
                 addLog("Workspace keys successfully saved to Vault.", "success");
-                router.push("/vault");
+                router.push("/dashboard");
               }}
               size="sm"
               className="h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 rounded-lg shadow flex items-center gap-1.5"
             >
-              <Save className="h-3.5 w-3.5" /> Save Keys & Open Vault
+              <Save className="h-3.5 w-3.5" /> Save Keys
             </Button>
+          </div>
+
+          {/* Mobile QR Code Sync Section */}
+          <div className="relative overflow-hidden rounded-xl border border-border/30 bg-foreground/[0.02] p-4 backdrop-blur mt-4">
+            <BorderBeam size={150} duration={8} colorFrom="#818cf8" colorTo="#6366f1" />
+            <div className="flex items-center gap-2 mb-3">
+              <Smartphone className="h-4 w-4 text-indigo-400" />
+              <h2 className="text-sm font-semibold text-foreground">Sync with Mobile Node</h2>
+            </div>
+            
+            {!ciphertext ? (
+              <div className="flex flex-col items-center justify-center p-6 border border-dashed border-border/40 rounded-xl bg-background/20 text-center">
+                <Smartphone className="h-8 w-8 text-foreground/20 mb-2" />
+                <p className="text-xs font-semibold text-foreground/50">No Active Encryption</p>
+                <p className="text-[10px] text-foreground/40 mt-1 max-w-[280px]">
+                  Upload a document, configure your ASK/RASK keys, and run the hybrid encryption first to generate a mobile sync QR code.
+                </p>
+              </div>
+            ) : syncingTransfer || !transferId ? (
+              <div className="flex flex-col items-center justify-center p-6 border border-indigo-500/20 rounded-xl bg-indigo-950/10 text-center gap-3">
+                <RefreshCw className="h-6 w-6 text-indigo-400 animate-spin" />
+                <p className="text-xs font-semibold text-indigo-300">Synchronizing Payload</p>
+                <p className="text-[10px] text-foreground/45 max-w-[280px]">
+                  Storing encrypted package details securely in your Supabase database to produce a lightweight QR link...
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col md:flex-row items-center justify-center gap-6 bg-indigo-950/10 border border-indigo-500/10 rounded-xl p-5">
+                <div className="bg-white p-3 rounded-xl shadow-xl flex items-center justify-center">
+                  <QRCodeSVG
+                    value={`http://${localIP}:8081/decrypt?transferId=${transferId}`}
+                    size={160}
+                    level="L"
+                    includeMargin={false}
+                  />
+                </div>
+                <div className="text-center md:text-left space-y-2 flex-1">
+                  <h4 className="text-indigo-400 font-bold text-xs flex items-center justify-center md:justify-start gap-1.5">
+                    <Zap className="h-3.5 w-3.5" /> Direct Mobile Decrypt Node
+                  </h4>
+                  <p className="text-[11px] text-foreground/60 leading-relaxed">
+                    Scan this QR code with your phone&apos;s camera app to open the React Native mobile UI in your web browser. 
+                  </p>
+                  <div className="bg-background/40 border border-border/10 rounded-lg p-2.5 font-mono text-[9px] text-foreground/40 break-all select-all">
+                    http://{localIP}:8081/decrypt?transferId={transferId}
+                  </div>
+                  <p className="text-[9px] text-indigo-400/70">
+                    Ensure both your phone and this computer are connected to the same local network.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>

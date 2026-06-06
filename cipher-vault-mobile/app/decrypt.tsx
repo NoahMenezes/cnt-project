@@ -12,12 +12,12 @@ import AnimatedCard from "@/components/AnimatedCard";
 import CustomSheet from "@/components/CustomSheet";
 
 export default function DecryptScreen() {
-  const { transferId } = useLocalSearchParams<{ transferId?: string }>();
+  const { transferId, rawTransferStr } = useLocalSearchParams<{ transferId?: string, rawTransferStr?: string }>();
   const router = useRouter();
   const { colors } = useColorScheme();
 
   const [transfer, setTransfer] = useState<EphemeralTransfer | null>(null);
-  const [loadingTransfer, setLoadingTransfer] = useState(!!transferId);
+  const [loadingTransfer, setLoadingTransfer] = useState(!!transferId || !!rawTransferStr);
   const [privateKey, setPrivateKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
@@ -38,6 +38,18 @@ export default function DecryptScreen() {
   }, []);
 
   useEffect(() => {
+    if (rawTransferStr) {
+      try {
+        const data = JSON.parse(rawTransferStr);
+        setTransfer(data as EphemeralTransfer);
+        setLoadingTransfer(false);
+      } catch (e) {
+        setDecryptError("Invalid raw payload");
+        setLoadingTransfer(false);
+      }
+      return;
+    }
+
     if (!transferId) return;
     supabase
       .from("ephemeral_transfers")
@@ -48,7 +60,7 @@ export default function DecryptScreen() {
         if (!error && data) setTransfer(data as EphemeralTransfer);
         setLoadingTransfer(false);
       });
-  }, [transferId]);
+  }, [transferId, rawTransferStr]);
 
   async function handleDecrypt() {
     if (!privateKey.trim()) {

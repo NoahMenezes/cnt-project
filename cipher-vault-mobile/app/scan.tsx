@@ -24,14 +24,27 @@ export default function ScanScreen() {
     setProcessing(true);
 
     try {
+      if (data.startsWith("ciphervault://decrypt")) {
+        const urlParams = new URLSearchParams(data.split("?")[1]);
+        const rawTransferStr = urlParams.get("rawTransferStr");
+        if (rawTransferStr) {
+          router.replace({
+            pathname: "/decrypt",
+            params: { rawTransferStr },
+          });
+          return;
+        }
+      }
+
       const payload = JSON.parse(data) as {
         deviceId?: string;
         deviceName?: string;
         userId?: string;
         transferId?: string;
+        rawTransfer?: any;
       };
 
-      if (payload.transferId) {
+      if (payload.transferId || payload.rawTransfer) {
         Alert.alert(
           "🔒 Payload Detected",
           "An encrypted document transfer has been scanned. Load in Decryption Node?",
@@ -40,9 +53,13 @@ export default function ScanScreen() {
             {
               text: "Load",
               onPress: () => {
+                const params: any = {};
+                if (payload.transferId) params.transferId = payload.transferId;
+                if (payload.rawTransfer) params.rawTransferStr = JSON.stringify(payload.rawTransfer);
+                
                 router.replace({
                   pathname: "/decrypt",
-                  params: { transferId: payload.transferId },
+                  params,
                 });
               },
             },

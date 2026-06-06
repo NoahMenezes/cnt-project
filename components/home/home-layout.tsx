@@ -7,7 +7,7 @@ import { GlassmorphismMinimalMetricsBlock } from "@/components/home/metrics-bloc
 import { motion, type Variants } from "motion/react";
 import Link from "next/link";
 import {
-  Lock, FileSearch, FlaskConical, BarChart3,
+  Lock, FileSearch, FlaskConical,
   BookOpen, Key, Layers,
   ArrowRight, CheckCircle, Upload,
   Cpu, Download,
@@ -52,15 +52,6 @@ const features = [
     href: "/analyze",
   },
   {
-    icon: BarChart3,
-    title: "Forensic Reporting",
-    description:
-      "Generate detailed PDF/JSON reports with findings, recommendations, RSA/AES breakdowns, and security classifications.",
-    accent: "from-emerald-500/20 to-emerald-500/0",
-    iconColor: "text-emerald-400",
-    href: "/reports",
-  },
-  {
     icon: FlaskConical,
     title: "Hybrid Lab Simulator",
     description:
@@ -68,15 +59,6 @@ const features = [
     accent: "from-amber-500/20 to-amber-500/0",
     iconColor: "text-amber-400",
     href: "/hybrid-lab",
-  },
-  {
-    icon: Key,
-    title: "Key Vault",
-    description:
-      "Securely store, browse, and manage your RSA & AES key pairs. Inspect key metadata, sizes, and associated encryption contexts.",
-    accent: "from-rose-500/20 to-rose-500/0",
-    iconColor: "text-rose-400",
-    href: "/vault",
   },
   {
     icon: BookOpen,
@@ -454,8 +436,6 @@ export default function AgencyHeroSection() {
     { title: "Dashboard", href: "/dashboard" },
     { title: "Analyze", href: "/analyze" },
     { title: "Hybrid Lab", href: "/hybrid-lab" },
-    { title: "Reports", href: "/reports" },
-    { title: "Key Vault", href: "/vault" },
   ];
 
   return (
@@ -482,8 +462,6 @@ export default function AgencyHeroSection() {
                 {[
                   { label: "Analyze", href: "/analyze" },
                   { label: "Hybrid Lab", href: "/hybrid-lab" },
-                  { label: "Reports", href: "/reports" },
-                  { label: "Key Vault", href: "/vault" },
                 ].map((l) => (
                   <Link
                     key={l.label}

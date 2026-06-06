@@ -21,8 +21,6 @@ const NAV = [
   { title: "Dashboard", href: "/dashboard" },
   { title: "Operation Lab", href: "/analyze" },
   { title: "Hybrid Lab", href: "/hybrid-lab", isActive: true },
-  { title: "Reports", href: "/reports" },
-  { title: "Key Vault", href: "/vault" },
 ];
 
 // ── tiny RSA helpers (same sim as analyze page) ────────────────────────────

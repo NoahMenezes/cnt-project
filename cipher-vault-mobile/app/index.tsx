@@ -77,7 +77,6 @@ export default function HomeScreen() {
         { label: "Open Secure Inbox", onPress: () => router.push("/inbox") },
         { label: "Scan New QR Code", onPress: () => router.push("/scan") },
         { label: "Decrypt Payload", onPress: () => router.push("/decrypt") },
-        { label: "Encrypt & Send to Web", onPress: () => router.push("/send") },
       ]
     : [
         { label: "Scan QR Code to Pair", onPress: () => router.push("/scan") },
@@ -222,14 +221,6 @@ export default function HomeScreen() {
                             <Text className="text-white text-[9px] font-bold">{pendingCount}</Text>
                           </View>
                         )}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={() => router.push("/send")}
-                        className="flex-1 border border-indigo-500/30 bg-indigo-500/5 rounded-xl py-3.5 items-center justify-center flex-row gap-2 active:bg-indigo-500/10"
-                      >
-                        <Lock size={15} color="#818cf8" />
-                        <Text className="text-indigo-300 font-semibold text-sm">Send to Web</Text>
                       </TouchableOpacity>
                     </View>
                   )}
