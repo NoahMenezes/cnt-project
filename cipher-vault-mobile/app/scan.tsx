@@ -149,7 +149,7 @@ export default function ScanScreen() {
               Camera Scanner
             </Text>
             <Text className="text-foreground opacity-60 text-xs text-center">
-              Go to the web app → Mobile Pair → Generate QR Code, then scan it here.
+              Scan a document transfer QR code from the web Operation Lab to load it directly.
             </Text>
 
             {hasPermission === null && (

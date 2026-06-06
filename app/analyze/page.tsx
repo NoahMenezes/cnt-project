@@ -378,7 +378,6 @@ export default function OperationPage() {
     { title: "Dashboard", href: "/dashboard" },
     { title: "Operation Lab", href: "/analyze", isActive: true },
     { title: "Hybrid Lab", href: "/hybrid-lab" },
-    { title: "Mobile Pair", href: "/mobile-pair" },
   ];
 
   // ─── Direct Mobile Sync State ───
@@ -575,6 +574,18 @@ export default function OperationPage() {
       document_name: uploadedFile ? uploadedFile.name : "Encrypted Document",
     };
 
+    // Broadcast 'clear_keys' first so the mobile app resets stale state in real time
+    const deviceChannel = supabase.channel(`device_sync_${syncDevice.id}`);
+    deviceChannel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        deviceChannel.send({
+          type: "broadcast",
+          event: "clear_keys",
+          payload: { deviceId: syncDevice.id },
+        });
+      }
+    });
+
     supabase
       .from("ephemeral_transfers")
       .insert(payload)
@@ -583,10 +594,17 @@ export default function OperationPage() {
       .then(({ data, error }) => {
         if (!error && data) {
           setTransferId(data.id);
+          // Broadcast 'keys_updated' so mobile auto-loads the new transfer immediately
+          deviceChannel.send({
+            type: "broadcast",
+            event: "keys_updated",
+            payload: { transferId: data.id, deviceId: syncDevice.id },
+          });
         } else {
           console.error("Failed to sync ephemeral transfer to database:", error);
         }
         setSyncingTransfer(false);
+        setTimeout(() => supabase.removeChannel(deviceChannel), 3000);
       });
   }, [ciphertext, encryptedSessionKey, aesIV, aesMode, uploadedFile, syncDevice?.id, rsaKeys, aesKey]);
 

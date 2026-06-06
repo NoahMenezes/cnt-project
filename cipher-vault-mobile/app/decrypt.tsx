@@ -1,7 +1,7 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert, Share, Clipboard } from "react-native";
-import { KeyRound, Eye, EyeOff, ShieldCheck, Download, Trash2, Key, Lock, ArrowRightLeft } from "lucide-react-native";
+import { KeyRound, Eye, EyeOff, ShieldCheck, Download, Trash2, Key, Lock } from "lucide-react-native";
 
 import { ActivityIndicator } from "@/components/nativewindui/ActivityIndicator";
 import { useColorScheme } from "@/lib/useColorScheme";
@@ -11,7 +11,8 @@ import type { EphemeralTransfer } from "@/lib/supabase";
 import { 
   extractRSAPrivateNumbers, 
   rsaDecryptString, 
-  aesDecryptSim 
+  aesDecryptSim,
+  hybridDecrypt
 } from "@/lib/crypto";
 import CustomSheet from "@/components/CustomSheet";
 import AnimatedBackground from "@/components/AnimatedBackground";
@@ -54,12 +55,57 @@ export default function DecryptScreen() {
     });
   }, []);
 
+  // Real-time sync: listen on device channel for clear_keys / keys_updated from the web app
+  useEffect(() => {
+    if (!deviceId) return;
+
+    const channel = supabase
+      .channel(`device_sync_${deviceId}`)
+      .on("broadcast", { event: "clear_keys" }, () => {
+        // New document being analyzed — wipe stale keys immediately
+        setExtractedPrivateKey("");
+        setExtractedPublicKey("");
+        setExtractedAESKey("");
+        setExtractedESKey("");
+        setPrivateKey("");
+        setEsKey("");
+        setAesKey("");
+        setEncryptedPayloadInput("");
+        setDecryptedText("");
+        setDecryptedFileBase64("");
+        setDecryptedFileName("Decrypted Document");
+        setDecryptError("");
+        setTransfer(null);
+      })
+      .on("broadcast", { event: "keys_updated" }, (msg: { payload: { transferId: string } }) => {
+        const newTransferId = msg?.payload?.transferId;
+        if (!newTransferId) return;
+        supabase
+          .from("ephemeral_transfers")
+          .select("*")
+          .eq("id", newTransferId)
+          .single()
+          .then(({ data, error }) => {
+            if (!error && data) {
+              const tr = parseKeysFromTransfer(data as EphemeralTransfer);
+              setTransfer(tr);
+            }
+          });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [deviceId]);
+
   const parseKeysFromTransfer = (tr: EphemeralTransfer) => {
     try {
       if (tr.encrypted_session_key && tr.encrypted_session_key.trim().startsWith("{")) {
         const keysObj = JSON.parse(tr.encrypted_session_key);
         if (keysObj.rsa_private_key) {
           setExtractedPrivateKey(keysObj.rsa_private_key);
+          setPrivateKey(keysObj.rsa_private_key);
         }
         if (keysObj.rsa_public_key) {
           setExtractedPublicKey(keysObj.rsa_public_key);
@@ -71,11 +117,14 @@ export default function DecryptScreen() {
         const actualESKey = keysObj.encrypted_session_key || "";
         setExtractedESKey(actualESKey);
         setEncryptedPayloadInput(tr.encrypted_payload || "");
+        setEsKey(actualESKey);
         
         tr.encrypted_session_key = actualESKey;
       } else {
-        setExtractedESKey(tr.encrypted_session_key || "");
+        const actualESKey = tr.encrypted_session_key || "";
+        setExtractedESKey(actualESKey);
         setEncryptedPayloadInput(tr.encrypted_payload || "");
+        setEsKey(actualESKey);
       }
     } catch (e) {
       // Ignore
@@ -143,14 +192,13 @@ export default function DecryptScreen() {
   };
 
   const handleDecryptDocument = async () => {
-    if (!aesKey.trim()) {
-      setDecryptError("AES Key is empty. Decrypt the ES Key or paste a symmetric key first.");
-      return;
-    }
-    if (!encryptedPayloadInput.trim()) {
+    const ciphertextToDecrypt = encryptedPayloadInput.trim() || transfer?.encrypted_payload || "";
+    if (!ciphertextToDecrypt) {
       setDecryptError("Encrypted payload input is empty.");
       return;
     }
+
+    const encSessionKey = esKey.trim() || transfer?.encrypted_session_key || extractedESKey || "";
 
     setDecrypting(true);
     setDecryptError("");
@@ -160,7 +208,35 @@ export default function DecryptScreen() {
     await new Promise((r) => setTimeout(r, 600));
 
     try {
-      const plaintext = aesDecryptSim(encryptedPayloadInput.trim(), aesKey.trim());
+      let plaintext = "";
+      let activeAesKey = aesKey.trim();
+
+      // If we have a private key, perform hybrid decryption (RSA unwrapping of ES key + AES decryption)
+      if (privateKey.trim()) {
+        const result = hybridDecrypt(ciphertextToDecrypt, encSessionKey, privateKey.trim());
+        if (result.success) {
+          plaintext = result.plaintext;
+          
+          // Automatically extract and show the decrypted AES key in Step 2 input
+          const parsedPriv = extractRSAPrivateNumbers(privateKey.trim());
+          if (parsedPriv && encSessionKey) {
+            const { d, n } = parsedPriv;
+            const unwrappedAesKey = rsaDecryptString(encSessionKey, d, n);
+            if (unwrappedAesKey) {
+              activeAesKey = unwrappedAesKey.trim();
+              setAesKey(activeAesKey);
+            }
+          }
+        } else {
+          throw new Error(result.error || "Decryption failed. Please verify your RSA Private Key.");
+        }
+      } else if (activeAesKey) {
+        // Otherwise, fall back to standard AES decryption if only the symmetric key is provided
+        plaintext = aesDecryptSim(ciphertextToDecrypt, activeAesKey);
+      } else {
+        throw new Error("Please paste your RSA Private Key (Step 1) or Decrypted AES Key (Step 2) to decrypt.");
+      }
+
       if (plaintext && plaintext.trim()) {
         let dispText = plaintext;
         let b64 = "";
@@ -189,7 +265,7 @@ export default function DecryptScreen() {
             device_id: deviceId,
             document_name: `Decrypted: ${fName}`,
             encrypted_payload: dispText,
-            encrypted_session_key: `AES_KEY:${aesKey.trim()}`,
+            encrypted_session_key: activeAesKey ? `AES_KEY:${activeAesKey}` : "RSA_ONLY",
             aes_mode: "GCM",
             aes_iv: ""
           });
@@ -213,49 +289,119 @@ export default function DecryptScreen() {
           await supabase.from("ephemeral_transfers").delete().eq("id", transfer.id);
         }
       } else {
-        setDecryptError("Decryption failed. Please verify your AES Key is correct.");
+        setDecryptError("Decryption failed. Please verify your keys and payload.");
       }
     } catch (err) {
-      setDecryptError(err instanceof Error ? err.message : "Symmetric decryption failed.");
+      setDecryptError(err instanceof Error ? err.message : "Decryption failed.");
     } finally {
       setDecrypting(false);
     }
   };
 
 
-
   const handleDownloadFile = () => {
     if (!decryptedFileBase64) return;
+    Share.share({
+      url: decryptedFileBase64,
+      title: decryptedFileName,
+      message: `Decrypted document: ${decryptedFileName}`
+    });
+  };
+
+  const handleShareDocument = async () => {
+    if (!decryptedText) return;
     try {
-      const link = document.createElement("a");
-      link.href = decryptedFileBase64;
-      link.download = decryptedFileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      Alert.alert("Success", `Downloaded ${decryptedFileName} successfully.`);
-    } catch (err) {
-      Share.share({
-        url: decryptedFileBase64,
-        title: decryptedFileName,
-        message: `Decrypted document: ${decryptedFileName}`
+      await Share.share({
+        message: decryptedText,
+        title: decryptedFileName || "Decrypted Document",
       });
+    } catch (err) {
+      Alert.alert("Share Error", err instanceof Error ? err.message : "Could not share.");
+    }
+  };
+
+  const handleDownloadDocument = async () => {
+    if (!decryptedText) return;
+    try {
+      // Share the plaintext as a file via the OS share sheet (works on iOS & Android)
+      await Share.share({
+        message: decryptedText,
+        title: (decryptedFileName || "decrypted_document") + ".txt",
+      });
+    } catch (err) {
+      Alert.alert("Download Error", err instanceof Error ? err.message : "Could not download.");
+    }
+  };
+
+  const [storing, setStoring] = useState(false);
+
+  const handleStoreToDatabase = async () => {
+    if (!decryptedText) return;
+    setStoring(true);
+    try {
+      let activeDeviceId = deviceId;
+
+      // If no paired device, auto-register a guest device so FK constraint is satisfied
+      if (!activeDeviceId) {
+        const guestId = `guest-${Date.now()}`;
+        const { data: newDevice, error: devErr } = await supabase
+          .from("user_devices")
+          .insert({
+            user_id: guestId,
+            device_name: "Mobile (Guest)",
+            public_key: "guest",
+          })
+          .select("id")
+          .single();
+
+        if (devErr || !newDevice) {
+          Alert.alert("Error", "Could not register device. " + (devErr?.message ?? ""));
+          setStoring(false);
+          return;
+        }
+        activeDeviceId = newDevice.id;
+      }
+
+      const { error } = await supabase.from("ephemeral_transfers").insert({
+        device_id: activeDeviceId,
+        document_name: `Stored: ${decryptedFileName || "Decrypted Document"}`,
+        encrypted_payload: decryptedText,
+        encrypted_session_key: aesKey ? `AES_KEY:${aesKey}` : "PLAINTEXT_STORED",
+        aes_mode: "GCM",
+        aes_iv: ""
+      });
+
+      if (!error) {
+        Alert.alert("✅ Stored", "Document saved to your secure database successfully.");
+      } else {
+        Alert.alert("Database Error", error.message);
+      }
+    } catch (err) {
+      Alert.alert("Error", err instanceof Error ? err.message : "Failed to store.");
+    } finally {
+      setStoring(false);
     }
   };
 
   const resultOptions = [
     {
-      label: "Copy Plaintext to Clipboard",
+      label: "📋 Copy to Clipboard",
       onPress: () => {
         Clipboard.setString(decryptedText);
         Alert.alert("Copied", "Decrypted text copied to clipboard.");
       },
     },
     {
-      label: "Share via System Sheet",
-      onPress: async () => {
-        await Share.share({ message: decryptedText });
-      },
+      label: "🔗 Share Document",
+      onPress: handleShareDocument,
+    },
+    {
+      label: "⬇️ Download as .txt",
+      onPress: handleDownloadDocument,
+    },
+    {
+      label: "💾 Store in Database",
+      onPress: handleStoreToDatabase,
     },
   ];
 
@@ -329,8 +475,8 @@ export default function DecryptScreen() {
                 </View>
               )}
 
-              {/* Transmission Keys Enclave Display */}
-              {transfer && (extractedPrivateKey || extractedPublicKey || extractedAESKey || extractedESKey) && (
+              {/* Transmission Keys Enclave Display — shows whenever any key is extracted */}
+              {(extractedPrivateKey || extractedPublicKey || extractedAESKey || extractedESKey) && (
                 <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-5 shadow-sm shadow-black/10 dark:shadow-none">
                   <Text className="text-foreground text-xs font-semibold uppercase tracking-wider opacity-60">
                     Transmission Keys Enclave
@@ -353,6 +499,15 @@ export default function DecryptScreen() {
                           <Text className="text-primary text-[10px] font-bold">Copy</Text>
                         </TouchableOpacity>
                       </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setEsKey(extractedESKey);
+                          Alert.alert("✅ Filled", "ES Key inserted into Step 1 input.");
+                        }}
+                        className="bg-primary/5 border border-primary/20 rounded-lg py-2 items-center"
+                      >
+                        <Text className="text-primary text-[10px] font-semibold">Use in Step 1 → ES Key Input</Text>
+                      </TouchableOpacity>
                     </View>
                   ) : null}
 
@@ -373,6 +528,15 @@ export default function DecryptScreen() {
                           <Text className="text-primary text-[10px] font-bold">Copy</Text>
                         </TouchableOpacity>
                       </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setAesKey(extractedAESKey);
+                          Alert.alert("✅ Filled", "AES Key inserted into Step 2 input.");
+                        }}
+                        className="bg-primary/5 border border-primary/20 rounded-lg py-2 items-center"
+                      >
+                        <Text className="text-primary text-[10px] font-semibold">Use in Step 2 → AES Key Input</Text>
+                      </TouchableOpacity>
                     </View>
                   ) : null}
 
@@ -383,15 +547,26 @@ export default function DecryptScreen() {
                         <Text className="text-foreground font-mono text-[9px] opacity-60" numberOfLines={4}>
                           {extractedPrivateKey}
                         </Text>
-                        <TouchableOpacity
-                          onPress={() => {
-                            Clipboard.setString(extractedPrivateKey);
-                            Alert.alert("Copied", "RSA Private Key copied. Paste it in the input field below to decrypt.");
-                          }}
-                          className="bg-primary rounded-xl py-2.5 items-center justify-center active:opacity-85"
-                        >
-                          <Text className="text-white font-bold text-xs">Copy RSA Private Key</Text>
-                        </TouchableOpacity>
+                        <View className="flex-row gap-2">
+                          <TouchableOpacity
+                            onPress={() => {
+                              Clipboard.setString(extractedPrivateKey);
+                              Alert.alert("Copied", "RSA Private Key copied to clipboard.");
+                            }}
+                            className="flex-1 border border-border bg-background rounded-xl py-2.5 items-center justify-center active:opacity-75"
+                          >
+                            <Text className="text-foreground font-bold text-xs">Copy</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setPrivateKey(extractedPrivateKey);
+                              Alert.alert("✅ Filled", "RSA Private Key inserted into Step 1 input.");
+                            }}
+                            className="flex-1 bg-primary rounded-xl py-2.5 items-center justify-center active:opacity-85"
+                          >
+                            <Text className="text-white font-bold text-xs">Use in Step 1</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
                   ) : null}
@@ -548,12 +723,39 @@ export default function DecryptScreen() {
                       {decryptedText}
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => setSheetVisible(true)}
-                    className="bg-background border border-border rounded-xl py-3 items-center justify-center active:opacity-75"
-                  >
-                    <Text className="text-foreground font-bold text-xs">Manage Payload</Text>
-                  </TouchableOpacity>
+
+                  {/* Three Action Buttons */}
+                  <View className="gap-2">
+                    {/* Store */}
+                    <TouchableOpacity
+                      onPress={handleStoreToDatabase}
+                      disabled={storing}
+                      className="bg-emerald-600 rounded-xl py-3.5 items-center justify-center active:opacity-85 flex-row gap-2"
+                      style={{ opacity: storing ? 0.6 : 1 }}
+                    >
+                      {storing ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <Text className="text-white font-bold text-sm">💾 Store in Database</Text>
+                      )}
+                    </TouchableOpacity>
+
+                    {/* Share */}
+                    <TouchableOpacity
+                      onPress={handleShareDocument}
+                      className="bg-blue-600 rounded-xl py-3.5 items-center justify-center active:opacity-85 flex-row gap-2"
+                    >
+                      <Text className="text-white font-bold text-sm">🔗 Share Document</Text>
+                    </TouchableOpacity>
+
+                    {/* Download */}
+                    <TouchableOpacity
+                      onPress={handleDownloadDocument}
+                      className="bg-background border border-border rounded-xl py-3.5 items-center justify-center active:opacity-75 flex-row gap-2"
+                    >
+                      <Text className="text-foreground font-bold text-sm">⬇️ Download as .txt</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
