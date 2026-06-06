@@ -30,9 +30,9 @@
     "typescript": "~5.9.2"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "web": "expo start --web"
+    "start": "expo start --offline",
+    "android": "expo start --android --offline",
+    "web": "expo start --web --offline"
   },
   "private": true
 }

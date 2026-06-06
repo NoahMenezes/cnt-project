@@ -84,39 +84,39 @@ export default function ScanScreen() {
       />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        className="p-4"
+        className="p-4 bg-[#0a0a0f]"
         showsVerticalScrollIndicator={false}
       >
-        <View className="gap-4">
-          <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-6 shadow-sm shadow-black/10 dark:shadow-none">
-            <Text className="text-foreground text-center text-sm font-medium tracking-wider opacity-60">
+        <View className="gap-4 mt-16">
+          <View className="border-[#1e1e2d] bg-[#111118]/80 gap-4 rounded-xl border p-4 pb-6 shadow-sm shadow-black/10 dark:shadow-none">
+            <Text className="text-white text-center text-sm font-medium tracking-wider opacity-60">
               Camera
             </Text>
-            <Text className="text-muted-foreground text-xs text-center">
+            <Text className="text-slate-400 text-xs text-center">
               Go to the web app → Mobile Pair → Generate QR Code, then scan it here.
             </Text>
 
             {hasPermission === null && (
-              <View className="h-64 rounded-lg items-center justify-center border-border border">
-                <Text className="text-muted-foreground text-sm">
+              <View className="h-64 rounded-lg items-center justify-center border-[#1e1e2d] border">
+                <Text className="text-slate-400 text-sm">
                   Requesting camera permission…
                 </Text>
               </View>
             )}
 
             {hasPermission === false && (
-              <View className="h-64 rounded-lg items-center justify-center border-border border gap-2">
-                <Text className="text-foreground font-semibold text-sm text-center">
+              <View className="h-64 rounded-lg items-center justify-center border-[#1e1e2d] border gap-2">
+                <Text className="text-white font-semibold text-sm text-center">
                   Camera Permission Required
                 </Text>
-                <Text className="text-muted-foreground text-xs text-center px-4">
+                <Text className="text-slate-400 text-xs text-center px-4">
                   Please enable camera access in Settings.
                 </Text>
               </View>
             )}
 
             {hasPermission === true && (
-              <View className="rounded-xl overflow-hidden border border-border" style={{ height: 320 }}>
+              <View className="rounded-xl overflow-hidden border border-[#1e1e2d]" style={{ height: 320 }}>
                 <CameraView
                   style={StyleSheet.absoluteFill}
                   facing="back"
@@ -132,8 +132,8 @@ export default function ScanScreen() {
             )}
           </View>
 
-          <View className="border-border bg-card rounded-xl border p-4 shadow-sm shadow-black/10 dark:shadow-none">
-            <Text className="text-muted-foreground text-xs text-center leading-5">
+          <View className="border-[#1e1e2d] bg-[#111118]/80 rounded-xl border p-4 shadow-sm shadow-black/10 dark:shadow-none">
+            <Text className="text-slate-400 text-xs text-center leading-5">
               🔐 Pairing links this phone as a trusted decryption node.{"\n"}
               No private keys are transmitted — they stay on this device.
             </Text>
