@@ -1,14 +1,14 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState, useEffect } from "react";
-import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Share, Clipboard } from "react-native";
-import { KeyRound, Eye, EyeOff, ShieldCheck, Download, Trash2, ArrowLeft } from "lucide-react-native";
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert, Share, Clipboard } from "react-native";
+import { KeyRound, Eye, EyeOff, ShieldCheck, Download, Trash2 } from "lucide-react-native";
 
+import { ActivityIndicator } from "@/components/nativewindui/ActivityIndicator";
 import { useColorScheme } from "@/lib/useColorScheme";
 import { getPrivateKey, savePrivateKey } from "@/lib/secureStore";
 import { supabase } from "@/lib/supabase";
 import type { EphemeralTransfer } from "@/lib/supabase";
 import { hybridDecrypt } from "@/lib/crypto";
-import AnimatedCard from "@/components/AnimatedCard";
 import CustomSheet from "@/components/CustomSheet";
 
 export default function DecryptScreen() {
@@ -18,6 +18,8 @@ export default function DecryptScreen() {
 
   const [transfer, setTransfer] = useState<EphemeralTransfer | null>(null);
   const [loadingTransfer, setLoadingTransfer] = useState(!!transferId || !!rawTransferStr);
+  
+  // Decryption Keys Input & States
   const [privateKey, setPrivateKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
@@ -26,6 +28,11 @@ export default function DecryptScreen() {
   const [decryptedFileName, setDecryptedFileName] = useState("Decrypted Document");
   const [decryptError, setDecryptError] = useState("");
   const [hasSavedKey, setHasSavedKey] = useState(false);
+
+  // Extracted Keys for Display (Uploaded with document)
+  const [extractedPrivateKey, setExtractedPrivateKey] = useState("");
+  const [extractedPublicKey, setExtractedPublicKey] = useState("");
+  const [extractedAESKey, setExtractedAESKey] = useState("");
   
   // Sheet state
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -44,9 +51,13 @@ export default function DecryptScreen() {
       if (tr.encrypted_session_key && tr.encrypted_session_key.trim().startsWith("{")) {
         const keysObj = JSON.parse(tr.encrypted_session_key);
         if (keysObj.rsa_private_key) {
-          setPrivateKey(keysObj.rsa_private_key);
-          setHasSavedKey(true);
-          savePrivateKey(keysObj.rsa_private_key);
+          setExtractedPrivateKey(keysObj.rsa_private_key);
+        }
+        if (keysObj.rsa_public_key) {
+          setExtractedPublicKey(keysObj.rsa_public_key);
+        }
+        if (keysObj.aes_key) {
+          setExtractedAESKey(keysObj.aes_key);
         }
         // Extract the actual wrapped session key for hybrid decryption
         tr.encrypted_session_key = keysObj.encrypted_session_key || "";
@@ -162,7 +173,7 @@ export default function DecryptScreen() {
 
   const resultOptions = [
     {
-      label: "Copy to Clipboard",
+      label: "Copy Plaintext to Clipboard",
       onPress: () => {
         Clipboard.setString(decryptedText);
         Alert.alert("Copied", "Decrypted text copied to clipboard.");
@@ -199,78 +210,144 @@ export default function DecryptScreen() {
   ];
 
   return (
-    <View className="flex-1 bg-[#0a0a0f]" style={{ overflow: "hidden" }}>
-      {/* Background radial glow */}
-      <View
-        className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-10"
-        style={{
-          backgroundColor: "#818cf8",
-          transform: [{ translateX: 80 }, { translateY: -80 }],
-          shadowColor: "#818cf8",
-          shadowRadius: 80,
-          shadowOpacity: 1,
-          elevation: 20,
-        }}
-      />
-
+    <View className="flex-1 bg-background" style={{ overflow: "hidden" }}>
       <Stack.Screen
         options={{
           title: "Decryption Node",
+          headerLargeTitle: true,
           headerTransparent: true,
         }}
       />
 
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingTop: 100, paddingBottom: 40, alignItems: "center" }}
+      <ScrollView 
+        contentInsetAdjustmentBehavior="automatic" 
+        className="p-4"
+        contentContainerStyle={{ paddingTop: 140, paddingBottom: 60, alignItems: "center" }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="w-full max-w-md px-6 gap-5">
+        <View className="w-full max-w-md gap-4">
+          
           {loadingTransfer ? (
-            <ActivityIndicator color="#818cf8" size="large" />
+            <View className="border-border bg-card rounded-xl border p-8 items-center justify-center shadow-sm shadow-black/10 dark:shadow-none">
+              <ActivityIndicator size="large" />
+              <Text className="text-foreground text-sm font-medium tracking-wider opacity-60 mt-3">
+                Loading Transfer...
+              </Text>
+            </View>
           ) : (
             <View className="gap-4">
               
               {/* Document Overview */}
               {transfer && (
-                <AnimatedCard delay={50} className="p-4 border border-slate-900 bg-slate-950/20">
-                  <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">
-                    Source Package
+                <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-5 shadow-sm shadow-black/10 dark:shadow-none">
+                  <Text className="text-foreground text-xs font-semibold uppercase tracking-wider opacity-60">
+                    Source Package Info
                   </Text>
-                  <Text className="text-white text-base font-bold mb-1">
-                    {transfer.document_name}
-                  </Text>
-                  <View className="flex-row gap-2 mt-1">
-                    <View className="px-2.5 py-0.5 rounded-full bg-slate-950/60 border border-slate-900">
-                      <Text className="text-slate-400 text-[9px] font-semibold font-mono">
-                        AES-{transfer.aes_mode}
-                      </Text>
-                    </View>
-                    <View className="px-2.5 py-0.5 rounded-full bg-slate-950/60 border border-slate-900">
-                      <Text className="text-slate-400 text-[9px] font-semibold font-mono">
-                        RSA-WRAP
-                      </Text>
+                  <View className="gap-1.5">
+                    <Text className="text-foreground text-base font-bold">
+                      {transfer.document_name}
+                    </Text>
+                    <View className="flex-row gap-2 mt-1">
+                      <View className="px-2.5 py-0.5 rounded-full bg-background border border-border">
+                        <Text className="text-foreground opacity-70 text-[9px] font-semibold font-mono">
+                          AES-{transfer.aes_mode}
+                        </Text>
+                      </View>
+                      <View className="px-2.5 py-0.5 rounded-full bg-background border border-border">
+                        <Text className="text-foreground opacity-70 text-[9px] font-semibold font-mono">
+                          RSA-WRAP
+                        </Text>
+                      </View>
                     </View>
                   </View>
-                </AnimatedCard>
+                </View>
               )}
 
-              {/* RSA Configuration Card */}
-              <AnimatedCard delay={150} className="p-5">
-                <View className="flex-row items-center justify-between mb-4 border-b border-slate-900 pb-3">
+              {/* Display Extracted Transmission Keys */}
+              {transfer && (extractedPrivateKey || extractedPublicKey || extractedAESKey) && (
+                <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-5 shadow-sm shadow-black/10 dark:shadow-none">
+                  <Text className="text-foreground text-xs font-semibold uppercase tracking-wider opacity-60">
+                    Transmission Keys Enclave
+                  </Text>
+
+                  {extractedAESKey ? (
+                    <View className="gap-1.5">
+                      <Text className="text-foreground text-xs font-medium opacity-80">AES Session Key</Text>
+                      <View className="flex-row gap-2 items-center bg-background border border-border rounded-xl p-2.5">
+                        <Text className="text-foreground font-mono text-[10px] flex-1" numberOfLines={1}>
+                          {extractedAESKey}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            Clipboard.setString(extractedAESKey);
+                            Alert.alert("Copied", "AES Session Key copied to clipboard.");
+                          }}
+                          className="bg-primary/10 px-3 py-1.5 rounded-lg active:opacity-75"
+                        >
+                          <Text className="text-primary text-[10px] font-bold">Copy</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {extractedPublicKey ? (
+                    <View className="gap-1.5">
+                      <Text className="text-foreground text-xs font-medium opacity-80">RSA Public Key</Text>
+                      <View className="flex-row gap-2 items-center bg-background border border-border rounded-xl p-2.5">
+                        <Text className="text-foreground font-mono text-[10px] flex-1" numberOfLines={1}>
+                          {extractedPublicKey}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            Clipboard.setString(extractedPublicKey);
+                            Alert.alert("Copied", "RSA Public Key copied to clipboard.");
+                          }}
+                          className="bg-primary/10 px-3 py-1.5 rounded-lg active:opacity-75"
+                        >
+                          <Text className="text-primary text-[10px] font-bold">Copy</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {extractedPrivateKey ? (
+                    <View className="gap-1.5">
+                      <Text className="text-foreground text-xs font-medium opacity-80">RSA Private Key</Text>
+                      <View className="bg-background border border-border rounded-xl p-3 gap-2.5">
+                        <Text className="text-foreground font-mono text-[9px] opacity-60" numberOfLines={4}>
+                          {extractedPrivateKey}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            Clipboard.setString(extractedPrivateKey);
+                            Alert.alert("Copied", "RSA Private Key copied. Paste it in the input field below to decrypt.");
+                          }}
+                          className="bg-primary rounded-xl py-2.5 items-center justify-center active:opacity-85"
+                        >
+                          <Text className="text-white font-bold text-xs">Copy RSA Private Key</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              )}
+
+              {/* Decryption Node input */}
+              <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-5 shadow-sm shadow-black/10 dark:shadow-none">
+                <View className="flex-row items-center justify-between border-b border-border pb-3">
                   <View className="flex-row items-center gap-2">
-                    <KeyRound size={16} color="#818cf8" />
-                    <Text className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                      RSA Private Key
+                    <KeyRound size={16} color={colors.primary} />
+                    <Text className="text-foreground text-xs font-semibold uppercase tracking-wider opacity-60">
+                      RSA Private Key Input
                     </Text>
                   </View>
                   {hasSavedKey && (
                     <TouchableOpacity
                       onPress={() => setHasSavedKey(false)}
-                      className="px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20"
+                      className="px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 active:opacity-75"
                     >
-                      <Text className="text-indigo-400 text-[10px] font-bold">Replace Key</Text>
+                      <Text className="text-primary text-[10px] font-bold">Replace Key</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -279,10 +356,10 @@ export default function DecryptScreen() {
                   <View className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 flex-row items-center gap-3">
                     <ShieldCheck size={20} color="#10b981" />
                     <View className="flex-1">
-                      <Text className="text-emerald-400 text-xs font-semibold">
+                      <Text className="text-emerald-500 text-xs font-semibold">
                         Key Authenticated
                       </Text>
-                      <Text className="text-slate-500 text-[10px]">
+                      <Text className="text-foreground opacity-50 text-[10px] mt-0.5">
                         Secure hardware store loading enabled.
                       </Text>
                     </View>
@@ -296,9 +373,9 @@ export default function DecryptScreen() {
                         multiline
                         numberOfLines={5}
                         placeholder="-----BEGIN RSA PRIVATE KEY-----"
-                        placeholderTextColor="#475569"
+                        placeholderTextColor="#64748b"
                         secureTextEntry={!showKey}
-                        className="w-full bg-slate-950 border border-slate-900 rounded-xl p-3 font-mono text-[10px] text-indigo-400"
+                        className="w-full bg-background border border-border text-foreground rounded-xl p-3 font-mono text-[10px]"
                         style={{ minHeight: 110, textAlignVertical: "top" }}
                       />
                       <TouchableOpacity
@@ -315,27 +392,27 @@ export default function DecryptScreen() {
                     {privateKey.trim().length > 0 && (
                       <TouchableOpacity
                         onPress={handleSaveKey}
-                        className="bg-indigo-600/10 border border-indigo-600/30 rounded-xl py-2.5 items-center justify-center active:bg-indigo-600/20"
+                        className="bg-primary/10 border border-primary/20 rounded-xl py-2.5 items-center justify-center active:opacity-75"
                       >
-                        <Text className="text-indigo-400 text-xs font-bold">Save Key for Auto-Load</Text>
+                        <Text className="text-primary text-xs font-bold">Save Key for Auto-Load</Text>
                       </TouchableOpacity>
                     )}
                   </View>
                 )}
-              </AnimatedCard>
+              </View>
 
               {/* Decrypt Trigger */}
               {transfer && (
                 <TouchableOpacity
                   onPress={handleDecrypt}
                   disabled={decrypting}
-                  className="bg-indigo-600 rounded-xl py-3.5 items-center justify-center active:bg-indigo-700 shadow-lg shadow-indigo-600/30"
+                  className="bg-primary rounded-xl py-3.5 items-center justify-center active:opacity-85 shadow-sm"
                   style={{ opacity: decrypting ? 0.6 : 1 }}
                 >
                   {decrypting ? (
                     <View className="flex-row items-center gap-2">
                       <ActivityIndicator color="#fff" size="small" />
-                      <Text className="text-white font-bold text-sm">Decrypting Payload…</Text>
+                      <Text className="text-white font-bold text-sm">Decrypting Payload...</Text>
                     </View>
                   ) : (
                     <Text className="text-white font-bold text-sm">Decrypt Document</Text>
@@ -343,41 +420,41 @@ export default function DecryptScreen() {
                 </TouchableOpacity>
               )}
 
-              {/* Errors container */}
+              {/* Errors Container */}
               {decryptError !== "" && (
-                <AnimatedCard className="p-4 border-red-500/20 bg-red-500/5">
-                  <Text className="text-red-400 text-xs text-center font-semibold leading-5">
+                <View className="border-red-500/20 bg-red-500/5 rounded-xl border p-4 shadow-sm">
+                  <Text className="text-red-500 text-xs text-center font-semibold leading-5">
                     {decryptError}
                   </Text>
-                </AnimatedCard>
+                </View>
               )}
 
               {/* Decrypted Output Container */}
               {decryptedText !== "" && (
-                <AnimatedCard delay={100} className="p-5 border-emerald-500/20 bg-emerald-500/5">
-                  <View className="flex-row items-center gap-2 mb-3">
+                <View className="border-emerald-500/20 bg-emerald-500/5 rounded-xl border p-5 shadow-sm gap-4">
+                  <View className="flex-row items-center gap-2">
                     <ShieldCheck size={16} color="#10b981" />
-                    <Text className="text-emerald-400 text-xs font-semibold uppercase tracking-wider">
+                    <Text className="text-emerald-500 text-xs font-semibold uppercase tracking-wider">
                       Decrypted Output
                     </Text>
                   </View>
 
                   {decryptedFileBase64 ? (
-                    <View className="mb-4 bg-slate-950 p-4 rounded-xl border border-slate-900/60 items-center justify-center gap-3">
+                    <View className="bg-background p-4 rounded-xl border border-border items-center justify-center gap-3">
                       <View className="w-12 h-12 rounded-full bg-emerald-500/10 items-center justify-center border border-emerald-500/20">
                         <Download size={20} color="#10b981" />
                       </View>
                       <View className="items-center">
-                        <Text className="text-white font-semibold text-xs text-center px-2" numberOfLines={1}>
+                        <Text className="text-foreground font-semibold text-xs text-center px-2" numberOfLines={1}>
                           {decryptedFileName}
                         </Text>
-                        <Text className="text-slate-500 text-[10px] mt-0.5">
+                        <Text className="text-foreground opacity-50 text-[10px] mt-0.5">
                           Original binary payload restored
                         </Text>
                       </View>
                       <TouchableOpacity
                         onPress={handleDownloadFile}
-                        className="bg-emerald-600 hover:bg-emerald-700 rounded-xl px-4 py-2.5 w-full items-center justify-center active:bg-emerald-850 flex-row gap-1.5"
+                        className="bg-emerald-600 hover:bg-emerald-700 rounded-xl px-4 py-2.5 w-full items-center justify-center active:bg-emerald-800 flex-row gap-1.5"
                       >
                         <Download size={14} color="#fff" />
                         <Text className="text-white font-bold text-xs">Save File to Device</Text>
@@ -385,37 +462,40 @@ export default function DecryptScreen() {
                     </View>
                   ) : null}
 
-                  <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">
-                    Plaintext Transcript
-                  </Text>
-                  <Text className="text-slate-300 font-mono text-xs mb-4 bg-slate-950 p-3.5 rounded-xl border border-slate-900/60 leading-5">
-                    {decryptedText}
-                  </Text>
+                  <View className="gap-1.5">
+                    <Text className="text-foreground opacity-50 text-[10px] font-bold uppercase tracking-wider">
+                      Plaintext Transcript
+                    </Text>
+                    <Text className="text-foreground font-mono text-xs bg-background p-3.5 rounded-xl border border-border leading-5">
+                      {decryptedText}
+                    </Text>
+                  </View>
                   <TouchableOpacity
                     onPress={() => setSheetVisible(true)}
-                    className="bg-[#151520] border border-slate-900 rounded-xl py-3 items-center justify-center active:bg-[#1e1e2d]"
+                    className="bg-background border border-border rounded-xl py-3 items-center justify-center active:opacity-75"
                   >
-                    <Text className="text-slate-300 font-bold text-xs">Manage Payload</Text>
+                    <Text className="text-foreground font-bold text-xs">Manage Payload</Text>
                   </TouchableOpacity>
-                </AnimatedCard>
+                </View>
               )}
 
               {!transfer && (
-                <AnimatedCard className="p-6 items-center justify-center border border-slate-900 bg-slate-950/20">
-                  <Text className="text-slate-400 text-xs text-center leading-5 mb-4">
+                <View className="border-border bg-card rounded-xl border p-6 items-center justify-center shadow-sm gap-4">
+                  <Text className="text-foreground opacity-60 text-xs text-center leading-5">
                     Open your secure inbox to load an encrypted transfer document into the decryptor module.
                   </Text>
                   <TouchableOpacity
                     onPress={() => router.push("/inbox")}
-                    className="bg-indigo-600 rounded-xl px-5 py-3 active:bg-indigo-700"
+                    className="bg-primary rounded-xl px-5 py-3 active:opacity-85 w-full items-center"
                   >
                     <Text className="text-white font-bold text-xs">Go to Inbox</Text>
                   </TouchableOpacity>
-                </AnimatedCard>
+                </View>
               )}
 
             </View>
           )}
+
         </View>
       </ScrollView>
 

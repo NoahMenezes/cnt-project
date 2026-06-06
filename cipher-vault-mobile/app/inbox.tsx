@@ -1,13 +1,13 @@
 import { Stack, useRouter } from "expo-router";
 import { useState, useEffect } from "react";
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
-import { Inbox, Trash2, ShieldAlert, KeyRound, Clock, ArrowRightLeft } from "lucide-react-native";
+import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
+import { Inbox, Trash2, ShieldAlert, KeyRound, Clock } from "lucide-react-native";
 
+import { ActivityIndicator } from "@/components/nativewindui/ActivityIndicator";
 import { useColorScheme } from "@/lib/useColorScheme";
 import { getDeviceId } from "@/lib/secureStore";
 import { supabase } from "@/lib/supabase";
 import type { EphemeralTransfer } from "@/lib/supabase";
-import AnimatedCard from "@/components/AnimatedCard";
 import CustomSheet from "@/components/CustomSheet";
 
 export default function InboxScreen() {
@@ -105,106 +105,97 @@ export default function InboxScreen() {
     : [];
 
   return (
-    <View className="flex-1 bg-[#0a0a0f]" style={{ overflow: "hidden" }}>
-      {/* Glow */}
-      <View
-        className="absolute top-0 left-0 w-80 h-80 rounded-full opacity-10"
-        style={{
-          backgroundColor: "#4f46e5",
-          transform: [{ translateX: -100 }, { translateY: -100 }],
-          shadowColor: "#4f46e5",
-          shadowRadius: 100,
-          shadowOpacity: 1,
-          elevation: 25,
-        }}
-      />
-
+    <View className="flex-1 bg-background" style={{ overflow: "hidden" }}>
       <Stack.Screen
         options={{
           title: "Secure Inbox",
+          headerLargeTitle: true,
           headerTransparent: true,
-          headerBlurEffect: "dark",
         }}
       />
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingTop: 100, paddingBottom: 40, alignItems: "center" }}
+        contentInsetAdjustmentBehavior="automatic"
+        className="p-4"
+        contentContainerStyle={{ paddingTop: 140, paddingBottom: 60, alignItems: "center" }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="w-full max-w-md px-6 gap-4">
+        <View className="w-full max-w-md gap-4">
           {loading ? (
-            <View className="py-20">
-              <ActivityIndicator color="#818cf8" size="large" />
+            <View className="border-border bg-card rounded-xl border p-8 items-center justify-center shadow-sm shadow-black/10 dark:shadow-none">
+              <ActivityIndicator size="large" />
+              <Text className="text-foreground text-sm font-medium tracking-wider opacity-60 mt-3">
+                Fetching Inbox...
+              </Text>
             </View>
           ) : !deviceId ? (
-            <AnimatedCard className="p-5 items-center justify-center">
-              <ShieldAlert size={40} color="#f59e0b" className="mb-3" />
-              <Text className="text-white text-base font-bold mb-2">Device Not Paired</Text>
-              <Text className="text-slate-400 text-xs text-center mb-4">
+            <View className="border-border bg-card gap-4 rounded-xl border p-5 pb-6 items-center justify-center shadow-sm shadow-black/10 dark:shadow-none">
+              <ShieldAlert size={40} color="#f59e0b" className="mb-1" />
+              <Text className="text-foreground text-base font-bold">Device Not Paired</Text>
+              <Text className="text-foreground opacity-60 text-xs text-center leading-5 mb-2">
                 Please pair your device with the web interface to check your secure inbox.
               </Text>
               <TouchableOpacity
                 onPress={() => router.push("/scan")}
-                className="bg-indigo-600 rounded-xl px-5 py-3 active:bg-indigo-700"
+                className="bg-primary rounded-xl px-5 py-3 active:opacity-85 w-full items-center"
               >
                 <Text className="text-white font-bold text-xs">Pair Now</Text>
               </TouchableOpacity>
-            </AnimatedCard>
+            </View>
           ) : transfers.length === 0 ? (
-            <AnimatedCard className="p-8 items-center justify-center border border-slate-900 bg-slate-950/20">
-              <Inbox size={48} color="#475569" className="mb-4" />
-              <Text className="text-slate-300 text-base font-bold mb-1">Inbox Empty</Text>
-              <Text className="text-slate-500 text-xs text-center leading-5">
+            <View className="border-border bg-card gap-4 rounded-xl border p-6 py-8 items-center justify-center shadow-sm shadow-black/10 dark:shadow-none">
+              <Inbox size={48} color="#64748b" className="mb-1" />
+              <Text className="text-foreground text-base font-bold">Inbox Empty</Text>
+              <Text className="text-foreground opacity-60 text-xs text-center leading-5">
                 Upload or encrypt a file in your web portal and forward it to this device node to test decryption.
               </Text>
-            </AnimatedCard>
+            </View>
           ) : (
             <View className="gap-3">
-              <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">
+              <Text className="text-foreground opacity-60 text-xs font-semibold uppercase tracking-wider mb-1">
                 Received Documents ({transfers.length})
               </Text>
-              {transfers.map((transfer, index) => (
-                <AnimatedCard
+              {transfers.map((transfer) => (
+                <TouchableOpacity
                   key={transfer.id}
-                  delay={index * 80}
                   onPress={() => openPayloadActions(transfer)}
-                  className="p-4 border border-[#1e1e2d] active:border-indigo-500/50"
+                  activeOpacity={0.8}
+                  className="border-border bg-card gap-3.5 rounded-xl border p-4 pb-5 shadow-sm shadow-black/10 dark:shadow-none active:opacity-90"
                 >
-                  <View className="flex-row items-center justify-between mb-3">
-                    <Text className="text-white font-bold text-sm flex-1 mr-3" numberOfLines={1}>
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-foreground font-bold text-sm flex-1 mr-3" numberOfLines={1}>
                       {transfer.document_name || "Secure Package"}
                     </Text>
                     <View className="flex-row items-center gap-1">
                       <Clock size={11} color="#64748b" />
-                      <Text className="text-slate-500 text-[10px]">
+                      <Text className="text-foreground opacity-60 text-[10px]">
                         {formatDate(transfer.created_at)}
                       </Text>
                     </View>
                   </View>
 
-                  <View className="flex-row gap-2 mb-3">
-                    <View className="px-2.5 py-0.5 rounded-full bg-slate-950/80 border border-slate-800">
-                      <Text className="text-slate-400 text-[9px] font-semibold font-mono">
+                  <View className="flex-row gap-2">
+                    <View className="px-2.5 py-0.5 rounded-full bg-background border border-border">
+                      <Text className="text-foreground opacity-70 text-[9px] font-semibold font-mono">
                         AES-{transfer.aes_mode}
                       </Text>
                     </View>
-                    <View className="px-2.5 py-0.5 rounded-full bg-indigo-500/5 border border-indigo-500/20">
-                      <Text className="text-indigo-400 text-[9px] font-semibold font-mono">
+                    <View className="px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                      <Text className="text-primary text-[9px] font-semibold font-mono">
                         RSA-WRAP
                       </Text>
                     </View>
                   </View>
 
-                  <Text className="text-slate-500 text-[10px] font-mono mb-2 bg-slate-950/60 p-2 rounded-lg border border-slate-900/60" numberOfLines={2}>
+                  <Text className="text-foreground opacity-60 text-[10px] font-mono bg-background p-2.5 rounded-xl border border-border" numberOfLines={2}>
                     {transfer.encrypted_payload}
                   </Text>
 
                   <View className="flex-row items-center justify-end gap-1 opacity-70">
-                    <Text className="text-indigo-400 text-[9px] font-semibold">Options</Text>
-                    <KeyRound size={10} color="#818cf8" />
+                    <Text className="text-primary text-[9px] font-semibold">Options</Text>
+                    <KeyRound size={10} color={colors.primary} />
                   </View>
-                </AnimatedCard>
+                </TouchableOpacity>
               ))}
             </View>
           )}

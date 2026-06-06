@@ -1,13 +1,13 @@
 import { Stack, useRouter } from "expo-router";
 import { useState, useEffect } from "react";
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
 import { Shield, QrCode, Inbox, Lock, Laptop } from "lucide-react-native";
 
+import { ActivityIndicator } from "@/components/nativewindui/ActivityIndicator";
 import { useColorScheme } from "@/lib/useColorScheme";
 import { getDeviceId, getDeviceName } from "@/lib/secureStore";
 import { supabase } from "@/lib/supabase";
 import ShieldGraphic from "@/components/ShieldGraphic";
-import AnimatedCard from "@/components/AnimatedCard";
 import CustomSheet from "@/components/CustomSheet";
 
 export default function HomeScreen() {
@@ -83,71 +83,39 @@ export default function HomeScreen() {
       ];
 
   return (
-    <View className="flex-1 bg-[#0a0a0f]" style={{ overflow: "hidden" }}>
-      {/* Background glow effects */}
-      <View
-        className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-20"
-        style={{
-          backgroundColor: "#4f46e5",
-          transform: [{ translateX: 100 }, { translateY: -100 }],
-          shadowColor: "#4f46e5",
-          shadowRadius: 100,
-          shadowOpacity: 1,
-          elevation: 25,
-        }}
-      />
-      <View
-        className="absolute bottom-0 left-0 w-72 h-72 rounded-full opacity-10"
-        style={{
-          backgroundColor: "#818cf8",
-          transform: [{ translateX: -80 }, { translateY: 80 }],
-          shadowColor: "#818cf8",
-          shadowRadius: 80,
-          shadowOpacity: 1,
-          elevation: 20,
-        }}
-      />
-
+    <View className="flex-1 bg-background" style={{ overflow: "hidden" }}>
       <Stack.Screen
         options={{
-          headerShown: false,
+          title: "CipherVault",
+          headerLargeTitle: true,
+          headerTransparent: true,
         }}
       />
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingTop: 80, paddingBottom: 40, alignItems: "center" }}
+        contentInsetAdjustmentBehavior="automatic"
+        className="p-4"
+        contentContainerStyle={{ paddingTop: 140, paddingBottom: 60, alignItems: "center" }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="w-full max-w-md px-6 gap-6">
+        <View className="w-full max-w-md gap-5">
           
-          {/* Header */}
-          <View className="flex-row items-center gap-3 justify-center mb-2">
-            <View className="w-12 h-12 rounded-2xl bg-indigo-500/10 items-center justify-center border border-indigo-500/20">
-              <Shield size={24} color="#818cf8" />
-            </View>
-            <View>
-              <Text className="text-white text-2xl font-bold tracking-tight">CipherVault</Text>
-              <Text className="text-slate-500 text-xs font-semibold">Secure Mobile Node</Text>
-            </View>
-          </View>
-
-          {/* Core Graphic */}
+          {/* Header Graphic */}
           <ShieldGraphic />
 
           {loading ? (
-            <View className="py-10">
-              <ActivityIndicator color="#818cf8" size="large" />
+            <View className="border-border bg-card rounded-xl border p-8 items-center justify-center shadow-sm shadow-black/10 dark:shadow-none">
+              <ActivityIndicator size="large" />
             </View>
           ) : (
             <View className="gap-4">
               
               {/* Device Status Card */}
-              <AnimatedCard delay={100} className="p-5">
-                <View className="flex-row items-center justify-between mb-4 border-b border-slate-900 pb-3">
+              <View className="border-border bg-card gap-4 rounded-xl border p-5 shadow-sm shadow-black/10 dark:shadow-none">
+                <View className="flex-row items-center justify-between border-b border-border pb-3">
                   <View className="flex-row items-center gap-2">
-                    <Laptop size={16} color="#818cf8" />
-                    <Text className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                    <Laptop size={16} color={colors.primary} />
+                    <Text className="text-foreground text-xs font-semibold uppercase tracking-wider opacity-60">
                       Device Status
                     </Text>
                   </View>
@@ -161,18 +129,18 @@ export default function HomeScreen() {
 
                 {deviceId ? (
                   <View>
-                    <Text className="text-white text-lg font-bold mb-1">
+                    <Text className="text-foreground text-lg font-bold">
                       {deviceName ?? "My Device"}
                     </Text>
-                    <Text className="text-slate-500 text-xs font-mono mb-2">
-                      ID: {deviceId.substring(0, 16)}…
+                    <Text className="text-foreground opacity-60 text-xs font-mono mb-2 mt-0.5">
+                      ID: {deviceId.substring(0, 16)}...
                     </Text>
                     {pendingCount > 0 && (
-                      <View className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-3 flex-row items-center justify-between">
-                        <Text className="text-indigo-300 text-xs font-semibold">
+                      <View className="bg-primary/10 border border-primary/20 rounded-xl p-3 flex-row items-center justify-between mt-2">
+                        <Text className="text-primary text-xs font-semibold">
                           Pending Transfers
                         </Text>
-                        <View className="bg-indigo-500 px-2.5 py-1 rounded-full">
+                        <View className="bg-primary px-2.5 py-1 rounded-full">
                           <Text className="text-white text-[10px] font-bold">{pendingCount}</Text>
                         </View>
                       </View>
@@ -180,30 +148,30 @@ export default function HomeScreen() {
                   </View>
                 ) : (
                   <View>
-                    <Text className="text-slate-300 text-sm mb-3">
+                    <Text className="text-foreground opacity-60 text-sm mb-3.5 leading-5">
                       Link this mobile app to your web terminal to manage and decrypt your documents.
                     </Text>
                     <TouchableOpacity
                       onPress={() => router.push("/scan")}
-                      className="bg-indigo-600 rounded-xl py-3 items-center flex-row justify-center gap-2 active:bg-indigo-700"
+                      className="bg-primary rounded-xl py-3 items-center flex-row justify-center gap-2 active:opacity-85"
                     >
                       <QrCode size={16} color="#fff" />
                       <Text className="text-white font-bold text-sm">Pair Device</Text>
                     </TouchableOpacity>
                   </View>
                 )}
-              </AnimatedCard>
+              </View>
 
               {/* Quick Actions Card */}
-              <AnimatedCard delay={200} className="p-5">
-                <Text className="text-slate-400 text-center text-xs font-semibold uppercase tracking-wider mb-4">
+              <View className="border-border bg-card gap-4 rounded-xl border p-5 shadow-sm shadow-black/10 dark:shadow-none">
+                <Text className="text-foreground opacity-60 text-center text-xs font-semibold uppercase tracking-wider">
                   Quick Actions
                 </Text>
                 
-                <View className="gap-2">
+                <View className="gap-2.5 mt-1">
                   <TouchableOpacity
                     onPress={() => setSheetVisible(true)}
-                    className="bg-indigo-600 rounded-xl py-3.5 items-center justify-center active:bg-indigo-700 shadow-lg shadow-indigo-600/30"
+                    className="bg-primary rounded-xl py-3.5 items-center justify-center active:opacity-85 shadow-sm"
                   >
                     <Text className="text-white font-bold text-sm">Open Menu</Text>
                   </TouchableOpacity>
@@ -212,12 +180,12 @@ export default function HomeScreen() {
                     <View className="flex-row gap-2">
                       <TouchableOpacity
                         onPress={() => router.push("/inbox")}
-                        className="flex-1 border border-[#1e1e2d] bg-[#151520]/40 rounded-xl py-3.5 items-center justify-center flex-row gap-2 active:bg-[#1e1e2d]"
+                        className="flex-1 border border-border bg-background rounded-xl py-3.5 items-center justify-center flex-row gap-2 active:opacity-85"
                       >
-                        <Inbox size={15} color="#818cf8" />
-                        <Text className="text-slate-300 font-semibold text-sm">Inbox</Text>
+                        <Inbox size={15} color={colors.primary} />
+                        <Text className="text-foreground font-semibold text-sm">Inbox</Text>
                         {pendingCount > 0 && (
-                          <View className="bg-indigo-500 px-2 py-0.5 rounded-full">
+                          <View className="bg-primary px-2 py-0.5 rounded-full">
                             <Text className="text-white text-[9px] font-bold">{pendingCount}</Text>
                           </View>
                         )}
@@ -225,17 +193,17 @@ export default function HomeScreen() {
                     </View>
                   )}
                 </View>
-              </AnimatedCard>
+              </View>
 
               {/* Security Banner */}
-              <AnimatedCard delay={300} className="p-4 bg-slate-950/20 border border-slate-900">
+              <View className="border-border bg-card rounded-xl border p-4 shadow-sm shadow-black/10 dark:shadow-none">
                 <View className="flex-row gap-2.5 items-center justify-center">
-                  <Lock size={14} color="#475569" />
-                  <Text className="text-[11px] text-slate-500 text-center leading-5">
+                  <Lock size={14} color="#64748b" />
+                  <Text className="text-[11px] text-foreground opacity-60 text-center leading-5">
                     RSA private keys are saved inside local hardware keychain enclaves.
                   </Text>
                 </View>
-              </AnimatedCard>
+              </View>
 
             </View>
           )}
