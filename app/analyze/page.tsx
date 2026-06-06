@@ -395,6 +395,41 @@ export default function OperationPage() {
       .catch(() => {});
   }, []);
 
+  // Listen for mobile decryption event to automatically navigate to dashboard
+  useEffect(() => {
+    if (!transferId) return;
+
+    // 1. Broadcast Channel listener
+    const broadcastChannel = supabase.channel(`transfer_channel_${transferId}`);
+    broadcastChannel
+      .on("broadcast", { event: "decrypted" }, () => {
+        window.location.href = "/dashboard";
+      })
+      .subscribe();
+
+    // 2. Database DELETE listener (burn-after-reading fallback)
+    const dbChannel = supabase
+      .channel(`db-transfer-sync-${transferId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "ephemeral_transfers",
+          filter: `id=eq.${transferId}`,
+        },
+        () => {
+          window.location.href = "/dashboard";
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(broadcastChannel);
+      supabase.removeChannel(dbChannel);
+    };
+  }, [transferId]);
+
   // Fetch or auto-create a default device for the user to support direct QR sync
   useEffect(() => {
     const userId = user?.id || "default-local-user";

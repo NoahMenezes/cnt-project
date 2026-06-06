@@ -203,6 +203,24 @@ export default function DecryptScreen() {
             aes_iv: ""
           });
         }
+
+        // Broadcast decryption completion to the website and delete transfer (burn)
+        if (transfer && transfer.id) {
+          const broadcastChannel = supabase.channel(`transfer_channel_${transfer.id}`);
+          await broadcastChannel.subscribe(async (status) => {
+            if (status === "SUBSCRIBED") {
+              await broadcastChannel.send({
+                type: "broadcast",
+                event: "decrypted",
+                payload: { decrypted: true },
+              });
+              supabase.removeChannel(broadcastChannel);
+            }
+          });
+
+          // Delete the temporary transfer to trigger fallback listener
+          await supabase.from("ephemeral_transfers").delete().eq("id", transfer.id);
+        }
       } else {
         setDecryptError("Decryption failed. Please verify your AES Key is correct.");
       }
