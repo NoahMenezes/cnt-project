@@ -1,28 +1,26 @@
-import { useActionSheet } from "@expo/react-native-action-sheet";
 import { Stack, useRouter } from "expo-router";
 import { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { Inbox, Trash2, ShieldAlert, KeyRound, Clock, ArrowRightLeft } from "lucide-react-native";
 
 import { useColorScheme } from "@/lib/useColorScheme";
 import { getDeviceId } from "@/lib/secureStore";
 import { supabase } from "@/lib/supabase";
 import type { EphemeralTransfer } from "@/lib/supabase";
+import AnimatedCard from "@/components/AnimatedCard";
+import CustomSheet from "@/components/CustomSheet";
 
 export default function InboxScreen() {
   const router = useRouter();
-  const { colors, isDarkColorScheme } = useColorScheme();
-  const { showActionSheetWithOptions } = useActionSheet();
+  const { colors } = useColorScheme();
 
   const [transfers, setTransfers] = useState<EphemeralTransfer[]>([]);
   const [loading, setLoading] = useState(true);
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  
+  // Sheet state
+  const [selectedTransfer, setSelectedTransfer] = useState<EphemeralTransfer | null>(null);
+  const [sheetVisible, setSheetVisible] = useState(false);
 
   async function fetchTransfers(devId: string) {
     const { data, error } = await supabase
@@ -67,37 +65,8 @@ export default function InboxScreen() {
   }, [deviceId]);
 
   function openPayloadActions(transfer: EphemeralTransfer) {
-    const options = ["Decrypt", "Delete from Server", "Cancel"];
-    const destructiveButtonIndex = 1;
-    const cancelButtonIndex = 2;
-
-    showActionSheetWithOptions(
-      {
-        options,
-        cancelButtonIndex,
-        destructiveButtonIndex,
-        title: transfer.document_name || "Encrypted Payload",
-        containerStyle: {
-          backgroundColor: isDarkColorScheme ? "#0a0a14" : "#ffffff",
-        },
-        textStyle: { color: colors.foreground },
-        titleTextStyle: { color: colors.mutedForeground },
-      },
-      async (selectedIndex) => {
-        if (selectedIndex === 0) {
-          router.push({ pathname: "/decrypt", params: { transferId: transfer.id } });
-        }
-        if (selectedIndex === destructiveButtonIndex) {
-          Alert.alert("Delete Payload", "Permanently delete this from the server?", [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Delete", style: "destructive",
-              onPress: () => supabase.from("ephemeral_transfers").delete().eq("id", transfer.id),
-            },
-          ]);
-        }
-      }
-    );
+    setSelectedTransfer(transfer);
+    setSheetVisible(true);
   }
 
   function formatDate(iso: string) {
@@ -106,92 +75,144 @@ export default function InboxScreen() {
     });
   }
 
+  const sheetOptions = selectedTransfer
+    ? [
+        {
+          label: "Decrypt Document",
+          onPress: () => router.push({ pathname: "/decrypt", params: { transferId: selectedTransfer.id } }),
+        },
+        {
+          label: "Delete from Server",
+          destructive: true,
+          onPress: () => {
+            Alert.alert("Delete Payload", "Permanently delete this encrypted file?", [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Delete", style: "destructive",
+                onPress: async () => {
+                  await supabase.from("ephemeral_transfers").delete().eq("id", selectedTransfer.id);
+                },
+              },
+            ]);
+          },
+        },
+      ]
+    : [];
+
   return (
-    <>
+    <View className="flex-1 bg-[#0a0a0f]">
+      {/* Glow */}
+      <View
+        className="absolute top-0 left-0 w-80 h-80 rounded-full opacity-10"
+        style={{
+          backgroundColor: "#4f46e5",
+          transform: [{ translateX: -100 }, { translateY: -100 }],
+          shadowColor: "#4f46e5",
+          shadowRadius: 100,
+          shadowOpacity: 1,
+          elevation: 25,
+        }}
+      />
+
       <Stack.Screen
         options={{
           title: "Secure Inbox",
-          headerLargeTitle: true,
           headerTransparent: true,
+          headerBlurEffect: "dark",
         }}
       />
+
       <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        className="p-4"
+        className="flex-1"
+        contentContainerStyle={{ paddingTop: 100, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {loading ? (
-          <View className="flex-1 items-center justify-center py-20">
-            <ActivityIndicator color={colors.primary} size="large" />
-          </View>
-        ) : !deviceId ? (
-          <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-6 shadow-sm shadow-black/10 dark:shadow-none">
-            <Text className="text-foreground text-center text-sm font-medium tracking-wider opacity-60">
-              Not Paired
-            </Text>
-            <Text className="text-muted-foreground text-xs text-center">
-              Scan a QR code from the CipherVault web app to pair this device.
-            </Text>
-            <TouchableOpacity
-              onPress={() => router.push("/scan")}
-              className="bg-primary rounded-lg py-3 items-center"
-              activeOpacity={0.8}
-            >
-              <Text className="text-primary-foreground font-semibold text-sm">
-                Scan QR Code
+        <View className="px-6 gap-4">
+          {loading ? (
+            <View className="py-20">
+              <ActivityIndicator color="#818cf8" size="large" />
+            </View>
+          ) : !deviceId ? (
+            <AnimatedCard className="p-5 items-center justify-center">
+              <ShieldAlert size={40} color="#f59e0b" className="mb-3" />
+              <Text className="text-white text-base font-bold mb-2">Device Not Paired</Text>
+              <Text className="text-slate-400 text-xs text-center mb-4">
+                Please pair your device with the web interface to check your secure inbox.
               </Text>
-            </TouchableOpacity>
-          </View>
-        ) : transfers.length === 0 ? (
-          <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-6 shadow-sm shadow-black/10 dark:shadow-none">
-            <Text className="text-foreground text-center text-sm font-medium tracking-wider opacity-60">
-              Inbox Empty
-            </Text>
-            <Text className="text-muted-foreground text-xs text-center">
-              No encrypted payloads yet.{"\n"}Encrypt a document on the web app and send it here.
-            </Text>
-          </View>
-        ) : (
-          <View className="gap-3">
-            {transfers.map((transfer) => (
               <TouchableOpacity
-                key={transfer.id}
-                onPress={() => openPayloadActions(transfer)}
-                activeOpacity={0.7}
+                onPress={() => router.push("/scan")}
+                className="bg-indigo-600 rounded-xl px-5 py-3 active:bg-indigo-700"
               >
-                <View className="border-border bg-card gap-3 rounded-xl border p-4 shadow-sm shadow-black/10 dark:shadow-none">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-foreground font-semibold text-sm flex-1 mr-2" numberOfLines={1}>
-                      {transfer.document_name || "Encrypted Payload"}
-                    </Text>
-                    <Text className="text-muted-foreground text-[10px]">
-                      {formatDate(transfer.created_at)}
-                    </Text>
-                  </View>
-                  <View className="flex-row gap-2">
-                    <View className="px-2 py-0.5 rounded-full border border-border">
-                      <Text className="text-muted-foreground text-[10px] font-mono">
-                        {transfer.aes_mode}
-                      </Text>
-                    </View>
-                    <View className="px-2 py-0.5 rounded-full border border-border">
-                      <Text className="text-muted-foreground text-[10px] font-mono">
-                        RSA-WRAPPED
-                      </Text>
-                    </View>
-                  </View>
-                  <Text className="text-muted-foreground text-[10px] font-mono" numberOfLines={2}>
-                    {transfer.encrypted_payload.substring(0, 80)}…
-                  </Text>
-                  <Text className="text-muted-foreground text-[10px] text-right opacity-60">
-                    Tap to view actions
-                  </Text>
-                </View>
+                <Text className="text-white font-bold text-xs">Pair Now</Text>
               </TouchableOpacity>
-            ))}
-          </View>
-        )}
+            </AnimatedCard>
+          ) : transfers.length === 0 ? (
+            <AnimatedCard className="p-8 items-center justify-center border border-slate-900 bg-slate-950/20">
+              <Inbox size={48} color="#475569" className="mb-4" />
+              <Text className="text-slate-300 text-base font-bold mb-1">Inbox Empty</Text>
+              <Text className="text-slate-500 text-xs text-center leading-5">
+                Upload or encrypt a file in your web portal and forward it to this device node to test decryption.
+              </Text>
+            </AnimatedCard>
+          ) : (
+            <View className="gap-3">
+              <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">
+                Received Documents ({transfers.length})
+              </Text>
+              {transfers.map((transfer, index) => (
+                <AnimatedCard
+                  key={transfer.id}
+                  delay={index * 80}
+                  onPress={() => openPayloadActions(transfer)}
+                  className="p-4 border border-[#1e1e2d] active:border-indigo-500/50"
+                >
+                  <View className="flex-row items-center justify-between mb-3">
+                    <Text className="text-white font-bold text-sm flex-1 mr-3" numberOfLines={1}>
+                      {transfer.document_name || "Secure Package"}
+                    </Text>
+                    <View className="flex-row items-center gap-1">
+                      <Clock size={11} color="#64748b" />
+                      <Text className="text-slate-500 text-[10px]">
+                        {formatDate(transfer.created_at)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="flex-row gap-2 mb-3">
+                    <View className="px-2.5 py-0.5 rounded-full bg-slate-950/80 border border-slate-800">
+                      <Text className="text-slate-400 text-[9px] font-semibold font-mono">
+                        AES-{transfer.aes_mode}
+                      </Text>
+                    </View>
+                    <View className="px-2.5 py-0.5 rounded-full bg-indigo-500/5 border border-indigo-500/20">
+                      <Text className="text-indigo-400 text-[9px] font-semibold font-mono">
+                        RSA-WRAP
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text className="text-slate-500 text-[10px] font-mono mb-2 bg-slate-950/60 p-2 rounded-lg border border-slate-900/60" numberOfLines={2}>
+                    {transfer.encrypted_payload}
+                  </Text>
+
+                  <View className="flex-row items-center justify-end gap-1 opacity-70">
+                    <Text className="text-indigo-400 text-[9px] font-semibold">Options</Text>
+                    <KeyRound size={10} color="#818cf8" />
+                  </View>
+                </AnimatedCard>
+              ))}
+            </View>
+          )}
+        </View>
       </ScrollView>
-    </>
+
+      {/* Custom Bottom Sheet */}
+      <CustomSheet
+        visible={sheetVisible}
+        title={selectedTransfer?.document_name || "Secure Payload Options"}
+        options={sheetOptions}
+        onClose={() => setSheetVisible(false)}
+      />
+    </View>
   );
 }
