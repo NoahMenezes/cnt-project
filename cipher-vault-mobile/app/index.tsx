@@ -1,6 +1,6 @@
 import { Stack, useRouter } from "expo-router";
 import { useState, useEffect } from "react";
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { Shield, QrCode, Inbox, Lock, Laptop } from "lucide-react-native";
 
 import { useColorScheme } from "@/lib/useColorScheme";
@@ -38,11 +38,46 @@ export default function HomeScreen() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (!deviceId) return;
+    const channel = supabase
+      .channel("home_realtime")
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "ephemeral_transfers",
+        filter: `device_id=eq.${deviceId}`,
+      }, (payload) => {
+        setPendingCount((prev) => prev + 1);
+        Alert.alert(
+          "New Transfer Received",
+          `Encrypted document "${payload.new.document_name || "Secure Package"}" has been sent from the web console.`,
+          [
+            { text: "View Inbox", onPress: () => router.push("/inbox") },
+            { text: "Dismiss", style: "cancel" },
+          ]
+        );
+      })
+      .on("postgres_changes", {
+        event: "DELETE",
+        schema: "public",
+        table: "ephemeral_transfers",
+        filter: `device_id=eq.${deviceId}`,
+      }, () => {
+        setPendingCount((prev) => Math.max(0, prev - 1));
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [deviceId]);
+
   const actionSheetOptions = deviceId
     ? [
         { label: "Open Secure Inbox", onPress: () => router.push("/inbox") },
         { label: "Scan New QR Code", onPress: () => router.push("/scan") },
         { label: "Decrypt Payload", onPress: () => router.push("/decrypt") },
+        { label: "Encrypt & Send to Web", onPress: () => router.push("/send") },
       ]
     : [
         { label: "Scan QR Code to Pair", onPress: () => router.push("/scan") },
@@ -175,18 +210,28 @@ export default function HomeScreen() {
                   </TouchableOpacity>
 
                   {deviceId && (
-                    <TouchableOpacity
-                      onPress={() => router.push("/inbox")}
-                      className="border border-[#1e1e2d] bg-[#151520]/40 rounded-xl py-3.5 items-center justify-center flex-row gap-2 active:bg-[#1e1e2d]"
-                    >
-                      <Inbox size={15} color="#818cf8" />
-                      <Text className="text-slate-300 font-semibold text-sm">Inbox</Text>
-                      {pendingCount > 0 && (
-                        <View className="bg-indigo-500 px-2 py-0.5 rounded-full">
-                          <Text className="text-white text-[9px] font-bold">{pendingCount}</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
+                    <View className="flex-row gap-2">
+                      <TouchableOpacity
+                        onPress={() => router.push("/inbox")}
+                        className="flex-1 border border-[#1e1e2d] bg-[#151520]/40 rounded-xl py-3.5 items-center justify-center flex-row gap-2 active:bg-[#1e1e2d]"
+                      >
+                        <Inbox size={15} color="#818cf8" />
+                        <Text className="text-slate-300 font-semibold text-sm">Inbox</Text>
+                        {pendingCount > 0 && (
+                          <View className="bg-indigo-500 px-2 py-0.5 rounded-full">
+                            <Text className="text-white text-[9px] font-bold">{pendingCount}</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        onPress={() => router.push("/send")}
+                        className="flex-1 border border-indigo-500/30 bg-indigo-500/5 rounded-xl py-3.5 items-center justify-center flex-row gap-2 active:bg-indigo-500/10"
+                      >
+                        <Lock size={15} color="#818cf8" />
+                        <Text className="text-indigo-300 font-semibold text-sm">Send to Web</Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
                 </View>
               </AnimatedCard>

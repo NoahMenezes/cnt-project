@@ -152,3 +152,17 @@ export function hybridDecrypt(
     };
   }
 }
+
+export function aesEncryptSim(text: string, keyHex: string): { ciphertext: string; iv: string } {
+  const iv = Array.from({ length: 12 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, "0")).join("");
+  const salt = keyHex.substring(0, 6);
+  const enc = btoa(encodeURIComponent(text + "||SALT||" + salt));
+  return { ciphertext: enc, iv };
+}
+
+export function generateAESKeyHex(bits: number): string {
+  return Array.from({ length: bits / 8 }, () =>
+    Math.floor(Math.random() * 256).toString(16).padStart(2, "0")
+  ).join("");
+}
+

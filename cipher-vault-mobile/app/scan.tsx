@@ -25,10 +25,31 @@ export default function ScanScreen() {
 
     try {
       const payload = JSON.parse(data) as {
-        deviceId: string;
-        deviceName: string;
-        userId: string;
+        deviceId?: string;
+        deviceName?: string;
+        userId?: string;
+        transferId?: string;
       };
+
+      if (payload.transferId) {
+        Alert.alert(
+          "🔒 Payload Detected",
+          "An encrypted document transfer has been scanned. Load in Decryption Node?",
+          [
+            { text: "Cancel", style: "cancel", onPress: () => setScanned(false) },
+            {
+              text: "Load",
+              onPress: () => {
+                router.replace({
+                  pathname: "/decrypt",
+                  params: { transferId: payload.transferId },
+                });
+              },
+            },
+          ]
+        );
+        return;
+      }
 
       if (!payload.deviceId || !payload.userId) {
         Alert.alert("Invalid QR Code", "This QR code is not from CipherVault.", [

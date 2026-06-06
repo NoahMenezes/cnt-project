@@ -50,7 +50,12 @@ export default function InboxScreen() {
         table: "ephemeral_transfers",
         filter: `device_id=eq.${deviceId}`,
       }, (payload) => {
-        setTransfers((prev) => [payload.new as EphemeralTransfer, ...prev]);
+        const newTransfer = payload.new as EphemeralTransfer;
+        setTransfers((prev) => [newTransfer, ...prev]);
+        Alert.alert(
+          "New Transfer Received",
+          `Encrypted document "${newTransfer.document_name || "Secure Package"}" received in your inbox.`
+        );
       })
       .on("postgres_changes", {
         event: "DELETE",
