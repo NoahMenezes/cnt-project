@@ -75,7 +75,7 @@ export default function ScanScreen() {
                 if (rawTransferStr) params.rawTransferStr = rawTransferStr;
                 
                 router.replace({
-                  pathname: "/decrypt",
+                  pathname: "/",
                   params,
                 });
               },

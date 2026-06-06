@@ -1533,8 +1533,8 @@ export default function OperationPage() {
                   <div className="bg-white p-3 rounded-xl shadow-xl flex items-center justify-center">
                     <QRCodeSVG
                       value={qrMode === "expo" 
-                        ? `exp://${localIP}:8081/--/decrypt?transferId=${transferId}` 
-                        : `http://${localIP}:8081/decrypt?transferId=${transferId}`}
+                        ? `exp://${localIP}:8081/?transferId=${transferId}` 
+                        : (typeof window !== "undefined" ? `${window.location.origin}/decrypt?transferId=${transferId}` : `http://${localIP}:3000/decrypt?transferId=${transferId}`)}
                       size={160}
                       level="L"
                       includeMargin={false}
@@ -1564,12 +1564,12 @@ export default function OperationPage() {
                   <p className="text-[11px] text-foreground/60 leading-relaxed">
                     {qrMode === "expo" 
                       ? "Scan with your phone's camera or Expo Go scanner to boot the React Native app directly."
-                      : "Scan with your phone's camera app to view the mobile UI rendered inside your web browser."}
+                      : "Scan with your phone's camera app to open a Universal Deep Link page in your browser."}
                   </p>
                   <div className="bg-background/40 border border-border/10 rounded-lg p-2.5 font-mono text-[9px] text-foreground/40 break-all select-all">
                     {qrMode === "expo"
-                      ? `exp://${localIP}:8081/--/decrypt?transferId=${transferId}`
-                      : `http://${localIP}:8081/decrypt?transferId=${transferId}`}
+                      ? `exp://${localIP}:8081/?transferId=${transferId}`
+                      : (typeof window !== "undefined" ? `${window.location.origin}/decrypt?transferId=${transferId}` : `http://${localIP}:3000/decrypt?transferId=${transferId}`)}
                   </div>
                   <p className="text-[9px] text-indigo-400/70">
                     Ensure both your phone and this computer are connected to the same local network.

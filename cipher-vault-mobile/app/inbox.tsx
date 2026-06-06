@@ -85,7 +85,7 @@ export default function InboxScreen() {
     ? [
         {
           label: "Decrypt Document",
-          onPress: () => router.push({ pathname: "/decrypt", params: { transferId: selectedTransfer.id } }),
+          onPress: () => router.push({ pathname: "/", params: { transferId: selectedTransfer.id } }),
         },
         {
           label: "Delete from Server",
