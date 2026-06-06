@@ -11,9 +11,7 @@ import type { EphemeralTransfer } from "@/lib/supabase";
 import { 
   extractRSAPrivateNumbers, 
   rsaDecryptString, 
-  aesDecryptSim, 
-  aesEncryptSim, 
-  generateAESKeyHex 
+  aesDecryptSim 
 } from "@/lib/crypto";
 import CustomSheet from "@/components/CustomSheet";
 import AnimatedBackground from "@/components/AnimatedBackground";
@@ -34,7 +32,6 @@ export default function DecryptScreen() {
   const [aesKey, setAesKey] = useState("");
 
   const [showKey, setShowKey] = useState(false);
-  const [showAesKey, setShowAesKey] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
   
   const [decryptedText, setDecryptedText] = useState("");
@@ -48,12 +45,6 @@ export default function DecryptScreen() {
   const [extractedAESKey, setExtractedAESKey] = useState("");
   const [extractedESKey, setExtractedESKey] = useState("");
 
-  // Mobile Encryption States
-  const [encryptDocName, setEncryptDocName] = useState("Mobile Encrypted Document");
-  const [encryptPlainText, setEncryptPlainText] = useState("");
-  const [encryptAesKey, setEncryptAesKey] = useState("");
-  const [encrypting, setEncrypting] = useState(false);
-  
   // Sheet state
   const [sheetVisible, setSheetVisible] = useState(false);
 
@@ -231,44 +222,7 @@ export default function DecryptScreen() {
     }
   };
 
-  const handleEncryptData = async () => {
-    if (!encryptPlainText.trim()) {
-      Alert.alert("Input Required", "Please enter some plaintext data to encrypt.");
-      return;
-    }
-    if (!encryptAesKey.trim()) {
-      Alert.alert("Input Required", "Please generate or paste an AES Key.");
-      return;
-    }
-    if (!deviceId) {
-      Alert.alert("Device Error", "Pair your mobile device first to insert to the database.");
-      return;
-    }
 
-    setEncrypting(true);
-    try {
-      const { ciphertext, iv } = aesEncryptSim(encryptPlainText, encryptAesKey.trim());
-      const { error } = await supabase.from("ephemeral_transfers").insert({
-        device_id: deviceId,
-        document_name: encryptDocName || "Mobile Encrypted Document",
-        encrypted_payload: ciphertext,
-        encrypted_session_key: encryptAesKey.trim(),
-        aes_mode: "GCM",
-        aes_iv: iv
-      });
-
-      if (!error) {
-        Alert.alert("✅ Document Encrypted", "Encrypted document successfully saved to Supabase!");
-        setEncryptPlainText("");
-      } else {
-        Alert.alert("Database Error", error.message);
-      }
-    } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Encryption failed.");
-    } finally {
-      setEncrypting(false);
-    }
-  };
 
   const handleDownloadFile = () => {
     if (!decryptedFileBase64) return;
@@ -504,26 +458,13 @@ export default function DecryptScreen() {
 
                 <View className="gap-1">
                   <Text className="text-foreground text-xs font-medium opacity-70">Decrypted AES Key Input</Text>
-                  <View className="relative">
-                    <TextInput
-                      value={aesKey}
-                      onChangeText={setAesKey}
-                      placeholder="AES Symmetric Key (will auto-fill from Step 1)"
-                      placeholderTextColor="#64748b"
-                      secureTextEntry={!showAesKey}
-                      className="w-full bg-background border border-border text-foreground rounded-xl p-3 font-mono text-[10px]"
-                    />
-                    <TouchableOpacity
-                      onPress={() => setShowAesKey((v) => !v)}
-                      className="absolute top-3.5 right-3"
-                    >
-                      {showAesKey ? (
-                        <EyeOff size={14} color="#64748b" />
-                      ) : (
-                        <Eye size={14} color="#64748b" />
-                      )}
-                    </TouchableOpacity>
-                  </View>
+                  <TextInput
+                    value={aesKey}
+                    onChangeText={setAesKey}
+                    placeholder="AES Symmetric Key (will auto-fill from Step 1)"
+                    placeholderTextColor="#64748b"
+                    className="w-full bg-background border border-border text-foreground rounded-xl p-3 font-mono text-[10px]"
+                  />
                 </View>
 
                 <View className="gap-1">
@@ -553,70 +494,6 @@ export default function DecryptScreen() {
                     </View>
                   ) : (
                     <Text className="text-white font-bold text-sm">Decrypt Document (AES)</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {/* Encryption Node Section (Mobile Encryption) */}
-              <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-5 shadow-sm shadow-black/10 dark:shadow-none">
-                <Text className="text-foreground text-xs font-semibold uppercase tracking-wider opacity-60">
-                  Encryption Node (Local Mobile Encrypt)
-                </Text>
-
-                <View className="gap-1">
-                  <Text className="text-foreground text-xs font-medium opacity-70">Document Name</Text>
-                  <TextInput
-                    value={encryptDocName}
-                    onChangeText={setEncryptDocName}
-                    placeholder="Enter document name..."
-                    placeholderTextColor="#64748b"
-                    className="w-full bg-background border border-border text-foreground rounded-xl p-3 font-mono text-[10px]"
-                  />
-                </View>
-
-                <View className="gap-1">
-                  <Text className="text-foreground text-xs font-medium opacity-70">AES Key Hex (Symmetric)</Text>
-                  <View className="flex-row gap-2">
-                    <TextInput
-                      value={encryptAesKey}
-                      onChangeText={setEncryptAesKey}
-                      placeholder="Symmetric AES Key..."
-                      placeholderTextColor="#64748b"
-                      className="flex-1 bg-background border border-border text-foreground rounded-xl p-2.5 font-mono text-[10px]"
-                    />
-                    <TouchableOpacity
-                      onPress={() => setEncryptAesKey(generateAESKeyHex(256))}
-                      className="bg-primary/10 border border-primary/20 px-3 items-center justify-center rounded-xl"
-                    >
-                      <Text className="text-primary text-[10px] font-bold">Generate</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View className="gap-1">
-                  <Text className="text-foreground text-xs font-medium opacity-70">Plaintext to Encrypt</Text>
-                  <TextInput
-                    value={encryptPlainText}
-                    onChangeText={setEncryptPlainText}
-                    multiline
-                    numberOfLines={3}
-                    placeholder="Type private message here..."
-                    placeholderTextColor="#64748b"
-                    className="w-full bg-background border border-border text-foreground rounded-xl p-3 font-mono text-[10px]"
-                    style={{ minHeight: 70, textAlignVertical: "top" }}
-                  />
-                </View>
-
-                <TouchableOpacity
-                  onPress={handleEncryptData}
-                  disabled={encrypting}
-                  className="bg-primary rounded-xl py-3 items-center justify-center active:opacity-85 shadow-sm"
-                  style={{ opacity: encrypting ? 0.6 : 1 }}
-                >
-                  {encrypting ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text className="text-white font-bold text-xs">Encrypt & Save to Database</Text>
                   )}
                 </TouchableOpacity>
               </View>
