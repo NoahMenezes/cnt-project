@@ -9,6 +9,7 @@ import { getDeviceId, getDeviceName } from "@/lib/secureStore";
 import { supabase } from "@/lib/supabase";
 import ShieldGraphic from "@/components/ShieldGraphic";
 import CustomSheet from "@/components/CustomSheet";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -83,7 +84,8 @@ export default function HomeScreen() {
       ];
 
   return (
-    <View className="flex-1 bg-background" style={{ overflow: "hidden" }}>
+    <View className="flex-1" style={{ overflow: "hidden" }}>
+      <AnimatedBackground />
       <Stack.Screen
         options={{
           title: "CipherVault",
@@ -94,7 +96,7 @@ export default function HomeScreen() {
 
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        className="p-4"
+        className="p-4 bg-transparent"
         contentContainerStyle={{ paddingTop: 140, paddingBottom: 60, alignItems: "center" }}
         showsVerticalScrollIndicator={false}
       >

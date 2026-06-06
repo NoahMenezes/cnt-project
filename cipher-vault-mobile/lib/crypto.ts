@@ -14,7 +14,7 @@ function modPow(base: bigint, exp: bigint, mod: bigint): bigint {
   return res;
 }
 
-function rsaDecryptString(cipherText: string, d: bigint, n: bigint): string {
+export function rsaDecryptString(cipherText: string, d: bigint, n: bigint): string {
   const chunks = cipherText.split("-");
   let out = "";
   for (const chunk of chunks) {
@@ -59,12 +59,38 @@ export function extractRSAPrivateNumbers(
   pem: string
 ): { d: bigint; n: bigint } | null {
   try {
-    const params = parsePEMParams(pem);
-    if (!params) return null;
-    const n = BigInt(params.n ?? "0");
-    const d = BigInt(params.d ?? "0");
-    if (n <= BigInt(0) || d <= BigInt(0)) return null;
-    return { d, n };
+    const cleaned = pem.trim();
+    
+    // Format 1: Direct JSON string
+    if (cleaned.startsWith("{")) {
+      const obj = JSON.parse(cleaned);
+      const n = BigInt(obj.n ?? "0");
+      const d = BigInt(obj.d ?? "0");
+      if (n > BigInt(0) && d > BigInt(0)) return { d, n };
+    }
+
+    // Format 2: PEM containing raw JSON instead of Base64
+    if (cleaned.includes("BEGIN") && (cleaned.includes("n") || cleaned.includes("d"))) {
+      const jsonStart = cleaned.indexOf("{");
+      const jsonEnd = cleaned.lastIndexOf("}");
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        const jsonStr = cleaned.substring(jsonStart, jsonEnd + 1);
+        const obj = JSON.parse(jsonStr);
+        const n = BigInt(obj.n ?? "0");
+        const d = BigInt(obj.d ?? "0");
+        if (n > BigInt(0) && d > BigInt(0)) return { d, n };
+      }
+    }
+
+    // Format 3: Original Base64-encoded PEM
+    const params = parsePEMParams(cleaned);
+    if (params) {
+      const n = BigInt(params.n ?? "0");
+      const d = BigInt(params.d ?? "0");
+      if (n > BigInt(0) && d > BigInt(0)) return { d, n };
+    }
+    
+    return null;
   } catch {
     return null;
   }

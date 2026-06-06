@@ -1,48 +1,65 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert, Share, Clipboard } from "react-native";
-import { KeyRound, Eye, EyeOff, ShieldCheck, Download, Trash2 } from "lucide-react-native";
+import { KeyRound, Eye, EyeOff, ShieldCheck, Download, Trash2, Key, Lock, ArrowRightLeft } from "lucide-react-native";
 
 import { ActivityIndicator } from "@/components/nativewindui/ActivityIndicator";
 import { useColorScheme } from "@/lib/useColorScheme";
-import { getPrivateKey, savePrivateKey } from "@/lib/secureStore";
+import { getDeviceId } from "@/lib/secureStore";
 import { supabase } from "@/lib/supabase";
 import type { EphemeralTransfer } from "@/lib/supabase";
-import { hybridDecrypt } from "@/lib/crypto";
+import { 
+  extractRSAPrivateNumbers, 
+  rsaDecryptString, 
+  aesDecryptSim, 
+  aesEncryptSim, 
+  generateAESKeyHex 
+} from "@/lib/crypto";
 import CustomSheet from "@/components/CustomSheet";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function DecryptScreen() {
   const { transferId, rawTransferStr } = useLocalSearchParams<{ transferId?: string, rawTransferStr?: string }>();
   const router = useRouter();
   const { colors } = useColorScheme();
 
+  const [deviceId, setDeviceId] = useState<string | null>(null);
   const [transfer, setTransfer] = useState<EphemeralTransfer | null>(null);
   const [loadingTransfer, setLoadingTransfer] = useState(!!transferId || !!rawTransferStr);
   
-  // Decryption Keys Input & States
+  // Decryption inputs (ALWAYS empty on mount)
   const [privateKey, setPrivateKey] = useState("");
+  const [esKey, setEsKey] = useState("");
+  const [encryptedPayloadInput, setEncryptedPayloadInput] = useState("");
+  const [aesKey, setAesKey] = useState("");
+
   const [showKey, setShowKey] = useState(false);
+  const [showAesKey, setShowAesKey] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
+  
   const [decryptedText, setDecryptedText] = useState("");
   const [decryptedFileBase64, setDecryptedFileBase64] = useState("");
   const [decryptedFileName, setDecryptedFileName] = useState("Decrypted Document");
   const [decryptError, setDecryptError] = useState("");
-  const [hasSavedKey, setHasSavedKey] = useState(false);
 
-  // Extracted Keys for Display (Uploaded with document)
+  // Extracted Keys for Display (from parsed synced transfer, but do NOT prefill inputs)
   const [extractedPrivateKey, setExtractedPrivateKey] = useState("");
   const [extractedPublicKey, setExtractedPublicKey] = useState("");
   const [extractedAESKey, setExtractedAESKey] = useState("");
+  const [extractedESKey, setExtractedESKey] = useState("");
+
+  // Mobile Encryption States
+  const [encryptDocName, setEncryptDocName] = useState("Mobile Encrypted Document");
+  const [encryptPlainText, setEncryptPlainText] = useState("");
+  const [encryptAesKey, setEncryptAesKey] = useState("");
+  const [encrypting, setEncrypting] = useState(false);
   
   // Sheet state
   const [sheetVisible, setSheetVisible] = useState(false);
 
   useEffect(() => {
-    getPrivateKey().then((key) => {
-      if (key) {
-        setPrivateKey(key);
-        setHasSavedKey(true);
-      }
+    getDeviceId().then((id) => {
+      setDeviceId(id);
     });
   }, []);
 
@@ -59,11 +76,18 @@ export default function DecryptScreen() {
         if (keysObj.aes_key) {
           setExtractedAESKey(keysObj.aes_key);
         }
-        // Extract the actual wrapped session key for hybrid decryption
-        tr.encrypted_session_key = keysObj.encrypted_session_key || "";
+        
+        const actualESKey = keysObj.encrypted_session_key || "";
+        setExtractedESKey(actualESKey);
+        setEncryptedPayloadInput(tr.encrypted_payload || "");
+        
+        tr.encrypted_session_key = actualESKey;
+      } else {
+        setExtractedESKey(tr.encrypted_session_key || "");
+        setEncryptedPayloadInput(tr.encrypted_payload || "");
       }
     } catch (e) {
-      // Not JSON
+      // Ignore
     }
     return tr;
   };
@@ -97,63 +121,140 @@ export default function DecryptScreen() {
       });
   }, [transferId, rawTransferStr]);
 
-  async function handleDecrypt() {
+  const handleDecryptESKey = () => {
     if (!privateKey.trim()) {
-      setDecryptError("Paste your RSA Private Key to decrypt.");
+      Alert.alert("Input Required", "Please paste your RSA Private Key.");
       return;
     }
-    if (!transfer) {
-      setDecryptError("No payload loaded.");
+    if (!esKey.trim()) {
+      Alert.alert("Input Required", "Please paste your Encrypted Session Key (ES Key).");
       return;
     }
+
+    const parsed = extractRSAPrivateNumbers(privateKey.trim());
+    if (!parsed) {
+      Alert.alert("Error", "Could not read RSA private key. Make sure it is copied completely.");
+      return;
+    }
+
+    try {
+      const { d, n } = parsed;
+      const unwrapped = rsaDecryptString(esKey.trim(), d, n);
+      if (unwrapped && unwrapped.trim()) {
+        setAesKey(unwrapped.trim());
+        Alert.alert("✅ AES Key Decrypted", `Successfully unwrapped the AES key: ${unwrapped}`);
+      } else {
+        Alert.alert("Error", "RSA decryption yielded an empty string. Verify your keys.");
+      }
+    } catch (err) {
+      Alert.alert("Decryption Error", err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleDecryptDocument = async () => {
+    if (!aesKey.trim()) {
+      setDecryptError("AES Key is empty. Decrypt the ES Key or paste a symmetric key first.");
+      return;
+    }
+    if (!encryptedPayloadInput.trim()) {
+      setDecryptError("Encrypted payload input is empty.");
+      return;
+    }
+
     setDecrypting(true);
     setDecryptError("");
     setDecryptedText("");
     setDecryptedFileBase64("");
+
     await new Promise((r) => setTimeout(r, 600));
-    const result = hybridDecrypt(
-      transfer.encrypted_payload,
-      transfer.encrypted_session_key,
-      privateKey
-    );
-    if (result.success) {
-      let dispText = result.plaintext;
-      let b64 = "";
-      let fName = "Decrypted Document";
 
-      try {
-        if (result.plaintext.trim().startsWith("{")) {
-          const parsed = JSON.parse(result.plaintext);
-          if (parsed.type === "file_package") {
-            dispText = parsed.plaintext;
-            b64 = parsed.fileBase64;
-            fName = parsed.fileName || fName;
+    try {
+      const plaintext = aesDecryptSim(encryptedPayloadInput.trim(), aesKey.trim());
+      if (plaintext && plaintext.trim()) {
+        let dispText = plaintext;
+        let b64 = "";
+        let fName = "Decrypted Document";
+
+        try {
+          if (plaintext.trim().startsWith("{")) {
+            const parsed = JSON.parse(plaintext);
+            if (parsed.type === "file_package") {
+              dispText = parsed.plaintext;
+              b64 = parsed.fileBase64;
+              fName = parsed.fileName || fName;
+            }
           }
+        } catch (e) {
+          // Not a JSON package
         }
-      } catch (e) {
-        // Not a JSON file package
+
+        setDecryptedText(dispText);
+        setDecryptedFileBase64(b64);
+        setDecryptedFileName(fName);
+
+        // Store decrypted log record in Supabase
+        if (deviceId) {
+          await supabase.from("ephemeral_transfers").insert({
+            device_id: deviceId,
+            document_name: `Decrypted: ${fName}`,
+            encrypted_payload: dispText,
+            encrypted_session_key: `AES_KEY:${aesKey.trim()}`,
+            aes_mode: "GCM",
+            aes_iv: ""
+          });
+        }
+      } else {
+        setDecryptError("Decryption failed. Please verify your AES Key is correct.");
       }
-
-      setDecryptedText(dispText);
-      setDecryptedFileBase64(b64);
-      setDecryptedFileName(fName);
-    } else {
-      setDecryptError(result.error ?? "Decryption failed.");
+    } catch (err) {
+      setDecryptError(err instanceof Error ? err.message : "Symmetric decryption failed.");
+    } finally {
+      setDecrypting(false);
     }
-    setDecrypting(false);
-  }
+  };
 
-  async function handleSaveKey() {
-    if (!privateKey.trim()) return;
-    await savePrivateKey(privateKey.trim());
-    setHasSavedKey(true);
-    Alert.alert("✅ Key Saved", "RSA Private Key securely stored inside device enclave.");
-  }
+  const handleEncryptData = async () => {
+    if (!encryptPlainText.trim()) {
+      Alert.alert("Input Required", "Please enter some plaintext data to encrypt.");
+      return;
+    }
+    if (!encryptAesKey.trim()) {
+      Alert.alert("Input Required", "Please generate or paste an AES Key.");
+      return;
+    }
+    if (!deviceId) {
+      Alert.alert("Device Error", "Pair your mobile device first to insert to the database.");
+      return;
+    }
+
+    setEncrypting(true);
+    try {
+      const { ciphertext, iv } = aesEncryptSim(encryptPlainText, encryptAesKey.trim());
+      const { error } = await supabase.from("ephemeral_transfers").insert({
+        device_id: deviceId,
+        document_name: encryptDocName || "Mobile Encrypted Document",
+        encrypted_payload: ciphertext,
+        encrypted_session_key: encryptAesKey.trim(),
+        aes_mode: "GCM",
+        aes_iv: iv
+      });
+
+      if (!error) {
+        Alert.alert("✅ Document Encrypted", "Encrypted document successfully saved to Supabase!");
+        setEncryptPlainText("");
+      } else {
+        Alert.alert("Database Error", error.message);
+      }
+    } catch (err) {
+      Alert.alert("Error", err instanceof Error ? err.message : "Encryption failed.");
+    } finally {
+      setEncrypting(false);
+    }
+  };
 
   const handleDownloadFile = () => {
     if (!decryptedFileBase64) return;
     try {
-      // Standard browser download link for mobile browsers/web
       const link = document.createElement("a");
       link.href = decryptedFileBase64;
       link.download = decryptedFileName;
@@ -162,7 +263,6 @@ export default function DecryptScreen() {
       document.body.removeChild(link);
       Alert.alert("Success", `Downloaded ${decryptedFileName} successfully.`);
     } catch (err) {
-      // Sharing fallback for native devices
       Share.share({
         url: decryptedFileBase64,
         title: decryptedFileName,
@@ -185,32 +285,13 @@ export default function DecryptScreen() {
         await Share.share({ message: decryptedText });
       },
     },
-    {
-      label: "Burn (Delete from Server)",
-      destructive: true,
-      onPress: () => {
-        if (!transfer) return;
-        Alert.alert(
-          "🔥 Burn After Reading",
-          "This will delete the encrypted payload from the server forever.",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Delete",
-              style: "destructive",
-              onPress: async () => {
-                await supabase.from("ephemeral_transfers").delete().eq("id", transfer.id);
-                router.replace("/inbox");
-              },
-            },
-          ]
-        );
-      },
-    },
   ];
 
   return (
-    <View className="flex-1 bg-background" style={{ overflow: "hidden" }}>
+    <View className="flex-1" style={{ overflow: "hidden" }}>
+      {/* Dynamic Animated Motion Background */}
+      <AnimatedBackground />
+
       <Stack.Screen
         options={{
           title: "Decryption Node",
@@ -221,7 +302,7 @@ export default function DecryptScreen() {
 
       <ScrollView 
         contentInsetAdjustmentBehavior="automatic" 
-        className="p-4"
+        className="p-4 bg-transparent"
         contentContainerStyle={{ paddingTop: 140, paddingBottom: 60, alignItems: "center" }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -238,15 +319,27 @@ export default function DecryptScreen() {
           ) : (
             <View className="gap-4">
               
-              {/* Document Overview */}
+              {/* Document Title Header */}
+              {transfer && (
+                <View className="items-center mb-2">
+                  <Text className="text-foreground opacity-60 text-[10px] font-bold uppercase tracking-wider">
+                    Active Decryption Document
+                  </Text>
+                  <Text className="text-foreground text-xl font-extrabold text-center mt-1">
+                    {transfer.document_name}
+                  </Text>
+                </View>
+              )}
+
+              {/* Source Package Info */}
               {transfer && (
                 <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-5 shadow-sm shadow-black/10 dark:shadow-none">
                   <Text className="text-foreground text-xs font-semibold uppercase tracking-wider opacity-60">
-                    Source Package Info
+                    Source Package Details
                   </Text>
                   <View className="gap-1.5">
-                    <Text className="text-foreground text-base font-bold">
-                      {transfer.document_name}
+                    <Text className="text-foreground text-sm font-medium">
+                      Name: {transfer.document_name}
                     </Text>
                     <View className="flex-row gap-2 mt-1">
                       <View className="px-2.5 py-0.5 rounded-full bg-background border border-border">
@@ -264,24 +357,24 @@ export default function DecryptScreen() {
                 </View>
               )}
 
-              {/* Display Extracted Transmission Keys */}
-              {transfer && (extractedPrivateKey || extractedPublicKey || extractedAESKey) && (
+              {/* Transmission Keys Enclave Display */}
+              {transfer && (extractedPrivateKey || extractedPublicKey || extractedAESKey || extractedESKey) && (
                 <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-5 shadow-sm shadow-black/10 dark:shadow-none">
                   <Text className="text-foreground text-xs font-semibold uppercase tracking-wider opacity-60">
                     Transmission Keys Enclave
                   </Text>
 
-                  {extractedAESKey ? (
+                  {extractedESKey ? (
                     <View className="gap-1.5">
-                      <Text className="text-foreground text-xs font-medium opacity-80">AES Session Key</Text>
+                      <Text className="text-foreground text-xs font-medium opacity-80">Encrypted Session Key (ES Key)</Text>
                       <View className="flex-row gap-2 items-center bg-background border border-border rounded-xl p-2.5">
                         <Text className="text-foreground font-mono text-[10px] flex-1" numberOfLines={1}>
-                          {extractedAESKey}
+                          {extractedESKey}
                         </Text>
                         <TouchableOpacity
                           onPress={() => {
-                            Clipboard.setString(extractedAESKey);
-                            Alert.alert("Copied", "AES Session Key copied to clipboard.");
+                            Clipboard.setString(extractedESKey);
+                            Alert.alert("Copied", "ES Key copied to clipboard.");
                           }}
                           className="bg-primary/10 px-3 py-1.5 rounded-lg active:opacity-75"
                         >
@@ -291,17 +384,17 @@ export default function DecryptScreen() {
                     </View>
                   ) : null}
 
-                  {extractedPublicKey ? (
+                  {extractedAESKey ? (
                     <View className="gap-1.5">
-                      <Text className="text-foreground text-xs font-medium opacity-80">RSA Public Key</Text>
+                      <Text className="text-foreground text-xs font-medium opacity-80">AES Session Key (Reference)</Text>
                       <View className="flex-row gap-2 items-center bg-background border border-border rounded-xl p-2.5">
                         <Text className="text-foreground font-mono text-[10px] flex-1" numberOfLines={1}>
-                          {extractedPublicKey}
+                          {extractedAESKey}
                         </Text>
                         <TouchableOpacity
                           onPress={() => {
-                            Clipboard.setString(extractedPublicKey);
-                            Alert.alert("Copied", "RSA Public Key copied to clipboard.");
+                            Clipboard.setString(extractedAESKey);
+                            Alert.alert("Copied", "AES key copied to clipboard.");
                           }}
                           className="bg-primary/10 px-3 py-1.5 rounded-lg active:opacity-75"
                         >
@@ -314,7 +407,7 @@ export default function DecryptScreen() {
                   {extractedPrivateKey ? (
                     <View className="gap-1.5">
                       <Text className="text-foreground text-xs font-medium opacity-80">RSA Private Key</Text>
-                      <View className="bg-background border border-border rounded-xl p-3 gap-2.5">
+                      <View className="bg-background border border-border rounded-xl p-3 gap-2">
                         <Text className="text-foreground font-mono text-[9px] opacity-60" numberOfLines={4}>
                           {extractedPrivateKey}
                         </Text>
@@ -333,78 +426,104 @@ export default function DecryptScreen() {
                 </View>
               )}
 
-              {/* Decryption Node input */}
+              {/* Step 1: RSA Decrypt ES Key Section */}
               <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-5 shadow-sm shadow-black/10 dark:shadow-none">
-                <View className="flex-row items-center justify-between border-b border-border pb-3">
-                  <View className="flex-row items-center gap-2">
-                    <KeyRound size={16} color={colors.primary} />
-                    <Text className="text-foreground text-xs font-semibold uppercase tracking-wider opacity-60">
-                      RSA Private Key Input
-                    </Text>
-                  </View>
-                  {hasSavedKey && (
+                <Text className="text-foreground text-xs font-semibold uppercase tracking-wider opacity-60">
+                  Step 1: RSA Session Key Unwrap
+                </Text>
+
+                <View className="gap-1">
+                  <Text className="text-foreground text-xs font-medium opacity-70">RSA Private Key Input</Text>
+                  <View className="relative">
+                    <TextInput
+                      value={privateKey}
+                      onChangeText={setPrivateKey}
+                      multiline
+                      numberOfLines={4}
+                      placeholder="-----BEGIN RSA PRIVATE KEY-----"
+                      placeholderTextColor="#64748b"
+                      secureTextEntry={!showKey}
+                      className="w-full bg-background border border-border text-foreground rounded-xl p-3 font-mono text-[10px]"
+                      style={{ minHeight: 90, textAlignVertical: "top" }}
+                    />
                     <TouchableOpacity
-                      onPress={() => setHasSavedKey(false)}
-                      className="px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 active:opacity-75"
+                      onPress={() => setShowKey((v) => !v)}
+                      className="absolute top-3 right-3"
                     >
-                      <Text className="text-primary text-[10px] font-bold">Replace Key</Text>
+                      {showKey ? (
+                        <EyeOff size={14} color="#64748b" />
+                      ) : (
+                        <Eye size={14} color="#64748b" />
+                      )}
                     </TouchableOpacity>
-                  )}
+                  </View>
                 </View>
 
-                {hasSavedKey ? (
-                  <View className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 flex-row items-center gap-3">
-                    <ShieldCheck size={20} color="#10b981" />
-                    <View className="flex-1">
-                      <Text className="text-emerald-500 text-xs font-semibold">
-                        Key Authenticated
-                      </Text>
-                      <Text className="text-foreground opacity-50 text-[10px] mt-0.5">
-                        Secure hardware store loading enabled.
-                      </Text>
-                    </View>
-                  </View>
-                ) : (
-                  <View className="gap-3">
-                    <View className="relative">
-                      <TextInput
-                        value={privateKey}
-                        onChangeText={setPrivateKey}
-                        multiline
-                        numberOfLines={5}
-                        placeholder="-----BEGIN RSA PRIVATE KEY-----"
-                        placeholderTextColor="#64748b"
-                        secureTextEntry={!showKey}
-                        className="w-full bg-background border border-border text-foreground rounded-xl p-3 font-mono text-[10px]"
-                        style={{ minHeight: 110, textAlignVertical: "top" }}
-                      />
-                      <TouchableOpacity
-                        onPress={() => setShowKey((v) => !v)}
-                        className="absolute top-3 right-3"
-                      >
-                        {showKey ? (
-                          <EyeOff size={14} color="#64748b" />
-                        ) : (
-                          <Eye size={14} color="#64748b" />
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                    {privateKey.trim().length > 0 && (
-                      <TouchableOpacity
-                        onPress={handleSaveKey}
-                        className="bg-primary/10 border border-primary/20 rounded-xl py-2.5 items-center justify-center active:opacity-75"
-                      >
-                        <Text className="text-primary text-xs font-bold">Save Key for Auto-Load</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )}
+                <View className="gap-1">
+                  <Text className="text-foreground text-xs font-medium opacity-70">Encrypted Session Key (ES Key) Input</Text>
+                  <TextInput
+                    value={esKey}
+                    onChangeText={setEsKey}
+                    placeholder="Paste encrypted session key..."
+                    placeholderTextColor="#64748b"
+                    className="w-full bg-background border border-border text-foreground rounded-xl p-3 font-mono text-[10px]"
+                  />
+                </View>
+
+                <TouchableOpacity
+                  onPress={handleDecryptESKey}
+                  className="bg-primary rounded-xl py-3 items-center justify-center active:opacity-85 shadow-sm"
+                >
+                  <Text className="text-white font-bold text-xs">Decrypt Session Key (RSA)</Text>
+                </TouchableOpacity>
               </View>
 
-              {/* Decrypt Trigger */}
-              {transfer && (
+              {/* Step 2: AES Decrypt Payload Section */}
+              <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-5 shadow-sm shadow-black/10 dark:shadow-none">
+                <Text className="text-foreground text-xs font-semibold uppercase tracking-wider opacity-60">
+                  Step 2: Document Payload Decryption
+                </Text>
+
+                <View className="gap-1">
+                  <Text className="text-foreground text-xs font-medium opacity-70">Decrypted AES Key Input</Text>
+                  <View className="relative">
+                    <TextInput
+                      value={aesKey}
+                      onChangeText={setAesKey}
+                      placeholder="AES Symmetric Key (will auto-fill from Step 1)"
+                      placeholderTextColor="#64748b"
+                      secureTextEntry={!showAesKey}
+                      className="w-full bg-background border border-border text-foreground rounded-xl p-3 font-mono text-[10px]"
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowAesKey((v) => !v)}
+                      className="absolute top-3.5 right-3"
+                    >
+                      {showAesKey ? (
+                        <EyeOff size={14} color="#64748b" />
+                      ) : (
+                        <Eye size={14} color="#64748b" />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View className="gap-1">
+                  <Text className="text-foreground text-xs font-medium opacity-70">Encrypted Document Payload (Ciphertext)</Text>
+                  <TextInput
+                    value={encryptedPayloadInput}
+                    onChangeText={setEncryptedPayloadInput}
+                    multiline
+                    numberOfLines={4}
+                    placeholder="Paste encrypted payload..."
+                    placeholderTextColor="#64748b"
+                    className="w-full bg-background border border-border text-foreground rounded-xl p-3 font-mono text-[10px]"
+                    style={{ minHeight: 90, textAlignVertical: "top" }}
+                  />
+                </View>
+
                 <TouchableOpacity
-                  onPress={handleDecrypt}
+                  onPress={handleDecryptDocument}
                   disabled={decrypting}
                   className="bg-primary rounded-xl py-3.5 items-center justify-center active:opacity-85 shadow-sm"
                   style={{ opacity: decrypting ? 0.6 : 1 }}
@@ -415,10 +534,74 @@ export default function DecryptScreen() {
                       <Text className="text-white font-bold text-sm">Decrypting Payload...</Text>
                     </View>
                   ) : (
-                    <Text className="text-white font-bold text-sm">Decrypt Document</Text>
+                    <Text className="text-white font-bold text-sm">Decrypt Document (AES)</Text>
                   )}
                 </TouchableOpacity>
-              )}
+              </View>
+
+              {/* Encryption Node Section (Mobile Encryption) */}
+              <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-5 shadow-sm shadow-black/10 dark:shadow-none">
+                <Text className="text-foreground text-xs font-semibold uppercase tracking-wider opacity-60">
+                  Encryption Node (Local Mobile Encrypt)
+                </Text>
+
+                <View className="gap-1">
+                  <Text className="text-foreground text-xs font-medium opacity-70">Document Name</Text>
+                  <TextInput
+                    value={encryptDocName}
+                    onChangeText={setEncryptDocName}
+                    placeholder="Enter document name..."
+                    placeholderTextColor="#64748b"
+                    className="w-full bg-background border border-border text-foreground rounded-xl p-3 font-mono text-[10px]"
+                  />
+                </View>
+
+                <View className="gap-1">
+                  <Text className="text-foreground text-xs font-medium opacity-70">AES Key Hex (Symmetric)</Text>
+                  <View className="flex-row gap-2">
+                    <TextInput
+                      value={encryptAesKey}
+                      onChangeText={setEncryptAesKey}
+                      placeholder="Symmetric AES Key..."
+                      placeholderTextColor="#64748b"
+                      className="flex-1 bg-background border border-border text-foreground rounded-xl p-2.5 font-mono text-[10px]"
+                    />
+                    <TouchableOpacity
+                      onPress={() => setEncryptAesKey(generateAESKeyHex(256))}
+                      className="bg-primary/10 border border-primary/20 px-3 items-center justify-center rounded-xl"
+                    >
+                      <Text className="text-primary text-[10px] font-bold">Generate</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View className="gap-1">
+                  <Text className="text-foreground text-xs font-medium opacity-70">Plaintext to Encrypt</Text>
+                  <TextInput
+                    value={encryptPlainText}
+                    onChangeText={setEncryptPlainText}
+                    multiline
+                    numberOfLines={3}
+                    placeholder="Type private message here..."
+                    placeholderTextColor="#64748b"
+                    className="w-full bg-background border border-border text-foreground rounded-xl p-3 font-mono text-[10px]"
+                    style={{ minHeight: 70, textAlignVertical: "top" }}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  onPress={handleEncryptData}
+                  disabled={encrypting}
+                  className="bg-primary rounded-xl py-3 items-center justify-center active:opacity-85 shadow-sm"
+                  style={{ opacity: encrypting ? 0.6 : 1 }}
+                >
+                  {encrypting ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text className="text-white font-bold text-xs">Encrypt & Save to Database</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
 
               {/* Errors Container */}
               {decryptError !== "" && (

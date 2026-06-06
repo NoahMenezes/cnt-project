@@ -5,6 +5,7 @@ import { CameraView, Camera } from "expo-camera";
 
 import { supabase } from "@/lib/supabase";
 import { saveDeviceId, saveDeviceName } from "@/lib/secureStore";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -112,7 +113,8 @@ export default function ScanScreen() {
   };
 
   return (
-    <>
+    <View className="flex-1" style={{ overflow: "hidden" }}>
+      <AnimatedBackground />
       <Stack.Screen
         options={{
           title: "Scan QR Code",
@@ -122,10 +124,10 @@ export default function ScanScreen() {
       />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        className="p-4 bg-background"
+        className="p-4 bg-transparent"
         showsVerticalScrollIndicator={false}
       >
-        <View className="gap-4 mt-20">
+        <View className="gap-4 mt-24">
           <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-6 shadow-sm shadow-black/10 dark:shadow-none">
             <Text className="text-foreground text-center text-sm font-medium tracking-wider opacity-60">
               Camera Scanner
@@ -178,6 +180,6 @@ export default function ScanScreen() {
           </View>
         </View>
       </ScrollView>
-    </>
+    </View>
   );
 }

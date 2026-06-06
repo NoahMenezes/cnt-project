@@ -9,6 +9,7 @@ import { getDeviceId } from "@/lib/secureStore";
 import { supabase } from "@/lib/supabase";
 import type { EphemeralTransfer } from "@/lib/supabase";
 import CustomSheet from "@/components/CustomSheet";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function InboxScreen() {
   const router = useRouter();
@@ -105,7 +106,8 @@ export default function InboxScreen() {
     : [];
 
   return (
-    <View className="flex-1 bg-background" style={{ overflow: "hidden" }}>
+    <View className="flex-1" style={{ overflow: "hidden" }}>
+      <AnimatedBackground />
       <Stack.Screen
         options={{
           title: "Secure Inbox",
@@ -116,7 +118,7 @@ export default function InboxScreen() {
 
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        className="p-4"
+        className="p-4 bg-transparent"
         contentContainerStyle={{ paddingTop: 140, paddingBottom: 60, alignItems: "center" }}
         showsVerticalScrollIndicator={false}
       >
