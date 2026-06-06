@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently --kill-others \"next dev -p 8051\" \"bash -c 'source backend/venv/bin/activate && uvicorn backend.main:app --port 8000 --reload'\"",
+    "dev": "concurrently --kill-others \"next dev\" \"bash -c 'source backend/venv/bin/activate && uvicorn backend.main:app --port 8000 --reload'\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
