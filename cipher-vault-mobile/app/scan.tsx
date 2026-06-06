@@ -1,7 +1,8 @@
+import { Stack, useRouter } from "expo-router";
 import { useState, useEffect } from "react";
-import { View, Text, Alert, StyleSheet } from "react-native";
+import { View, Text, ScrollView, StyleSheet, Alert } from "react-native";
 import { CameraView, Camera } from "expo-camera";
-import { useRouter } from "expo-router";
+
 import { supabase } from "@/lib/supabase";
 import { saveDeviceId, saveDeviceName } from "@/lib/secureStore";
 
@@ -17,12 +18,7 @@ export default function ScanScreen() {
     });
   }, []);
 
-  const handleBarCodeScanned = async ({
-    data,
-  }: {
-    type: string;
-    data: string;
-  }) => {
+  const handleBarCodeScanned = async ({ data }: { type: string; data: string }) => {
     if (scanned || processing) return;
     setScanned(true);
     setProcessing(true);
@@ -77,80 +73,73 @@ export default function ScanScreen() {
     }
   };
 
-  if (hasPermission === null) {
-    return (
-      <View className="flex-1 bg-[#0a0a0f] items-center justify-center">
-        <Text className="text-slate-400 text-sm">Requesting camera permission...</Text>
-      </View>
-    );
-  }
-
-  if (hasPermission === false) {
-    return (
-      <View className="flex-1 bg-[#0a0a0f] items-center justify-center px-8">
-        <Text className="text-white text-base font-semibold mb-2 text-center">
-          Camera Permission Required
-        </Text>
-        <Text className="text-slate-500 text-sm text-center">
-          Please enable camera access in Settings to scan the pairing QR code.
-        </Text>
-      </View>
-    );
-  }
-
   return (
-    <View className="flex-1 bg-[#0a0a0f]">
-      {/* Blue glow */}
-      <View
-        className="absolute bottom-0 right-0 w-56 h-56 rounded-full opacity-15"
-        style={{
-          backgroundColor: "#6366f1",
-          transform: [{ translateX: 60 }, { translateY: 60 }],
-          shadowColor: "#6366f1",
-          shadowRadius: 60,
-          shadowOpacity: 1,
-          elevation: 20,
+    <>
+      <Stack.Screen
+        options={{
+          title: "Scan QR Code",
+          headerLargeTitle: false,
+          headerTransparent: true,
         }}
       />
-
-      <View className="px-5 pt-4 pb-3">
-        <Text className="text-white text-base font-semibold mb-1">
-          Scan Pairing QR Code
-        </Text>
-        <Text className="text-slate-500 text-xs">
-          Go to the web app → Mobile Pair → Generate QR Code, then scan it here.
-        </Text>
-      </View>
-
-      <View
-        className="mx-5 rounded-2xl overflow-hidden border border-[#1e1e2e]"
-        style={{ height: 340 }}
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        className="p-4"
+        showsVerticalScrollIndicator={false}
       >
-        <CameraView
-          style={StyleSheet.absoluteFill}
-          facing="back"
-          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-        />
-        {/* Corner markers */}
-        <View className="absolute top-5 left-5 w-8 h-8 border-t-2 border-l-2 border-indigo-500 rounded-tl-md" />
-        <View className="absolute top-5 right-5 w-8 h-8 border-t-2 border-r-2 border-indigo-500 rounded-tr-md" />
-        <View className="absolute bottom-5 left-5 w-8 h-8 border-b-2 border-l-2 border-indigo-500 rounded-bl-md" />
-        <View className="absolute bottom-5 right-5 w-8 h-8 border-b-2 border-r-2 border-indigo-500 rounded-br-md" />
+        <View className="gap-4">
+          <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-6 shadow-sm shadow-black/10 dark:shadow-none">
+            <Text className="text-foreground text-center text-sm font-medium tracking-wider opacity-60">
+              Camera
+            </Text>
+            <Text className="text-muted-foreground text-xs text-center">
+              Go to the web app → Mobile Pair → Generate QR Code, then scan it here.
+            </Text>
 
-        {processing && (
-          <View className="absolute inset-0 bg-black/60 items-center justify-center">
-            <Text className="text-white font-semibold text-sm">Verifying…</Text>
+            {hasPermission === null && (
+              <View className="h-64 rounded-lg items-center justify-center border-border border">
+                <Text className="text-muted-foreground text-sm">
+                  Requesting camera permission…
+                </Text>
+              </View>
+            )}
+
+            {hasPermission === false && (
+              <View className="h-64 rounded-lg items-center justify-center border-border border gap-2">
+                <Text className="text-foreground font-semibold text-sm text-center">
+                  Camera Permission Required
+                </Text>
+                <Text className="text-muted-foreground text-xs text-center px-4">
+                  Please enable camera access in Settings.
+                </Text>
+              </View>
+            )}
+
+            {hasPermission === true && (
+              <View className="rounded-xl overflow-hidden border border-border" style={{ height: 320 }}>
+                <CameraView
+                  style={StyleSheet.absoluteFill}
+                  facing="back"
+                  onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                  barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+                />
+                {processing && (
+                  <View className="absolute inset-0 bg-black/50 items-center justify-center">
+                    <Text className="text-white font-semibold text-sm">Verifying…</Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
-        )}
-      </View>
 
-      <View className="mx-5 mt-4 p-4 rounded-xl border border-[#1e1e2e] bg-[#111118]">
-        <Text className="text-[11px] text-slate-600 text-center leading-5">
-          🔐 Pairing links this phone as a trusted decryption node.{"\n"}
-          No private keys are transmitted — they stay on this device.
-        </Text>
-      </View>
-    </View>
+          <View className="border-border bg-card rounded-xl border p-4 shadow-sm shadow-black/10 dark:shadow-none">
+            <Text className="text-muted-foreground text-xs text-center leading-5">
+              🔐 Pairing links this phone as a trusted decryption node.{"\n"}
+              No private keys are transmitted — they stay on this device.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+    </>
   );
 }

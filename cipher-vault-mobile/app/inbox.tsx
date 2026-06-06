@@ -1,3 +1,5 @@
+import { useActionSheet } from "@expo/react-native-action-sheet";
+import { Stack, useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import {
   View,
@@ -7,14 +9,17 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { Inbox, Lock, Trash2, ChevronRight, RefreshCw } from "lucide-react-native";
+
+import { useColorScheme } from "@/lib/useColorScheme";
+import { getDeviceId } from "@/lib/secureStore";
 import { supabase } from "@/lib/supabase";
 import type { EphemeralTransfer } from "@/lib/supabase";
-import { getDeviceId } from "@/lib/secureStore";
 
 export default function InboxScreen() {
   const router = useRouter();
+  const { colors, isDarkColorScheme } = useColorScheme();
+  const { showActionSheetWithOptions } = useActionSheet();
+
   const [transfers, setTransfers] = useState<EphemeralTransfer[]>([]);
   const [loading, setLoading] = useState(true);
   const [deviceId, setDeviceId] = useState<string | null>(null);
@@ -37,191 +42,156 @@ export default function InboxScreen() {
     });
   }, []);
 
-  // Real-time subscription
   useEffect(() => {
     if (!deviceId) return;
     const channel = supabase
       .channel("inbox_realtime")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "ephemeral_transfers",
-          filter: `device_id=eq.${deviceId}`,
-        },
-        (payload) => {
-          setTransfers((prev) => [payload.new as EphemeralTransfer, ...prev]);
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "ephemeral_transfers",
-          filter: `device_id=eq.${deviceId}`,
-        },
-        (payload) => {
-          setTransfers((prev) => prev.filter((t) => t.id !== (payload.old as { id: string }).id));
-        }
-      )
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "ephemeral_transfers",
+        filter: `device_id=eq.${deviceId}`,
+      }, (payload) => {
+        setTransfers((prev) => [payload.new as EphemeralTransfer, ...prev]);
+      })
+      .on("postgres_changes", {
+        event: "DELETE",
+        schema: "public",
+        table: "ephemeral_transfers",
+        filter: `device_id=eq.${deviceId}`,
+      }, (payload) => {
+        setTransfers((prev) => prev.filter((t) => t.id !== (payload.old as { id: string }).id));
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [deviceId]);
 
-  async function handleDelete(id: string) {
-    Alert.alert(
-      "Delete Payload",
-      "Permanently delete this encrypted payload from the server?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            await supabase.from("ephemeral_transfers").delete().eq("id", id);
-          },
+  function openPayloadActions(transfer: EphemeralTransfer) {
+    const options = ["Decrypt", "Delete from Server", "Cancel"];
+    const destructiveButtonIndex = 1;
+    const cancelButtonIndex = 2;
+
+    showActionSheetWithOptions(
+      {
+        options,
+        cancelButtonIndex,
+        destructiveButtonIndex,
+        title: transfer.document_name || "Encrypted Payload",
+        containerStyle: {
+          backgroundColor: isDarkColorScheme ? "#0a0a14" : "#ffffff",
         },
-      ]
+        textStyle: { color: colors.foreground },
+        titleTextStyle: { color: colors.mutedForeground },
+      },
+      async (selectedIndex) => {
+        if (selectedIndex === 0) {
+          router.push({ pathname: "/decrypt", params: { transferId: transfer.id } });
+        }
+        if (selectedIndex === destructiveButtonIndex) {
+          Alert.alert("Delete Payload", "Permanently delete this from the server?", [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Delete", style: "destructive",
+              onPress: () => supabase.from("ephemeral_transfers").delete().eq("id", transfer.id),
+            },
+          ]);
+        }
+      }
     );
   }
 
   function formatDate(iso: string) {
     return new Date(iso).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
+      day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
     });
   }
 
-  if (loading) {
-    return (
-      <View className="flex-1 bg-[#0a0a0f] items-center justify-center">
-        <ActivityIndicator color="#6366f1" size="large" />
-      </View>
-    );
-  }
-
-  if (!deviceId) {
-    return (
-      <View className="flex-1 bg-[#0a0a0f] items-center justify-center px-8">
-        <Lock size={40} color="#6366f1" />
-        <Text className="text-white text-base font-bold mt-4 mb-2 text-center">
-          Device Not Paired
-        </Text>
-        <Text className="text-slate-500 text-sm text-center">
-          Scan a QR code from the CipherVault web app to pair this device.
-        </Text>
-        <TouchableOpacity
-          onPress={() => router.push("/scan")}
-          className="mt-6 px-6 py-3 rounded-xl bg-indigo-500/20 border border-indigo-500/30"
-        >
-          <Text className="text-indigo-400 font-semibold text-sm">Scan QR Code</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
-    <View className="flex-1 bg-[#0a0a0f]">
-      <View
-        className="absolute top-0 left-0 w-48 h-48 rounded-full opacity-10"
-        style={{
-          backgroundColor: "#6366f1",
-          transform: [{ translateX: -60 }, { translateY: -60 }],
-          shadowColor: "#6366f1",
-          shadowRadius: 60,
-          shadowOpacity: 1,
-          elevation: 20,
+    <>
+      <Stack.Screen
+        options={{
+          title: "Secure Inbox",
+          headerLargeTitle: true,
+          headerTransparent: true,
         }}
       />
-
       <ScrollView
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 40 }}
+        contentInsetAdjustmentBehavior="automatic"
+        className="p-4"
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center justify-between mb-4">
-          <View className="flex-row items-center gap-2">
-            <Inbox size={16} color="#6366f1" />
-            <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-              Secure Inbox
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => fetchTransfers(deviceId)}
-            className="p-2 rounded-lg bg-[#111118] border border-[#1e1e2e]"
-          >
-            <RefreshCw size={14} color="#94a3b8" />
-          </TouchableOpacity>
-        </View>
-
-        {transfers.length === 0 ? (
+        {loading ? (
           <View className="flex-1 items-center justify-center py-20">
-            <Lock size={40} color="#1e1e2e" />
-            <Text className="text-slate-600 text-sm mt-4 text-center">
-              No encrypted payloads yet.{"\n"}
-              Encrypt a document on the web app and send it here.
+            <ActivityIndicator color={colors.primary} size="large" />
+          </View>
+        ) : !deviceId ? (
+          <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-6 shadow-sm shadow-black/10 dark:shadow-none">
+            <Text className="text-foreground text-center text-sm font-medium tracking-wider opacity-60">
+              Not Paired
+            </Text>
+            <Text className="text-muted-foreground text-xs text-center">
+              Scan a QR code from the CipherVault web app to pair this device.
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push("/scan")}
+              className="bg-primary rounded-lg py-3 items-center"
+              activeOpacity={0.8}
+            >
+              <Text className="text-primary-foreground font-semibold text-sm">
+                Scan QR Code
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : transfers.length === 0 ? (
+          <View className="border-border bg-card gap-4 rounded-xl border p-4 pb-6 shadow-sm shadow-black/10 dark:shadow-none">
+            <Text className="text-foreground text-center text-sm font-medium tracking-wider opacity-60">
+              Inbox Empty
+            </Text>
+            <Text className="text-muted-foreground text-xs text-center">
+              No encrypted payloads yet.{"\n"}Encrypt a document on the web app and send it here.
             </Text>
           </View>
         ) : (
           <View className="gap-3">
             {transfers.map((transfer) => (
-              <View
+              <TouchableOpacity
                 key={transfer.id}
-                className="rounded-2xl border border-[#1e1e2e] bg-[#111118] overflow-hidden"
+                onPress={() => openPayloadActions(transfer)}
+                activeOpacity={0.7}
               >
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push({
-                      pathname: "/decrypt",
-                      params: { transferId: transfer.id },
-                    })
-                  }
-                  className="p-4 active:opacity-70"
-                >
-                  <View className="flex-row items-center gap-3">
-                    <View className="w-10 h-10 rounded-xl bg-indigo-500/15 items-center justify-center">
-                      <Lock size={18} color="#6366f1" />
-                    </View>
-                    <View className="flex-1">
-                      <Text
-                        className="text-sm font-semibold text-white mb-0.5"
-                        numberOfLines={1}
-                      >
-                        {transfer.document_name || "Encrypted Payload"}
-                      </Text>
-                      <Text className="text-[11px] text-slate-600">
-                        {formatDate(transfer.created_at)} · {transfer.aes_mode}
-                      </Text>
-                    </View>
-                    <ChevronRight size={16} color="#475569" />
+                <View className="border-border bg-card gap-3 rounded-xl border p-4 shadow-sm shadow-black/10 dark:shadow-none">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-foreground font-semibold text-sm flex-1 mr-2" numberOfLines={1}>
+                      {transfer.document_name || "Encrypted Payload"}
+                    </Text>
+                    <Text className="text-muted-foreground text-[10px]">
+                      {formatDate(transfer.created_at)}
+                    </Text>
                   </View>
-                </TouchableOpacity>
-                <View className="mx-4 mb-3 p-2.5 rounded-lg bg-orange-500/5 border border-orange-500/10">
-                  <Text
-                    className="text-[10px] font-mono text-orange-400/60"
-                    numberOfLines={2}
-                  >
+                  <View className="flex-row gap-2">
+                    <View className="px-2 py-0.5 rounded-full border border-border">
+                      <Text className="text-muted-foreground text-[10px] font-mono">
+                        {transfer.aes_mode}
+                      </Text>
+                    </View>
+                    <View className="px-2 py-0.5 rounded-full border border-border">
+                      <Text className="text-muted-foreground text-[10px] font-mono">
+                        RSA-WRAPPED
+                      </Text>
+                    </View>
+                  </View>
+                  <Text className="text-muted-foreground text-[10px] font-mono" numberOfLines={2}>
                     {transfer.encrypted_payload.substring(0, 80)}…
                   </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => handleDelete(transfer.id)}
-                  className="flex-row items-center justify-center gap-2 py-2.5 border-t border-[#1e1e2e] active:opacity-70"
-                >
-                  <Trash2 size={13} color="#ef4444" />
-                  <Text className="text-[11px] font-semibold text-red-500">
-                    Delete from Server
+                  <Text className="text-muted-foreground text-[10px] text-right opacity-60">
+                    Tap to view actions
                   </Text>
-                </TouchableOpacity>
-              </View>
+                </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
       </ScrollView>
-    </View>
+    </>
   );
 }

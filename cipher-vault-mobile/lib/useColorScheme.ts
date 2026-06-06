@@ -1,0 +1,34 @@
+import { useColorScheme as useNativeColorScheme } from "react-native";
+
+const COLORS = {
+  light: {
+    background: "hsl(0 0% 100%)",
+    foreground: "hsl(240 10% 3.9%)",
+    card: "hsl(0 0% 100%)",
+    cardForeground: "hsl(240 10% 3.9%)",
+    primary: "hsl(240 5.9% 10%)",
+    primaryForeground: "hsl(0 0% 98%)",
+    muted: "hsl(240 4.8% 95.9%)",
+    mutedForeground: "hsl(240 3.8% 46.1%)",
+    border: "hsl(240 5.9% 90%)",
+    destructive: "hsl(0 84.2% 60.2%)",
+  },
+  dark: {
+    background: "hsl(240 10% 3.9%)",
+    foreground: "hsl(0 0% 98%)",
+    card: "hsl(240 10% 3.9%)",
+    cardForeground: "hsl(0 0% 98%)",
+    primary: "hsl(0 0% 98%)",
+    primaryForeground: "hsl(240 5.9% 10%)",
+    muted: "hsl(240 3.7% 15.9%)",
+    mutedForeground: "hsl(240 5% 64.9%)",
+    border: "hsl(240 3.7% 15.9%)",
+    destructive: "hsl(0 72% 51%)",
+  },
+};
+
+export function useColorScheme() {
+  const colorScheme = useNativeColorScheme() ?? "dark";
+  const colors = COLORS[colorScheme];
+  return { colorScheme, colors, isDarkColorScheme: colorScheme === "dark" };
+}
