@@ -386,6 +386,7 @@ export default function OperationPage() {
   const [syncDevice, setSyncDevice] = useState<{ id: string; device_name: string } | null>(null);
   const [transferId, setTransferId] = useState<string>("");
   const [syncingTransfer, setSyncingTransfer] = useState(false);
+  const [qrMode, setQrMode] = useState<"expo" | "web">("expo");
 
   useEffect(() => {
     fetch("/api/local-ip")
@@ -1475,23 +1476,47 @@ export default function OperationPage() {
               </div>
             ) : (
               <div className="flex flex-col md:flex-row items-center justify-center gap-6 bg-indigo-950/10 border border-indigo-500/10 rounded-xl p-5">
-                <div className="bg-white p-3 rounded-xl shadow-xl flex items-center justify-center">
-                  <QRCodeSVG
-                    value={`http://${localIP}:8081/decrypt?transferId=${transferId}`}
-                    size={160}
-                    level="L"
-                    includeMargin={false}
-                  />
+                <div className="flex flex-col items-center gap-3">
+                  <div className="bg-white p-3 rounded-xl shadow-xl flex items-center justify-center">
+                    <QRCodeSVG
+                      value={qrMode === "expo" 
+                        ? `exp://${localIP}:8081/--/decrypt?transferId=${transferId}` 
+                        : `http://${localIP}:8081/decrypt?transferId=${transferId}`}
+                      size={160}
+                      level="L"
+                      includeMargin={false}
+                    />
+                  </div>
+                  <div className="flex bg-background/50 rounded-lg p-0.5 border border-border/10 w-full">
+                    <button
+                      type="button"
+                      onClick={() => setQrMode("expo")}
+                      className={`flex-1 text-[9px] py-1 font-bold rounded-md transition-all ${qrMode === "expo" ? "bg-indigo-600 text-white" : "text-foreground/60 hover:text-foreground"}`}
+                    >
+                      Expo Go App
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQrMode("web")}
+                      className={`flex-1 text-[9px] py-1 font-bold rounded-md transition-all ${qrMode === "web" ? "bg-indigo-600 text-white" : "text-foreground/60 hover:text-foreground"}`}
+                    >
+                      Web Browser
+                    </button>
+                  </div>
                 </div>
                 <div className="text-center md:text-left space-y-2 flex-1">
                   <h4 className="text-indigo-400 font-bold text-xs flex items-center justify-center md:justify-start gap-1.5">
                     <Zap className="h-3.5 w-3.5" /> Direct Mobile Decrypt Node
                   </h4>
                   <p className="text-[11px] text-foreground/60 leading-relaxed">
-                    Scan this QR code with your phone&apos;s camera app to open the React Native mobile UI in your web browser. 
+                    {qrMode === "expo" 
+                      ? "Scan with your phone's camera or Expo Go scanner to boot the React Native app directly."
+                      : "Scan with your phone's camera app to view the mobile UI rendered inside your web browser."}
                   </p>
                   <div className="bg-background/40 border border-border/10 rounded-lg p-2.5 font-mono text-[9px] text-foreground/40 break-all select-all">
-                    http://{localIP}:8081/decrypt?transferId={transferId}
+                    {qrMode === "expo"
+                      ? `exp://${localIP}:8081/--/decrypt?transferId=${transferId}`
+                      : `http://${localIP}:8081/decrypt?transferId=${transferId}`}
                   </div>
                   <p className="text-[9px] text-indigo-400/70">
                     Ensure both your phone and this computer are connected to the same local network.

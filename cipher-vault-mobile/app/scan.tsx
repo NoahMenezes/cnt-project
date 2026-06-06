@@ -25,27 +25,43 @@ export default function ScanScreen() {
     setProcessing(true);
 
     try {
-      if (data.startsWith("ciphervault://decrypt")) {
-        const urlParams = new URLSearchParams(data.split("?")[1]);
-        const rawTransferStr = urlParams.get("rawTransferStr");
-        if (rawTransferStr) {
-          router.replace({
-            pathname: "/decrypt",
-            params: { rawTransferStr },
-          });
-          return;
+      let transferId = "";
+      let rawTransferStr = "";
+      let isPairingQr = false;
+      let pairingPayload: { deviceId?: string; deviceName?: string; userId?: string } = {};
+
+      const isUrl = 
+        data.startsWith("http://") || 
+        data.startsWith("https://") || 
+        data.startsWith("exp://") || 
+        data.startsWith("ciphervault://");
+
+      if (isUrl) {
+        const urlPart = data.split("?")[1];
+        if (urlPart) {
+          const urlParams = new URLSearchParams(urlPart);
+          transferId = urlParams.get("transferId") || "";
+          rawTransferStr = urlParams.get("rawTransferStr") || "";
+        }
+      } else {
+        try {
+          const payload = JSON.parse(data);
+          if (payload.transferId) {
+            transferId = payload.transferId;
+          }
+          if (payload.rawTransfer) {
+            rawTransferStr = JSON.stringify(payload.rawTransfer);
+          }
+          if (payload.deviceId && payload.userId) {
+            isPairingQr = true;
+            pairingPayload = payload;
+          }
+        } catch {
+          // Keep fallthrough
         }
       }
 
-      const payload = JSON.parse(data) as {
-        deviceId?: string;
-        deviceName?: string;
-        userId?: string;
-        transferId?: string;
-        rawTransfer?: any;
-      };
-
-      if (payload.transferId || payload.rawTransfer) {
+      if (transferId || rawTransferStr) {
         Alert.alert(
           "🔒 Payload Detected",
           "An encrypted document transfer has been scanned. Load in Decryption Node?",
@@ -55,8 +71,8 @@ export default function ScanScreen() {
               text: "Load",
               onPress: () => {
                 const params: any = {};
-                if (payload.transferId) params.transferId = payload.transferId;
-                if (payload.rawTransfer) params.rawTransferStr = JSON.stringify(payload.rawTransfer);
+                if (transferId) params.transferId = transferId;
+                if (rawTransferStr) params.rawTransferStr = rawTransferStr;
                 
                 router.replace({
                   pathname: "/decrypt",
@@ -69,8 +85,8 @@ export default function ScanScreen() {
         return;
       }
 
-      if (!payload.deviceId || !payload.userId) {
-        Alert.alert("Invalid QR Code", "This QR code is not from CipherVault.", [
+      if (!isPairingQr || !pairingPayload.deviceId || !pairingPayload.userId) {
+        Alert.alert("Invalid QR Code", "This QR code is not recognized by CipherVault.", [
           { text: "Try Again", onPress: () => setScanned(false) },
         ]);
         setProcessing(false);
@@ -80,7 +96,7 @@ export default function ScanScreen() {
       const { data: device, error } = await supabase
         .from("user_devices")
         .select("id, device_name")
-        .eq("id", payload.deviceId)
+        .eq("id", pairingPayload.deviceId)
         .single();
 
       if (error || !device) {
@@ -104,7 +120,7 @@ export default function ScanScreen() {
     } catch {
       Alert.alert(
         "Scan Error",
-        "Could not read QR code. Please scan the CipherVault pairing QR code.",
+        "Could not read QR code. Please try scanning again.",
         [{ text: "Try Again", onPress: () => setScanned(false) }]
       );
     } finally {
