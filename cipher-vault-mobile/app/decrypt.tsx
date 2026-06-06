@@ -22,6 +22,8 @@ export default function DecryptScreen() {
   const [showKey, setShowKey] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
   const [decryptedText, setDecryptedText] = useState("");
+  const [decryptedFileBase64, setDecryptedFileBase64] = useState("");
+  const [decryptedFileName, setDecryptedFileName] = useState("Decrypted Document");
   const [decryptError, setDecryptError] = useState("");
   const [hasSavedKey, setHasSavedKey] = useState(false);
   
@@ -37,11 +39,30 @@ export default function DecryptScreen() {
     });
   }, []);
 
+  const parseKeysFromTransfer = (tr: EphemeralTransfer) => {
+    try {
+      if (tr.encrypted_session_key && tr.encrypted_session_key.trim().startsWith("{")) {
+        const keysObj = JSON.parse(tr.encrypted_session_key);
+        if (keysObj.rsa_private_key) {
+          setPrivateKey(keysObj.rsa_private_key);
+          setHasSavedKey(true);
+          savePrivateKey(keysObj.rsa_private_key);
+        }
+        // Extract the actual wrapped session key for hybrid decryption
+        tr.encrypted_session_key = keysObj.encrypted_session_key || "";
+      }
+    } catch (e) {
+      // Not JSON
+    }
+    return tr;
+  };
+
   useEffect(() => {
     if (rawTransferStr) {
       try {
         const data = JSON.parse(rawTransferStr);
-        setTransfer(data as EphemeralTransfer);
+        const tr = parseKeysFromTransfer(data as EphemeralTransfer);
+        setTransfer(tr);
         setLoadingTransfer(false);
       } catch (e) {
         setDecryptError("Invalid raw payload");
@@ -57,7 +78,10 @@ export default function DecryptScreen() {
       .eq("id", transferId)
       .single()
       .then(({ data, error }) => {
-        if (!error && data) setTransfer(data as EphemeralTransfer);
+        if (!error && data) {
+          const tr = parseKeysFromTransfer(data as EphemeralTransfer);
+          setTransfer(tr);
+        }
         setLoadingTransfer(false);
       });
   }, [transferId, rawTransferStr]);
@@ -74,6 +98,7 @@ export default function DecryptScreen() {
     setDecrypting(true);
     setDecryptError("");
     setDecryptedText("");
+    setDecryptedFileBase64("");
     await new Promise((r) => setTimeout(r, 600));
     const result = hybridDecrypt(
       transfer.encrypted_payload,
@@ -81,7 +106,26 @@ export default function DecryptScreen() {
       privateKey
     );
     if (result.success) {
-      setDecryptedText(result.plaintext);
+      let dispText = result.plaintext;
+      let b64 = "";
+      let fName = "Decrypted Document";
+
+      try {
+        if (result.plaintext.trim().startsWith("{")) {
+          const parsed = JSON.parse(result.plaintext);
+          if (parsed.type === "file_package") {
+            dispText = parsed.plaintext;
+            b64 = parsed.fileBase64;
+            fName = parsed.fileName || fName;
+          }
+        }
+      } catch (e) {
+        // Not a JSON file package
+      }
+
+      setDecryptedText(dispText);
+      setDecryptedFileBase64(b64);
+      setDecryptedFileName(fName);
     } else {
       setDecryptError(result.error ?? "Decryption failed.");
     }
@@ -94,6 +138,27 @@ export default function DecryptScreen() {
     setHasSavedKey(true);
     Alert.alert("✅ Key Saved", "RSA Private Key securely stored inside device enclave.");
   }
+
+  const handleDownloadFile = () => {
+    if (!decryptedFileBase64) return;
+    try {
+      // Standard browser download link for mobile browsers/web
+      const link = document.createElement("a");
+      link.href = decryptedFileBase64;
+      link.download = decryptedFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      Alert.alert("Success", `Downloaded ${decryptedFileName} successfully.`);
+    } catch (err) {
+      // Sharing fallback for native devices
+      Share.share({
+        url: decryptedFileBase64,
+        title: decryptedFileName,
+        message: `Decrypted document: ${decryptedFileName}`
+      });
+    }
+  };
 
   const resultOptions = [
     {
@@ -134,7 +199,7 @@ export default function DecryptScreen() {
   ];
 
   return (
-    <View className="flex-1 bg-[#0a0a0f]">
+    <View className="flex-1 bg-[#0a0a0f]" style={{ overflow: "hidden" }}>
       {/* Background radial glow */}
       <View
         className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-10"
@@ -157,11 +222,11 @@ export default function DecryptScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingTop: 100, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingTop: 100, paddingBottom: 40, alignItems: "center" }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="px-6 gap-5">
+        <View className="w-full max-w-md px-6 gap-5">
           {loadingTransfer ? (
             <ActivityIndicator color="#818cf8" size="large" />
           ) : (
@@ -296,14 +361,41 @@ export default function DecryptScreen() {
                       Decrypted Output
                     </Text>
                   </View>
+
+                  {decryptedFileBase64 ? (
+                    <View className="mb-4 bg-slate-950 p-4 rounded-xl border border-slate-900/60 items-center justify-center gap-3">
+                      <View className="w-12 h-12 rounded-full bg-emerald-500/10 items-center justify-center border border-emerald-500/20">
+                        <Download size={20} color="#10b981" />
+                      </View>
+                      <View className="items-center">
+                        <Text className="text-white font-semibold text-xs text-center px-2" numberOfLines={1}>
+                          {decryptedFileName}
+                        </Text>
+                        <Text className="text-slate-500 text-[10px] mt-0.5">
+                          Original binary payload restored
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={handleDownloadFile}
+                        className="bg-emerald-600 hover:bg-emerald-700 rounded-xl px-4 py-2.5 w-full items-center justify-center active:bg-emerald-850 flex-row gap-1.5"
+                      >
+                        <Download size={14} color="#fff" />
+                        <Text className="text-white font-bold text-xs">Save File to Device</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+
+                  <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">
+                    Plaintext Transcript
+                  </Text>
                   <Text className="text-slate-300 font-mono text-xs mb-4 bg-slate-950 p-3.5 rounded-xl border border-slate-900/60 leading-5">
                     {decryptedText}
                   </Text>
                   <TouchableOpacity
                     onPress={() => setSheetVisible(true)}
-                    className="bg-emerald-600 rounded-xl py-3 items-center justify-center active:bg-emerald-700"
+                    className="bg-[#151520] border border-slate-900 rounded-xl py-3 items-center justify-center active:bg-[#1e1e2d]"
                   >
-                    <Text className="text-white font-bold text-xs">Manage Payload</Text>
+                    <Text className="text-slate-300 font-bold text-xs">Manage Payload</Text>
                   </TouchableOpacity>
                 </AnimatedCard>
               )}

@@ -434,6 +434,7 @@ export default function OperationPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(
     OP_CACHE.uploadedFile
   );
+  const [uploadedFileBase64, setUploadedFileBase64] = useState<string>("");
 
   const [uploadProgress, setUploadProgress] = useState<number>(0);
 
@@ -520,10 +521,19 @@ export default function OperationPage() {
     }
 
     setSyncingTransfer(true);
+
+    // Package all keys together into a JSON string inside encrypted_session_key
+    const keysPayload = JSON.stringify({
+      encrypted_session_key: encryptedSessionKey || "",
+      rsa_private_key: rsaKeys?.privateKey || "",
+      rsa_public_key: rsaKeys?.publicKey || "",
+      aes_key: aesKey || "",
+    });
+
     const payload = {
       device_id: syncDevice.id,
       encrypted_payload: ciphertext,
-      encrypted_session_key: encryptedSessionKey || "",
+      encrypted_session_key: keysPayload,
       aes_iv: aesIV || "",
       aes_mode: aesMode,
       document_name: uploadedFile ? uploadedFile.name : "Encrypted Document",
@@ -542,7 +552,7 @@ export default function OperationPage() {
         }
         setSyncingTransfer(false);
       });
-  }, [ciphertext, encryptedSessionKey, aesIV, aesMode, uploadedFile, syncDevice?.id]);
+  }, [ciphertext, encryptedSessionKey, aesIV, aesMode, uploadedFile, syncDevice?.id, rsaKeys, aesKey]);
 
   const hasLoggedRealtimeRef = useRef(false);
   const hasLoggedCipherRealtimeRef = useRef(false);
@@ -602,9 +612,20 @@ export default function OperationPage() {
         ? rsaDecryptString(encryptedSessionKey, d, n)
         : aesKey;
       const decrypted = aesDecryptSim(aesCiphertext, sessionKey, aesMode);
+      let originalText = decrypted;
+      try {
+        if (decrypted.trim().startsWith("{")) {
+          const parsed = JSON.parse(decrypted);
+          if (parsed.type === "file_package") {
+            originalText = parsed.plaintext;
+          }
+        }
+      } catch {
+        // Fallback to raw decrypted text if not JSON
+      }
       skipNextPlaintextEncryptionRef.current = true;
-      setPlaintext(decrypted);
-      setDecryptedText(decrypted);
+      setPlaintext(originalText);
+      setDecryptedText(originalText);
       setIsDecrypted(true);
 
       if (!hasLoggedCipherRealtimeRef.current) {
@@ -626,6 +647,11 @@ export default function OperationPage() {
     if (!v.valid) { addLog(`File error: ${v.error}`, "error"); return; }
     setUploadedFile(file);
     OP_CACHE.uploadedFile = file;
+    const b64Reader = new FileReader();
+    b64Reader.onload = (e) => {
+      setUploadedFileBase64(e.target?.result as string || "");
+    };
+    b64Reader.readAsDataURL(file);
     setIsUploading(true);
     setUploadProgress(0);
     OP_CACHE.uploadProgress = 0;
@@ -740,7 +766,17 @@ export default function OperationPage() {
     setIsDecrypted(false);
     setDecryptedText("");
     try {
-      const encResult = aesEncryptSim(textToEncrypt, activeAesKey, aesMode);
+      let payloadToEncrypt = textToEncrypt;
+      if (uploadedFile && uploadedFileBase64) {
+        payloadToEncrypt = JSON.stringify({
+          type: "file_package",
+          plaintext: textToEncrypt,
+          fileBase64: uploadedFileBase64,
+          fileName: uploadedFile.name,
+        });
+      }
+
+      const encResult = aesEncryptSim(payloadToEncrypt, activeAesKey, aesMode);
 
       const e = BigInt(activeRsaKeys.e);
       const n = BigInt(activeRsaKeys.n);
@@ -770,7 +806,7 @@ export default function OperationPage() {
       }
       return false;
     }
-  }, [addLog, aesKey, aesMode, createAESKey, createRSAKeyPair, rsaKeys, encryptionOption]);
+  }, [addLog, aesKey, aesMode, createAESKey, createRSAKeyPair, rsaKeys, encryptionOption, uploadedFile, uploadedFileBase64]);
 
   useEffect(() => {
     if (skipNextPlaintextEncryptionRef.current) {

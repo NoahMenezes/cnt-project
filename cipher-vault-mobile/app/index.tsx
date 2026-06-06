@@ -83,7 +83,7 @@ export default function HomeScreen() {
       ];
 
   return (
-    <View className="flex-1 bg-[#0a0a0f]">
+    <View className="flex-1 bg-[#0a0a0f]" style={{ overflow: "hidden" }}>
       {/* Background glow effects */}
       <View
         className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-20"
@@ -116,10 +116,10 @@ export default function HomeScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingTop: 80, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingTop: 80, paddingBottom: 40, alignItems: "center" }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="px-6 gap-6">
+        <View className="w-full max-w-md px-6 gap-6">
           
           {/* Header */}
           <View className="flex-row items-center gap-3 justify-center mb-2">

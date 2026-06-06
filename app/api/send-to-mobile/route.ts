@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       deviceName: device.device_name,
       message: `Payload sent to "${device.device_name}" successfully.`,
     });
-  } catch (err) {
+  } catch {
     return NextResponse.json(
       { error: "Internal server error." },
       { status: 500 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "@/lib/supabase";
@@ -34,28 +34,38 @@ interface Device {
 
 export default function MobilePairPage() {
   const { user } = useUser();
+  const userId = user?.id;
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newDeviceName, setNewDeviceName] = useState("");
   const [newDevice, setNewDevice] = useState<Device | null>(null);
   const [qrPayload, setQrPayload] = useState<string>("");
-  const [copySuccess, setCopySuccess] = useState(false);
 
-  const fetchDevices = useCallback(async () => {
-    if (!user?.id) return;
+  const fetchDevices = async () => {
+    if (!userId) return;
     const { data } = await supabase
       .from("user_devices")
       .select("id, device_name, created_at")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order("created_at", { ascending: false });
     setDevices((data as Device[]) ?? []);
     setLoading(false);
-  }, [user?.id]);
+  };
 
   useEffect(() => {
-    fetchDevices();
-  }, [fetchDevices]);
+    if (userId) {
+      supabase
+        .from("user_devices")
+        .select("id, device_name, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .then(({ data }) => {
+          setDevices((data as Device[]) ?? []);
+          setLoading(false);
+        });
+    }
+  }, [userId]);
 
   async function handleCreateDevice() {
     if (!user?.id || !newDeviceName.trim()) return;
@@ -271,7 +281,7 @@ export default function MobilePairPage() {
               <div className="flex items-start gap-2">
                 <Shield className="h-3.5 w-3.5 text-primary/60 mt-0.5 shrink-0" />
                 <p className="text-[11px] text-foreground/35 leading-4">
-                  Private RSA keys are stored exclusively on your phone's hardware enclave.
+                  Private RSA keys are stored exclusively on your phone&apos;s hardware enclave.
                   They are never transmitted to the server.
                 </p>
               </div>

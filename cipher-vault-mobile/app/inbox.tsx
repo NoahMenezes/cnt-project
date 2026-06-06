@@ -105,7 +105,7 @@ export default function InboxScreen() {
     : [];
 
   return (
-    <View className="flex-1 bg-[#0a0a0f]">
+    <View className="flex-1 bg-[#0a0a0f]" style={{ overflow: "hidden" }}>
       {/* Glow */}
       <View
         className="absolute top-0 left-0 w-80 h-80 rounded-full opacity-10"
@@ -129,10 +129,10 @@ export default function InboxScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingTop: 100, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingTop: 100, paddingBottom: 40, alignItems: "center" }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="px-6 gap-4">
+        <View className="w-full max-w-md px-6 gap-4">
           {loading ? (
             <View className="py-20">
               <ActivityIndicator color="#818cf8" size="large" />
