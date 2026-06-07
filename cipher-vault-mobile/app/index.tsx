@@ -51,51 +51,85 @@ export default function HomeScreen() {
 
   useEffect(() => {
     getDeviceId().then((id) => {
-      setDeviceId(id);
+      if (id) {
+        setDeviceId(id);
+      } else {
+        // Fallback for seamless testing: grab the most recent device created by the web app
+        supabase
+          .from("user_devices")
+          .select("id")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single()
+          .then(({ data }) => {
+            if (data?.id) {
+              setDeviceId(data.id);
+            }
+          });
+      }
     });
   }, []);
 
   // Real-time sync: listen on device channel for clear_keys / keys_updated from the web app
   useEffect(() => {
-    if (!deviceId) return;
+    const handleClearKeys = () => {
+      // New document being analyzed — wipe stale keys immediately
+      setExtractedPrivateKey("");
+      setExtractedPublicKey("");
+      setExtractedAESKey("");
+      setExtractedESKey("");
+      setPrivateKey("");
+      setEsKey("");
+      setAesKey("");
+      setEncryptedPayloadInput("");
+      setDecryptedText("");
+      setDecryptedFileBase64("");
+      setDecryptedFileName("Decrypted Document");
+      setDecryptError("");
+      setTransfer(null);
+    };
 
-    const channel = supabase
-      .channel(`device_sync_${deviceId}`)
-      .on("broadcast", { event: "clear_keys" }, () => {
-        // New document being analyzed — wipe stale keys immediately
-        setExtractedPrivateKey("");
-        setExtractedPublicKey("");
-        setExtractedAESKey("");
-        setExtractedESKey("");
-        setPrivateKey("");
-        setEsKey("");
-        setAesKey("");
-        setEncryptedPayloadInput("");
-        setDecryptedText("");
-        setDecryptedFileBase64("");
-        setDecryptedFileName("Decrypted Document");
-        setDecryptError("");
-        setTransfer(null);
-      })
-      .on("broadcast", { event: "keys_updated" }, (msg: { payload: { transferId: string } }) => {
-        const newTransferId = msg?.payload?.transferId;
-        if (!newTransferId) return;
-        supabase
-          .from("ephemeral_transfers")
-          .select("*")
-          .eq("id", newTransferId)
-          .single()
-          .then(({ data, error }) => {
-            if (!error && data) {
-              const tr = parseKeysFromTransfer(data as EphemeralTransfer);
-              setTransfer(tr);
-            }
-          });
-      })
+    const handleKeysUpdated = (msg: { payload: { transferId: string, fullTransfer?: EphemeralTransfer } }) => {
+      const newTransferId = msg?.payload?.transferId;
+      if (!newTransferId) return;
+
+      if (msg?.payload?.fullTransfer) {
+        const tr = parseKeysFromTransfer(msg.payload.fullTransfer);
+        setTransfer(tr);
+        return;
+      }
+
+      supabase
+        .from("ephemeral_transfers")
+        .select("*")
+        .eq("id", newTransferId)
+        .single()
+        .then(({ data, error }) => {
+          if (!error && data) {
+            const tr = parseKeysFromTransfer(data as EphemeralTransfer);
+            setTransfer(tr);
+          }
+        });
+    };
+
+    const globalChannel = supabase
+      .channel('global_sync')
+      .on("broadcast", { event: "clear_keys" }, handleClearKeys)
+      .on("broadcast", { event: "keys_updated" }, handleKeysUpdated)
       .subscribe();
 
+    let deviceChannel: any = null;
+    if (deviceId) {
+      deviceChannel = supabase
+        .channel(`device_sync_${deviceId}`)
+        .on("broadcast", { event: "clear_keys" }, handleClearKeys)
+        .on("broadcast", { event: "keys_updated" }, handleKeysUpdated)
+        .subscribe();
+    }
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(globalChannel);
+      if (deviceChannel) supabase.removeChannel(deviceChannel);
     };
   }, [deviceId]);
 
@@ -112,6 +146,7 @@ export default function HomeScreen() {
         }
         if (keysObj.aes_key) {
           setExtractedAESKey(keysObj.aes_key);
+          setAesKey(keysObj.aes_key);
         }
         
         const actualESKey = keysObj.encrypted_session_key || "";
@@ -131,6 +166,13 @@ export default function HomeScreen() {
     }
     return tr;
   };
+
+  // Robustly populate input fields whenever transfer is set
+  useEffect(() => {
+    if (transfer) {
+      parseKeysFromTransfer(transfer);
+    }
+  }, [transfer]);
 
   useEffect(() => {
     if (rawTransferStr) {
