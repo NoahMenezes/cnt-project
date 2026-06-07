@@ -1441,83 +1441,7 @@ export default function OperationPage() {
             )}
           </div>
 
-          <div className="flex justify-end gap-3 mt-3">
-            <input 
-              type="file" 
-              accept=".json,.ciphervault" 
-              className="hidden" 
-              id="keys-upload" 
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                  try {
-                    const result = ev.target?.result as string;
-                    const keysArr = JSON.parse(result);
-                    
-                    const privKey = keysArr.find((k: any) => k.keyType === "RSA_PRIVATE");
-                    const pubKey = keysArr.find((k: any) => k.keyType === "RSA_PUBLIC");
-                    const aesSessionKey = keysArr.find((k: any) => k.keyType === "AES_SESSION");
-                    
-                    const keysPayload = JSON.stringify({
-                      encrypted_session_key: pubKey?.encryptedSessionKey || aesSessionKey?.encryptedSessionKey || "",
-                      rsa_private_key: privKey?.keyValue || "",
-                      rsa_public_key: pubKey?.keyValue || "",
-                      aes_key: aesSessionKey?.keyValue || "",
-                    });
-
-                    const payload = {
-                      device_id: syncDevice?.id || "global",
-                      encrypted_payload: pubKey?.ciphertextPayload || aesSessionKey?.ciphertextPayload || "",
-                      encrypted_session_key: keysPayload,
-                      aes_iv: pubKey?.aesIV || aesSessionKey?.aesIV || "",
-                      aes_mode: pubKey?.aesMode || aesSessionKey?.aesMode || "AES-GCM",
-                      document_name: pubKey?.documentName || aesSessionKey?.documentName || "Restored Document",
-                    };
-
-                    const globalChannel = supabase.channel(`global_sync`);
-                    let deviceChannel: any = null;
-                    if (syncDevice?.id) {
-                      deviceChannel = supabase.channel(`device_sync_${syncDevice.id}`);
-                    }
-
-                    const sendPush = () => {
-                      globalChannel.send({ type: "broadcast", event: "keys_updated", payload: { fullTransfer: payload, deviceId: "global" } });
-                      if (deviceChannel) deviceChannel.send({ type: "broadcast", event: "keys_updated", payload: { fullTransfer: payload, deviceId: syncDevice?.id } });
-                      addLog("Successfully pushed restored keys to mobile node.", "success");
-                      setTimeout(() => {
-                         supabase.removeChannel(globalChannel);
-                         if (deviceChannel) supabase.removeChannel(deviceChannel);
-                      }, 1000);
-                    };
-
-                    globalChannel.subscribe((status: string) => {
-                      if (status === "SUBSCRIBED" && !syncDevice?.id) sendPush();
-                    });
-                    
-                    if (deviceChannel) {
-                      deviceChannel.subscribe((status: string) => {
-                        if (status === "SUBSCRIBED") sendPush();
-                      });
-                    }
-                    
-                    e.target.value = ""; // Reset input
-                  } catch (err) {
-                    addLog("Invalid keys bundle file.", "error");
-                  }
-                };
-                reader.readAsText(file);
-              }}
-            />
-            <label htmlFor="keys-upload">
-              <Button variant="outline" className="cursor-pointer bg-foreground/[0.05] border-border/20 hover:bg-foreground/[0.1] text-foreground font-semibold h-8 text-xs px-4 rounded-lg shadow-sm flex items-center gap-1.5 transition-all" asChild>
-                <span>
-                  <Upload className="h-3.5 w-3.5" /> Upload .json Keys Bundle
-                </span>
-              </Button>
-            </label>
-
+          <div className="flex justify-end">
             <Button
               onClick={() => {
                 if (!rsaKeys && !aesKey) {
@@ -1530,7 +1454,7 @@ export default function OperationPage() {
                     id: `pub_${Date.now()}`,
                     keyType: "RSA_PUBLIC",
                     keyValue: rsaKeys.publicKey,
-                    keySize: rsaKeys.publicKey.length,
+                    keySize: rsaBits,
                     label: `RSA Public Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
                     description: "Workspace RSA Public Key",
@@ -1547,7 +1471,7 @@ export default function OperationPage() {
                     id: `priv_${Date.now()}`,
                     keyType: "RSA_PRIVATE",
                     keyValue: rsaKeys.privateKey,
-                    keySize: rsaKeys.privateKey.length,
+                    keySize: rsaBits,
                     label: `RSA Private Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
                     description: "Workspace RSA Private Key - KEEP SECURE",
@@ -1560,7 +1484,7 @@ export default function OperationPage() {
                     id: `aes_${Date.now()}`,
                     keyType: "AES_SESSION",
                     keyValue: aesKey,
-                    keySize: aesKey.length,
+                    keySize: aesBits,
                     label: `AES Session Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
                     description: "Workspace AES Session Key",
@@ -1658,7 +1582,93 @@ export default function OperationPage() {
             )}
           </div>
 
+          {/* Direct Key Push Section */}
+          <div className="relative overflow-hidden rounded-xl border border-border/30 bg-foreground/[0.02] p-4 backdrop-blur mt-4">
+            <h3 className="text-sm font-black tracking-tight text-foreground flex items-center gap-2 mb-4">
+              <Upload className="h-4 w-4 text-indigo-500" />
+              Direct Key Push
+            </h3>
+            <div className="flex flex-col items-center justify-center p-6 border border-dashed border-border/40 rounded-xl bg-background/20 text-center">
+              <p className="text-[11px] text-foreground/60 mb-4 max-w-[300px]">
+                Upload a previously saved keys bundle to instantly push the decrypted payload & keys to your connected mobile decryption node.
+              </p>
+              <input 
+                type="file" 
+                accept=".json,.ciphervault" 
+                className="hidden" 
+                id="keys-upload" 
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    try {
+                      const result = ev.target?.result as string;
+                      const keysArr = JSON.parse(result);
+                      
+                      const privKey = keysArr.find((k: any) => k.keyType === "RSA_PRIVATE");
+                      const pubKey = keysArr.find((k: any) => k.keyType === "RSA_PUBLIC");
+                      const aesSessionKey = keysArr.find((k: any) => k.keyType === "AES_SESSION");
+                      
+                      const keysPayload = JSON.stringify({
+                        encrypted_session_key: pubKey?.encryptedSessionKey || aesSessionKey?.encryptedSessionKey || "",
+                        rsa_private_key: privKey?.keyValue || "",
+                        rsa_public_key: pubKey?.keyValue || "",
+                        aes_key: aesSessionKey?.keyValue || "",
+                      });
 
+                      const payload = {
+                        device_id: syncDevice?.id || "global",
+                        encrypted_payload: pubKey?.ciphertextPayload || aesSessionKey?.ciphertextPayload || "",
+                        encrypted_session_key: keysPayload,
+                        aes_iv: pubKey?.aesIV || aesSessionKey?.aesIV || "",
+                        aes_mode: pubKey?.aesMode || aesSessionKey?.aesMode || "AES-GCM",
+                        document_name: pubKey?.documentName || aesSessionKey?.documentName || "Restored Document",
+                      };
+
+                      const globalChannel = supabase.channel(`global_sync`);
+                      let deviceChannel: any = null;
+                      if (syncDevice?.id) {
+                        deviceChannel = supabase.channel(`device_sync_${syncDevice.id}`);
+                      }
+
+                      const sendPush = () => {
+                        globalChannel.send({ type: "broadcast", event: "keys_updated", payload: { fullTransfer: payload, deviceId: "global" } });
+                        if (deviceChannel) deviceChannel.send({ type: "broadcast", event: "keys_updated", payload: { fullTransfer: payload, deviceId: syncDevice?.id } });
+                        addLog("Successfully pushed restored keys to mobile node.", "success");
+                        setTimeout(() => {
+                           supabase.removeChannel(globalChannel);
+                           if (deviceChannel) supabase.removeChannel(deviceChannel);
+                        }, 1000);
+                      };
+
+                      globalChannel.subscribe((status: string) => {
+                        if (status === "SUBSCRIBED" && !syncDevice?.id) sendPush();
+                      });
+                      
+                      if (deviceChannel) {
+                        deviceChannel.subscribe((status: string) => {
+                          if (status === "SUBSCRIBED") sendPush();
+                        });
+                      }
+                      
+                      e.target.value = ""; // Reset input
+                    } catch (err) {
+                      addLog("Invalid keys bundle file.", "error");
+                    }
+                  };
+                  reader.readAsText(file);
+                }}
+              />
+              <label htmlFor="keys-upload">
+                <Button variant="outline" className="cursor-pointer bg-white text-black hover:bg-gray-100 font-semibold h-9 text-xs px-5 shadow-sm" asChild>
+                  <span>
+                    <Upload className="h-3.5 w-3.5 mr-2" /> Upload .json Keys Bundle
+                  </span>
+                </Button>
+              </label>
+            </div>
+          </div>
 
         </div>
       </main>
