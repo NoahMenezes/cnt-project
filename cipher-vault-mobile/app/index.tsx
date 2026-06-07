@@ -89,20 +89,23 @@ export default function HomeScreen() {
       setTransfer(null);
     };
 
-    const handleKeysUpdated = (msg: { payload: { transferId: string, fullTransfer?: EphemeralTransfer } }) => {
-      const newTransferId = msg?.payload?.transferId;
-      if (!newTransferId) return;
-
-      if (msg?.payload?.fullTransfer) {
-        const tr = parseKeysFromTransfer(msg.payload.fullTransfer);
+    const handleKeysUpdated = (msg: { payload: { transferId: string, fullTransfer?: any } }) => {
+      const { transferId, newTransferId, fullTransfer } = msg?.payload as any || {};
+      const targetId = transferId || newTransferId || fullTransfer?.id;
+      
+      if (fullTransfer) {
+        // Instant UI update from websocket payload
+        const tr = parseKeysFromTransfer({ ...fullTransfer, id: targetId } as EphemeralTransfer);
         setTransfer(tr);
-        return;
       }
-
+      
+      if (!targetId) return;
+      
+      // Fallback/consistency check from DB
       supabase
         .from("ephemeral_transfers")
         .select("*")
-        .eq("id", newTransferId)
+        .eq("id", targetId)
         .single()
         .then(({ data, error }) => {
           if (!error && data) {
@@ -146,7 +149,6 @@ export default function HomeScreen() {
         }
         if (keysObj.aes_key) {
           setExtractedAESKey(keysObj.aes_key);
-          setAesKey(keysObj.aes_key);
         }
         
         const actualESKey = keysObj.encrypted_session_key || "";
@@ -166,13 +168,6 @@ export default function HomeScreen() {
     }
     return tr;
   };
-
-  // Robustly populate input fields whenever transfer is set
-  useEffect(() => {
-    if (transfer) {
-      parseKeysFromTransfer(transfer);
-    }
-  }, [transfer]);
 
   useEffect(() => {
     if (rawTransferStr) {

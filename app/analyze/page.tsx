@@ -574,18 +574,18 @@ export default function OperationPage() {
       document_name: uploadedFile ? uploadedFile.name : "Encrypted Document",
     };
 
-    // Broadcast 'clear_keys' first so the mobile app resets stale state in real time
+    // Broadcast the full payload instantly over WebSockets for a magical zero-latency feel
     const deviceChannel = supabase.channel(`device_sync_${syncDevice.id}`);
     const globalChannel = supabase.channel(`global_sync`);
 
     deviceChannel.subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        deviceChannel.send({ type: "broadcast", event: "clear_keys", payload: { deviceId: syncDevice.id } });
+        deviceChannel.send({ type: "broadcast", event: "keys_updated", payload: { fullTransfer: payload, deviceId: syncDevice.id } });
       }
     });
     globalChannel.subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        globalChannel.send({ type: "broadcast", event: "clear_keys", payload: { deviceId: "global" } });
+        globalChannel.send({ type: "broadcast", event: "keys_updated", payload: { fullTransfer: payload, deviceId: "global" } });
       }
     });
 
@@ -597,10 +597,9 @@ export default function OperationPage() {
       .then(({ data, error }) => {
         if (!error && data) {
           setTransferId(data.id);
-          // Broadcast 'keys_updated' with full payload so mobile auto-loads instantly without a database SELECT delay
-          const fullPayload = { ...payload, id: data.id };
-          deviceChannel.send({ type: "broadcast", event: "keys_updated", payload: { transferId: data.id, deviceId: syncDevice.id, fullTransfer: fullPayload } });
-          globalChannel.send({ type: "broadcast", event: "keys_updated", payload: { transferId: data.id, deviceId: "global", fullTransfer: fullPayload } });
+          // Broadcast again with the DB-assigned ID to ensure consistency
+          deviceChannel.send({ type: "broadcast", event: "keys_updated", payload: { transferId: data.id, fullTransfer: { ...payload, id: data.id }, deviceId: syncDevice.id } });
+          globalChannel.send({ type: "broadcast", event: "keys_updated", payload: { transferId: data.id, fullTransfer: { ...payload, id: data.id }, deviceId: "global" } });
         } else {
           console.error("Failed to sync ephemeral transfer to database:", error);
         }
@@ -1442,7 +1441,83 @@ export default function OperationPage() {
             )}
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3 mt-3">
+            <input 
+              type="file" 
+              accept=".json,.ciphervault" 
+              className="hidden" 
+              id="keys-upload" 
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  try {
+                    const result = ev.target?.result as string;
+                    const keysArr = JSON.parse(result);
+                    
+                    const privKey = keysArr.find((k: any) => k.keyType === "RSA_PRIVATE");
+                    const pubKey = keysArr.find((k: any) => k.keyType === "RSA_PUBLIC");
+                    const aesSessionKey = keysArr.find((k: any) => k.keyType === "AES_SESSION");
+                    
+                    const keysPayload = JSON.stringify({
+                      encrypted_session_key: pubKey?.encryptedSessionKey || aesSessionKey?.encryptedSessionKey || "",
+                      rsa_private_key: privKey?.keyValue || "",
+                      rsa_public_key: pubKey?.keyValue || "",
+                      aes_key: aesSessionKey?.keyValue || "",
+                    });
+
+                    const payload = {
+                      device_id: syncDevice?.id || "global",
+                      encrypted_payload: pubKey?.ciphertextPayload || aesSessionKey?.ciphertextPayload || "",
+                      encrypted_session_key: keysPayload,
+                      aes_iv: pubKey?.aesIV || aesSessionKey?.aesIV || "",
+                      aes_mode: pubKey?.aesMode || aesSessionKey?.aesMode || "AES-GCM",
+                      document_name: pubKey?.documentName || aesSessionKey?.documentName || "Restored Document",
+                    };
+
+                    const globalChannel = supabase.channel(`global_sync`);
+                    let deviceChannel: any = null;
+                    if (syncDevice?.id) {
+                      deviceChannel = supabase.channel(`device_sync_${syncDevice.id}`);
+                    }
+
+                    const sendPush = () => {
+                      globalChannel.send({ type: "broadcast", event: "keys_updated", payload: { fullTransfer: payload, deviceId: "global" } });
+                      if (deviceChannel) deviceChannel.send({ type: "broadcast", event: "keys_updated", payload: { fullTransfer: payload, deviceId: syncDevice?.id } });
+                      addLog("Successfully pushed restored keys to mobile node.", "success");
+                      setTimeout(() => {
+                         supabase.removeChannel(globalChannel);
+                         if (deviceChannel) supabase.removeChannel(deviceChannel);
+                      }, 1000);
+                    };
+
+                    globalChannel.subscribe((status: string) => {
+                      if (status === "SUBSCRIBED" && !syncDevice?.id) sendPush();
+                    });
+                    
+                    if (deviceChannel) {
+                      deviceChannel.subscribe((status: string) => {
+                        if (status === "SUBSCRIBED") sendPush();
+                      });
+                    }
+                    
+                    e.target.value = ""; // Reset input
+                  } catch (err) {
+                    addLog("Invalid keys bundle file.", "error");
+                  }
+                };
+                reader.readAsText(file);
+              }}
+            />
+            <label htmlFor="keys-upload">
+              <Button variant="outline" className="cursor-pointer bg-foreground/[0.05] border-border/20 hover:bg-foreground/[0.1] text-foreground font-semibold h-8 text-xs px-4 rounded-lg shadow-sm flex items-center gap-1.5 transition-all" asChild>
+                <span>
+                  <Upload className="h-3.5 w-3.5" /> Upload .json Keys Bundle
+                </span>
+              </Button>
+            </label>
+
             <Button
               onClick={() => {
                 if (!rsaKeys && !aesKey) {
@@ -1455,7 +1530,7 @@ export default function OperationPage() {
                     id: `pub_${Date.now()}`,
                     keyType: "RSA_PUBLIC",
                     keyValue: rsaKeys.publicKey,
-                    keySize: rsaBits,
+                    keySize: rsaKeys.publicKey.length,
                     label: `RSA Public Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
                     description: "Workspace RSA Public Key",
@@ -1472,7 +1547,7 @@ export default function OperationPage() {
                     id: `priv_${Date.now()}`,
                     keyType: "RSA_PRIVATE",
                     keyValue: rsaKeys.privateKey,
-                    keySize: rsaBits,
+                    keySize: rsaKeys.privateKey.length,
                     label: `RSA Private Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
                     description: "Workspace RSA Private Key - KEEP SECURE",
@@ -1485,7 +1560,7 @@ export default function OperationPage() {
                     id: `aes_${Date.now()}`,
                     keyType: "AES_SESSION",
                     keyValue: aesKey,
-                    keySize: aesBits,
+                    keySize: aesKey.length,
                     label: `AES Session Key (${new Date().toLocaleDateString()})`,
                     generatedAt: new Date().toISOString(),
                     description: "Workspace AES Session Key",
@@ -1582,6 +1657,8 @@ export default function OperationPage() {
               </div>
             )}
           </div>
+
+
 
         </div>
       </main>
