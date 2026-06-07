@@ -352,6 +352,8 @@ const OP_CACHE = {
   generatedKeysDisplay: [] as GeneratedKeyDisplay[],
   uploadedFile: null as File | null,
   uploadProgress: 0,
+  rsaKeysGeneratedManually: false,
+  aesKeyGeneratedManually: false,
 };
 
 const safeSetLocal = (key: string, value: string) => {
@@ -391,7 +393,7 @@ export default function OperationPage() {
     fetch("/api/local-ip")
       .then((res) => res.json())
       .then((data) => setLocalIP(data.ip || "localhost"))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Listen for mobile decryption event to automatically navigate to dashboard
@@ -494,6 +496,8 @@ export default function OperationPage() {
       const isD = localStorage.getItem("op_isDecrypted"); if (isD !== null) setIsDecrypted(isD === "true");
       const eO = localStorage.getItem("op_encryptionOption"); if (eO !== null) setEncryptionOption(eO as "standard" | "rsa_payload");
       const gKD = localStorage.getItem("op_generatedKeysDisplay"); if (gKD !== null) setGeneratedKeysDisplay(JSON.parse(gKD));
+      const rsaMan = localStorage.getItem("op_rsaKeysGeneratedManually"); if (rsaMan !== null) setRsaKeysGeneratedManually(rsaMan === "true");
+      const aesMan = localStorage.getItem("op_aesKeyGeneratedManually"); if (aesMan !== null) setAesKeyGeneratedManually(aesMan === "true");
     } catch (e) {
       console.warn("Could not parse operation lab local storage", e);
     }
@@ -519,6 +523,8 @@ export default function OperationPage() {
   const [aesBits, setAesBits] = useState<number>(OP_CACHE.aesBits);
   const [aesMode, setAesMode] = useState<string>(OP_CACHE.aesMode);
   const [aesKey, setAesKey] = useState<string>(OP_CACHE.aesKey);
+  const [rsaKeysGeneratedManually, setRsaKeysGeneratedManually] = useState<boolean>(OP_CACHE.rsaKeysGeneratedManually);
+  const [aesKeyGeneratedManually, setAesKeyGeneratedManually] = useState<boolean>(OP_CACHE.aesKeyGeneratedManually);
 
   // ─── Operational Output States ───
   const [ciphertext, setCiphertext] = useState<string>(OP_CACHE.ciphertext);
@@ -543,6 +549,8 @@ export default function OperationPage() {
   useEffect(() => { OP_CACHE.decryptedText = decryptedText; safeSetLocal("op_decryptedText", decryptedText); }, [decryptedText]);
   useEffect(() => { OP_CACHE.isDecrypted = isDecrypted; safeSetLocal("op_isDecrypted", String(isDecrypted)); }, [isDecrypted]);
   useEffect(() => { OP_CACHE.encryptionOption = encryptionOption; safeSetLocal("op_encryptionOption", encryptionOption); }, [encryptionOption]);
+  useEffect(() => { OP_CACHE.rsaKeysGeneratedManually = rsaKeysGeneratedManually; safeSetLocal("op_rsaKeysGeneratedManually", String(rsaKeysGeneratedManually)); }, [rsaKeysGeneratedManually]);
+  useEffect(() => { OP_CACHE.aesKeyGeneratedManually = aesKeyGeneratedManually; safeSetLocal("op_aesKeyGeneratedManually", String(aesKeyGeneratedManually)); }, [aesKeyGeneratedManually]);
 
   // ─── Generated Keys Display ───
   const [generatedKeysDisplay, setGeneratedKeysDisplay] = useState<GeneratedKeyDisplay[]>(OP_CACHE.generatedKeysDisplay);
@@ -557,13 +565,15 @@ export default function OperationPage() {
 
     setSyncingTransfer(true);
 
-    // Package all keys together into a JSON string inside encrypted_session_key
-    const keysPayload = JSON.stringify({
-      encrypted_session_key: encryptedSessionKey || "",
-      rsa_private_key: rsaKeys?.privateKey || "",
-      rsa_public_key: rsaKeys?.publicKey || "",
-      aes_key: aesKey || "",
-    });
+    // Only package the keys payload if both RSA and AES keys have been generated manually on the website
+    const keysPayload = (rsaKeysGeneratedManually && aesKeyGeneratedManually)
+      ? JSON.stringify({
+        encrypted_session_key: encryptedSessionKey || "",
+        rsa_private_key: rsaKeys?.privateKey || "",
+        rsa_public_key: rsaKeys?.publicKey || "",
+        aes_key: aesKey || "",
+      })
+      : (encryptedSessionKey || "");
 
     const payload = {
       device_id: syncDevice.id,
@@ -609,7 +619,7 @@ export default function OperationPage() {
           supabase.removeChannel(globalChannel);
         }, 3000);
       });
-  }, [ciphertext, encryptedSessionKey, aesIV, aesMode, uploadedFile, syncDevice?.id, rsaKeys, aesKey]);
+  }, [ciphertext, encryptedSessionKey, aesIV, aesMode, uploadedFile, syncDevice?.id, rsaKeys, aesKey, rsaKeysGeneratedManually, aesKeyGeneratedManually]);
 
   const hasLoggedRealtimeRef = useRef(false);
   const hasLoggedCipherRealtimeRef = useRef(false);
@@ -704,6 +714,8 @@ export default function OperationPage() {
     if (!v.valid) { addLog(`File error: ${v.error}`, "error"); return; }
     setUploadedFile(file);
     OP_CACHE.uploadedFile = file;
+    setRsaKeysGeneratedManually(false);
+    setAesKeyGeneratedManually(false);
     const b64Reader = new FileReader();
     b64Reader.onload = (e) => {
       setUploadedFileBase64(e.target?.result as string || "");
@@ -933,6 +945,8 @@ export default function OperationPage() {
               setEncryptedSessionKey("");
               setAesIV("");
               setGeneratedKeysDisplay([]);
+              setRsaKeysGeneratedManually(false);
+              setAesKeyGeneratedManually(false);
               addLog("Workspace ready for new document.", "info");
             }} className="h-8 text-xs border-border/50 hover:bg-foreground/[0.04] shrink-0">
               <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Analyze New File
@@ -1234,6 +1248,7 @@ export default function OperationPage() {
                 onClick={() => {
                   const pair = generateRSAPairSim(rsaBits);
                   setRsaKeys(pair);
+                  setRsaKeysGeneratedManually(true);
 
                   const publicKeyId = `pub_${Date.now()}`;
                   const privateKeyId = `priv_${Date.now() + 1}`;
@@ -1297,6 +1312,7 @@ export default function OperationPage() {
                 onClick={() => {
                   const aesSessionKey = generateAESKeyHex(aesBits);
                   setAesKey(aesSessionKey);
+                  setAesKeyGeneratedManually(true);
 
                   const aesKeyId = `aes_${Date.now()}`;
                   const aesKeyObj: CryptographicKey = {
@@ -1513,7 +1529,7 @@ export default function OperationPage() {
               <Smartphone className="h-4 w-4 text-indigo-400" />
               <h2 className="text-sm font-semibold text-foreground">Sync with Mobile Node</h2>
             </div>
-            
+
             {!ciphertext ? (
               <div className="flex flex-col items-center justify-center p-6 border border-dashed border-border/40 rounded-xl bg-background/20 text-center">
                 <Smartphone className="h-8 w-8 text-foreground/20 mb-2" />
@@ -1535,12 +1551,13 @@ export default function OperationPage() {
                 <div className="flex flex-col items-center gap-3">
                   <div className="bg-white p-3 rounded-xl shadow-xl flex items-center justify-center">
                     <QRCodeSVG
-                      value={qrMode === "expo" 
-                        ? `exp://${localIP}:8081/?transferId=${transferId}` 
-                        : `http://${localIP}:8081/?transferId=${transferId}`}
+                      value={
+                        qrMode === "expo"
+                          ? `exp://${localIP}:8081/?transferId=${transferId}`
+                          : "https://yvzgmz0-anonymous-8081.exp.direct/"
+                      }
                       size={160}
                       level="L"
-                      includeMargin={false}
                     />
                   </div>
                   <div className="flex bg-background/50 rounded-lg p-0.5 border border-border/10 w-full">
@@ -1565,14 +1582,14 @@ export default function OperationPage() {
                     <Zap className="h-3.5 w-3.5" /> Direct Mobile Decrypt Node
                   </h4>
                   <p className="text-[11px] text-foreground/60 leading-relaxed">
-                    {qrMode === "expo" 
+                    {qrMode === "expo"
                       ? "Scan with your phone's camera or Expo Go scanner to boot the React Native app directly."
                       : "Scan with your phone's camera app to view the mobile UI rendered inside your web browser."}
                   </p>
                   <div className="bg-background/40 border border-border/10 rounded-lg p-2.5 font-mono text-[9px] text-foreground/40 break-all select-all">
                     {qrMode === "expo"
                       ? `exp://${localIP}:8081/?transferId=${transferId}`
-                      : `http://${localIP}:8081/?transferId=${transferId}`}
+                      : `https://yvzgmz0-anonymous-8081.exp.direct/`}
                   </div>
                   <p className="text-[9px] text-indigo-400/70">
                     Ensure both your phone and this computer are connected to the same local network.
@@ -1592,11 +1609,11 @@ export default function OperationPage() {
               <p className="text-[11px] text-foreground/60 mb-4 max-w-[300px]">
                 Upload a previously saved keys bundle to instantly push the decrypted payload & keys to your connected mobile decryption node.
               </p>
-              <input 
-                type="file" 
-                accept=".json,.ciphervault" 
-                className="hidden" 
-                id="keys-upload" 
+              <input
+                type="file"
+                accept=".json,.ciphervault"
+                className="hidden"
+                id="keys-upload"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
@@ -1605,11 +1622,11 @@ export default function OperationPage() {
                     try {
                       const result = ev.target?.result as string;
                       const keysArr = JSON.parse(result);
-                      
+
                       const privKey = keysArr.find((k: any) => k.keyType === "RSA_PRIVATE");
                       const pubKey = keysArr.find((k: any) => k.keyType === "RSA_PUBLIC");
                       const aesSessionKey = keysArr.find((k: any) => k.keyType === "AES_SESSION");
-                      
+
                       const keysPayload = JSON.stringify({
                         encrypted_session_key: pubKey?.encryptedSessionKey || aesSessionKey?.encryptedSessionKey || "",
                         rsa_private_key: privKey?.keyValue || "",
@@ -1637,21 +1654,21 @@ export default function OperationPage() {
                         if (deviceChannel) deviceChannel.send({ type: "broadcast", event: "keys_updated", payload: { fullTransfer: payload, deviceId: syncDevice?.id } });
                         addLog("Successfully pushed restored keys to mobile node.", "success");
                         setTimeout(() => {
-                           supabase.removeChannel(globalChannel);
-                           if (deviceChannel) supabase.removeChannel(deviceChannel);
+                          supabase.removeChannel(globalChannel);
+                          if (deviceChannel) supabase.removeChannel(deviceChannel);
                         }, 1000);
                       };
 
                       globalChannel.subscribe((status: string) => {
                         if (status === "SUBSCRIBED" && !syncDevice?.id) sendPush();
                       });
-                      
+
                       if (deviceChannel) {
                         deviceChannel.subscribe((status: string) => {
                           if (status === "SUBSCRIBED") sendPush();
                         });
                       }
-                      
+
                       e.target.value = ""; // Reset input
                     } catch (err) {
                       addLog("Invalid keys bundle file.", "error");
