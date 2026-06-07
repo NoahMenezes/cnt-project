@@ -576,13 +576,16 @@ export default function OperationPage() {
 
     // Broadcast 'clear_keys' first so the mobile app resets stale state in real time
     const deviceChannel = supabase.channel(`device_sync_${syncDevice.id}`);
+    const globalChannel = supabase.channel(`global_sync`);
+
     deviceChannel.subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        deviceChannel.send({
-          type: "broadcast",
-          event: "clear_keys",
-          payload: { deviceId: syncDevice.id },
-        });
+        deviceChannel.send({ type: "broadcast", event: "clear_keys", payload: { deviceId: syncDevice.id } });
+      }
+    });
+    globalChannel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        globalChannel.send({ type: "broadcast", event: "clear_keys", payload: { deviceId: "global" } });
       }
     });
 
@@ -594,17 +597,18 @@ export default function OperationPage() {
       .then(({ data, error }) => {
         if (!error && data) {
           setTransferId(data.id);
-          // Broadcast 'keys_updated' so mobile auto-loads the new transfer immediately
-          deviceChannel.send({
-            type: "broadcast",
-            event: "keys_updated",
-            payload: { transferId: data.id, deviceId: syncDevice.id },
-          });
+          // Broadcast 'keys_updated' with full payload so mobile auto-loads instantly without a database SELECT delay
+          const fullPayload = { ...payload, id: data.id };
+          deviceChannel.send({ type: "broadcast", event: "keys_updated", payload: { transferId: data.id, deviceId: syncDevice.id, fullTransfer: fullPayload } });
+          globalChannel.send({ type: "broadcast", event: "keys_updated", payload: { transferId: data.id, deviceId: "global", fullTransfer: fullPayload } });
         } else {
           console.error("Failed to sync ephemeral transfer to database:", error);
         }
         setSyncingTransfer(false);
-        setTimeout(() => supabase.removeChannel(deviceChannel), 3000);
+        setTimeout(() => {
+          supabase.removeChannel(deviceChannel);
+          supabase.removeChannel(globalChannel);
+        }, 3000);
       });
   }, [ciphertext, encryptedSessionKey, aesIV, aesMode, uploadedFile, syncDevice?.id, rsaKeys, aesKey]);
 
@@ -1534,7 +1538,7 @@ export default function OperationPage() {
                     <QRCodeSVG
                       value={qrMode === "expo" 
                         ? `exp://${localIP}:8081/?transferId=${transferId}` 
-                        : (typeof window !== "undefined" ? `${window.location.origin}/decrypt?transferId=${transferId}` : `http://${localIP}:3000/decrypt?transferId=${transferId}`)}
+                        : `http://${localIP}:8081/?transferId=${transferId}`}
                       size={160}
                       level="L"
                       includeMargin={false}
@@ -1564,12 +1568,12 @@ export default function OperationPage() {
                   <p className="text-[11px] text-foreground/60 leading-relaxed">
                     {qrMode === "expo" 
                       ? "Scan with your phone's camera or Expo Go scanner to boot the React Native app directly."
-                      : "Scan with your phone's camera app to open a Universal Deep Link page in your browser."}
+                      : "Scan with your phone's camera app to view the mobile UI rendered inside your web browser."}
                   </p>
                   <div className="bg-background/40 border border-border/10 rounded-lg p-2.5 font-mono text-[9px] text-foreground/40 break-all select-all">
                     {qrMode === "expo"
                       ? `exp://${localIP}:8081/?transferId=${transferId}`
-                      : (typeof window !== "undefined" ? `${window.location.origin}/decrypt?transferId=${transferId}` : `http://${localIP}:3000/decrypt?transferId=${transferId}`)}
+                      : `http://${localIP}:8081/?transferId=${transferId}`}
                   </div>
                   <p className="text-[9px] text-indigo-400/70">
                     Ensure both your phone and this computer are connected to the same local network.
