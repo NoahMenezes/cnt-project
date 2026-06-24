@@ -16,7 +16,7 @@ import { BorderBeam } from "@/components/ui/border-beam";
 import { supabase } from "@/lib/supabase";
 import { saveKey, CryptographicKey, syncKeysForUser, saveReport } from "@/lib/store";
 import { useUser } from "@clerk/nextjs";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { Editor, EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { QRCodeSVG } from "qrcode.react";
@@ -159,13 +159,14 @@ function aesEncryptSim(text: string, keyHex: string, mode: string): { ciphertext
   return { ciphertext: enc, iv, tag };
 }
 
-function aesDecryptSim(ciphertext: string, keyHex: string, mode: string): string {
+function aesDecryptSim(ciphertext: string, keyHex: string): string {
   try {
-    if (!keyHex || !mode) {
-      // Dummy reference to avoid unused variable warning
-    }
     const dec = decodeURIComponent(atob(ciphertext));
     const parts = dec.split("||SALT||");
+    const expectedSalt = keyHex.substring(0, 6);
+    if (parts.length < 2 || parts[1] !== expectedSalt) {
+      throw new Error("Key mismatch or tampered ciphertext");
+    }
     return parts[0];
   } catch {
     throw new Error("Decryption failed. Bad session key or tampered ciphertext.");
@@ -189,7 +190,7 @@ function textToEditorHtml(value: string) {
     .join("");
 }
 
-function editorPlainText(editor: NonNullable<ReturnType<typeof useEditor>>) {
+function editorPlainText(editor: Editor) {
   return editor.state.doc.textBetween(0, editor.state.doc.content.size, "\n");
 }
 
@@ -678,7 +679,7 @@ export default function OperationPage() {
       const sessionKey = encryptedSessionKey
         ? rsaDecryptString(encryptedSessionKey, d, n)
         : aesKey;
-      const decrypted = aesDecryptSim(aesCiphertext, sessionKey, aesMode);
+      const decrypted = aesDecryptSim(aesCiphertext, sessionKey);
       let originalText = decrypted;
       try {
         if (decrypted.trim().startsWith("{")) {
@@ -707,7 +708,7 @@ export default function OperationPage() {
       setDecryptedText("");
       setIsDecrypted(false);
     }
-  }, [addLog, aesKey, aesMode, encryptedSessionKey, rsaKeys, encryptionOption]);
+  }, [addLog, aesKey, encryptedSessionKey, rsaKeys, encryptionOption]);
 
   const handleFile = useCallback(async (file: File) => {
     const v = validateFile(file);
@@ -1623,9 +1624,9 @@ export default function OperationPage() {
                       const result = ev.target?.result as string;
                       const keysArr = JSON.parse(result);
 
-                      const privKey = keysArr.find((k: any) => k.keyType === "RSA_PRIVATE");
-                      const pubKey = keysArr.find((k: any) => k.keyType === "RSA_PUBLIC");
-                      const aesSessionKey = keysArr.find((k: any) => k.keyType === "AES_SESSION");
+                      const privKey = keysArr.find((k: Record<string, unknown>) => k.keyType === "RSA_PRIVATE");
+                      const pubKey = keysArr.find((k: Record<string, unknown>) => k.keyType === "RSA_PUBLIC");
+                      const aesSessionKey = keysArr.find((k: Record<string, unknown>) => k.keyType === "AES_SESSION");
 
                       const keysPayload = JSON.stringify({
                         encrypted_session_key: pubKey?.encryptedSessionKey || aesSessionKey?.encryptedSessionKey || "",
@@ -1644,10 +1645,7 @@ export default function OperationPage() {
                       };
 
                       const globalChannel = supabase.channel(`global_sync`);
-                      let deviceChannel: any = null;
-                      if (syncDevice?.id) {
-                        deviceChannel = supabase.channel(`device_sync_${syncDevice.id}`);
-                      }
+                      const deviceChannel = syncDevice?.id ? supabase.channel(`device_sync_${syncDevice.id}`) : null;
 
                       const sendPush = () => {
                         globalChannel.send({ type: "broadcast", event: "keys_updated", payload: { fullTransfer: payload, deviceId: "global" } });
@@ -1670,7 +1668,7 @@ export default function OperationPage() {
                       }
 
                       e.target.value = ""; // Reset input
-                    } catch (err) {
+                    } catch {
                       addLog("Invalid keys bundle file.", "error");
                     }
                   };

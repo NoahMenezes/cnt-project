@@ -1,6 +1,4 @@
 import os
-import sys
-sys.path.append("/home/noah/.local/lib/python3.14/site-packages")
 import math
 import uuid
 import datetime
@@ -21,7 +19,10 @@ app = FastAPI(title="CipherScope AI Analysis Agent Backend")
 # Enable CORS for Next.js frontend calls
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -837,32 +838,38 @@ async def analyze_vault_document(req: VaultAnalysisRequest):
         "id": report_id,
         "fileName": file_name,
         "type": "Decrypted Document (Vault Analysis)",
-        "fileSize": len(content),
+        "fileSize": f"{len(content)} B",
         "analysisDate": datetime.datetime.utcnow().isoformat() + "Z",
         "securityScore": overall_score,
         "status": status,
         "entropy": {
             "value": round(entropy_val, 2),
             "classification": "Medium",
+            "randomnessScore": randomness_score,
+            "explanation": "Shannon entropy measures the average information content per character.",
             "interpretation": "Analysis from Key Vault"
         },
         "rsa": {
             "keySize": rsa_size,
             "exponent": 65537,
-            "padding": "OAEP",
-            "riskLevel": "Medium"
+            "publicExponent": 65537,
+            "riskLevel": "Medium",
+            "vulnerabilities": [],
+            "securityAssessment": security_assessment,
+            "modulusInfo": f"{rsa_size}-bit modulus detected."
         },
         "aes": {
-            "mode": aes_mode,
             "keyStrength": f"{aes_size}-bit",
+            "mode": aes_mode,
+            "encryptionMode": aes_mode,
             "passwordComplexity": "Medium",
             "securityRecommendations": []
         },
         "patterns": {
-            "hexPatterns": 0,
-            "base64Patterns": 0,
-            "standardEmail": 0,
+            "repeatedCharacters": False,
+            "repeatedSequences": [],
             "blockRepetition": False,
+            "observations": "Vault document analysis complete.",
             "unstructuredChunks": [{"id": 1, "text": content, "length": len(content), "type": "Full Text"}]
         },
         "findings": findings,

@@ -158,6 +158,7 @@ const Header = ({ navigationData, className }: HeaderProps) => {
                           <NavigationMenuItem key={item.title}>
                             <NavigationMenuLink
                                 href={item.href}
+                                onClick={() => setIsOpen(false)}
                                 className={cn(
                                   "group/nav flex items-center text-2xl font-semibold tracking-tight transition-all p-0 hover:bg-transparent focus:bg-transparent data-[active]:bg-transparent data-[state=open]:bg-transparent",
                                   item.isActive
