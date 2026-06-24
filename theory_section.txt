@@ -1,0 +1,52 @@
+THEORY
+
+1. Introduction to Hybrid Cryptography
+In large-scale projects, securing sensitive files requires encryption methods that are both computationally fast and mathematically robust. Symmetric cryptography (like AES) is fast and perfect for encrypting large data payloads, but it suffers from the key distribution problem. Asymmetric cryptography (like RSA) solves key distribution using public-private key pairs, but it is too slow for large files. 
+
+Hybrid cryptography combines both systems:
+- A symmetric AES session key is generated dynamically to encrypt the file payload at high speed.
+- The recipient's RSA public key is used to encrypt (wrap) the lightweight AES key.
+- The encrypted payload and wrapped key are transmitted together. The recipient decrypts the AES key using their RSA private key, then decrypts the file.
+
+2. Mathematical Foundations and Formulas
+
+RSA Key Generation:
+1. Select two large prime numbers p and q.
+2. Modulus: n = p * q
+3. Euler Totient: phi(n) = (p - 1) * (q - 1)
+4. Public Exponent: e = 65537 (coprime to phi(n))
+5. Private Exponent: d = e^(-1) mod phi(n) (calculated via Extended Euclidean Algorithm)
+Public Key: (e, n)
+Private Key: (d, n)
+
+RSA Key Wrapping (Encryption):
+The AES session key (M) is encrypted using the public key:
+C = M^e mod n
+
+RSA Key Unwrapping (Decryption):
+The encrypted session key (C) is decrypted on the mobile client using the private key:
+M = C^d mod n
+This is computed efficiently using Modular Exponentiation (Square-and-Multiply algorithm).
+
+AES Symmetric Encryption:
+The plaintext document is encrypted using AES with the session key (K) in GCM (Galois/Counter Mode) to produce the ciphertext (C_doc), an initialization vector (IV), and an authentication tag:
+C_doc = AES-Encrypt(Plaintext, K, IV)
+
+AES Decryption:
+Plaintext = AES-Decrypt(C_doc, K, IV)
+
+3. Web-to-Mobile Architecture and Data Sync
+
+The system connects a Next.js web application (encryption client) to a React Native mobile application (decryption node).
+
+Data Transmission Pipeline:
+1. Next.js Client: Plaintext is extracted from the uploaded document, encrypted using a dynamically generated AES-256 session key, and the AES key is wrapped with the RSA public key.
+2. Ephemeral Storage: The encrypted document and wrapped key are inserted into the Supabase database (ephemeral_transfers table).
+3. Real-Time Sync: To achieve zero-latency transmission, the Next.js client broadcasts the payload in real-time over Supabase WebSockets (global_sync or device_sync channels). Alternatively, a QR code containing the transfer ID is scanned by the mobile device.
+4. Mobile Decryption: The React Native app receives the broadcast, parses the RSA private key numbers (d, n), performs modular exponentiation to unwrap the AES key, and decrypts the document payload.
+5. Burn-After-Reading: Once decrypted, the mobile client sends a "decrypted" WebSocket broadcast back to the web app and deletes the database record immediately, ensuring no sensitive data persists.
+
+4. Real-World Security Benefits
+- Hardware Isolation: Keeping the RSA private key on a separate mobile device isolates it from browser-based memory sniffing or malware.
+- Performance: Symmetric AES encryption processes megabytes of data in milliseconds.
+- Forward Secrecy: Ephemeral transport and the burn-after-reading protocol ensure files cannot be recovered post-decryption.
