@@ -56,8 +56,27 @@ CREATE POLICY "allow_all_ephemeral_transfers" ON ephemeral_transfers
 -- ── 4. Enable Realtime ────────────────────────────────────────
 -- Required for the mobile inbox to receive live push notifications
 
-ALTER PUBLICATION supabase_realtime ADD TABLE ephemeral_transfers;
-ALTER PUBLICATION supabase_realtime ADD TABLE user_devices;
+CREATE OR REPLACE FUNCTION public.safely_add_to_realtime(target_table TEXT)
+RETURNS VOID AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 
+      FROM pg_publication_tables 
+      WHERE pubname = 'supabase_realtime' 
+        AND schemaname = 'public' 
+        AND tablename = target_table
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', target_table);
+    END IF;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+SELECT public.safely_add_to_realtime('ephemeral_transfers');
+SELECT public.safely_add_to_realtime('user_devices');
 
 -- ── 5. reports ────────────────────────────────────────────────
 -- Stores cryptographic analysis reports
@@ -211,13 +230,13 @@ CREATE POLICY "allow_all_audio_previews" ON audio_previews
   FOR ALL USING (true) WITH CHECK (true);
 
 -- ── 13. Enable Realtime on new tables ──────────────────────────
-ALTER PUBLICATION supabase_realtime ADD TABLE reports;
-ALTER PUBLICATION supabase_realtime ADD TABLE cryptographic_keys_v2;
-ALTER PUBLICATION supabase_realtime ADD TABLE cryptographic_keys;
-ALTER PUBLICATION supabase_realtime ADD TABLE unstructured_chunks;
-ALTER PUBLICATION supabase_realtime ADD TABLE structured_parameters;
-ALTER PUBLICATION supabase_realtime ADD TABLE corrected_documents;
-ALTER PUBLICATION supabase_realtime ADD TABLE audio_previews;
+SELECT public.safely_add_to_realtime('reports');
+SELECT public.safely_add_to_realtime('cryptographic_keys_v2');
+SELECT public.safely_add_to_realtime('cryptographic_keys');
+SELECT public.safely_add_to_realtime('unstructured_chunks');
+SELECT public.safely_add_to_realtime('structured_parameters');
+SELECT public.safely_add_to_realtime('corrected_documents');
+SELECT public.safely_add_to_realtime('audio_previews');
 
 -- ── 14. Verify Tables Created ─────────────────────────────────
 SELECT

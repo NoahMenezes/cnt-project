@@ -90,7 +90,8 @@ export default function HomeScreen() {
     };
 
     const handleKeysUpdated = (msg: { payload: { transferId: string, fullTransfer?: any } }) => {
-      const { transferId, newTransferId, fullTransfer } = msg?.payload as any || {};
+      const payload = (msg?.payload as any) || {};
+      const { transferId, newTransferId, fullTransfer } = payload;
       const targetId = transferId || newTransferId || fullTransfer?.id;
       
       if (fullTransfer) {

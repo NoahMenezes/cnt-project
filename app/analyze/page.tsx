@@ -437,28 +437,18 @@ export default function OperationPage() {
   // Fetch or auto-create a default device for the user to support direct QR sync
   useEffect(() => {
     const userId = user?.id || "default-local-user";
-    supabase
-      .from("user_devices")
-      .select("id, device_name")
-      .eq("user_id", userId)
-      .then(async ({ data, error }) => {
-        if (!error && data && data.length > 0) {
-          setSyncDevice(data[0]);
-        } else {
-          // Auto-create a default sync device
-          const { data: newDev, error: createError } = await supabase
-            .from("user_devices")
-            .insert({
-              user_id: userId,
-              device_name: "Direct Sync Device",
-              public_key: "pending",
-            })
-            .select()
-            .single();
-          if (!createError && newDev) {
-            setSyncDevice(newDev);
-          }
+    fetch(`/api/db/device?userId=${userId}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.error("Failed to fetch/create device via API:", err);
+          return;
         }
+        const data = await res.json();
+        setSyncDevice(data);
+      })
+      .catch((err) => {
+        console.error("Network error fetching device via API:", err);
       });
   }, [user?.id]);
 
@@ -602,20 +592,30 @@ export default function OperationPage() {
       }
     });
 
-    supabase
-      .from("ephemeral_transfers")
-      .insert(payload)
-      .select("id")
-      .single()
-      .then(({ data, error }) => {
-        if (!error && data) {
+    fetch("/api/db/transfer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
           setTransferId(data.id);
           // Broadcast again with the DB-assigned ID to ensure consistency
           deviceChannel.send({ type: "broadcast", event: "keys_updated", payload: { transferId: data.id, fullTransfer: { ...payload, id: data.id }, deviceId: syncDevice.id } });
           globalChannel.send({ type: "broadcast", event: "keys_updated", payload: { transferId: data.id, fullTransfer: { ...payload, id: data.id }, deviceId: "global" } });
         } else {
-          console.error("Failed to sync ephemeral transfer to database:", error);
+          const errData = await res.json().catch(() => ({}));
+          console.error("Failed to sync ephemeral transfer via API:", errData.error || res.statusText);
         }
+        setSyncingTransfer(false);
+        setTimeout(() => {
+          supabase.removeChannel(deviceChannel);
+          supabase.removeChannel(globalChannel);
+        }, 3000);
+      })
+      .catch((err) => {
+        console.error("Network error syncing ephemeral transfer via API:", err);
         setSyncingTransfer(false);
         setTimeout(() => {
           supabase.removeChannel(deviceChannel);
@@ -1557,7 +1557,7 @@ export default function OperationPage() {
                       value={
                         qrMode === "expo"
                           ? `exp://${localIP}:8081/?transferId=${transferId}`
-                          : "https://yvzgmz0-anonymous-8081.exp.direct/"
+                          : `http://${localIP}:3000/mobile-decrypt?transferId=${transferId}`
                       }
                       size={160}
                       level="L"
@@ -1592,7 +1592,7 @@ export default function OperationPage() {
                   <div className="bg-background/40 border border-border/10 rounded-lg p-2.5 font-mono text-[9px] text-foreground/40 break-all select-all">
                     {qrMode === "expo"
                       ? `exp://${localIP}:8081/?transferId=${transferId}`
-                      : `https://yvzgmz0-anonymous-8081.exp.direct/`}
+                      : `http://${localIP}:3000/mobile-decrypt?transferId=${transferId}`}
                   </div>
                   <p className="text-[9px] text-indigo-400/70">
                     Ensure both your phone and this computer are connected to the same local network.

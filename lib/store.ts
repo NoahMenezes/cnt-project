@@ -234,9 +234,89 @@ if (typeof window !== "undefined" && !isKeysInitialized) {
   } catch {}
 }
 
+interface CryptographicKeyV2Row {
+  id: string;
+  key_type: string;
+  key_value: string;
+  key_size: number;
+  label: string;
+  generated_at: string;
+  description?: string;
+  document_name?: string;
+  plaintext_snippet?: string;
+  ciphertext_payload?: string;
+  encrypted_session_key?: string;
+  aes_iv?: string;
+  aes_mode?: string;
+  paired_key_id?: string;
+}
+
+function mapV2Row(row: unknown): CryptographicKey {
+  const r = row as CryptographicKeyV2Row;
+  return {
+    id: r.id,
+    keyType: r.key_type as CryptographicKey["keyType"],
+    keyValue: r.key_value,
+    keySize: r.key_size,
+    label: r.label,
+    generatedAt: r.generated_at,
+    description: r.description || "",
+    documentName: r.document_name || "",
+    plaintextSnippet: r.plaintext_snippet || "",
+    ciphertextPayload: r.ciphertext_payload || "",
+    encryptedSessionKey: r.encrypted_session_key || "",
+    aesIV: r.aes_iv || "",
+    aesMode: r.aes_mode || "",
+    pairedKeyId: r.paired_key_id || "",
+  };
+}
+
+function mapV1Row(row: Record<string, unknown>): CryptographicKey {
+  let desc = row.description as string || "";
+  let docName = "";
+  let pSnippet = "";
+  let cPayload = "";
+  let encSessionKey = "";
+  let iv = "";
+  let mode = "";
+  let pairedId = "";
+
+  if (desc.startsWith("METADATA_JSON:")) {
+    try {
+      const parsed = JSON.parse(desc.substring(14));
+      desc = parsed.description || "";
+      docName = parsed.documentName || "";
+      pSnippet = parsed.plaintextSnippet || "";
+      cPayload = parsed.ciphertextPayload || "";
+      encSessionKey = parsed.encryptedSessionKey || "";
+      iv = parsed.aesIV || "";
+      mode = parsed.aesMode || "";
+      pairedId = parsed.pairedKeyId || "";
+    } catch {}
+  }
+
+  return {
+    id: row.id as string,
+    keyType: row.key_type as CryptographicKey["keyType"],
+    keyValue: row.key_value as string,
+    keySize: row.key_size as number,
+    label: row.label as string,
+    generatedAt: row.generated_at as string,
+    description: desc,
+    documentName: docName,
+    plaintextSnippet: pSnippet,
+    ciphertextPayload: cPayload,
+    encryptedSessionKey: encSessionKey,
+    aesIV: iv,
+    aesMode: mode,
+    pairedKeyId: pairedId,
+  };
+}
+
 /** Call once after Clerk user loads to pull Supabase keys for that user */
 export async function syncKeysForUser(clerkUserId: string) {
   const dbUserId = toUuid(clerkUserId);
+  
   // Try querying structured V2 table first
   const { data: dataV2, error: errV2 } = await supabase
     .from("cryptographic_keys_v2")
@@ -244,48 +324,39 @@ export async function syncKeysForUser(clerkUserId: string) {
     .eq("user_id", dbUserId)
     .order("created_at", { ascending: false });
 
-  if (!errV2 && dataV2 && dataV2.length > 0) {
-    interface CryptographicKeyV2Row {
-      id: string;
-      key_type: string;
-      key_value: string;
-      key_size: number;
-      label: string;
-      generated_at: string;
-      description?: string;
-      document_name?: string;
-      plaintext_snippet?: string;
-      ciphertext_payload?: string;
-      encrypted_session_key?: string;
-      aes_iv?: string;
-      aes_mode?: string;
-      paired_key_id?: string;
+  if (errV2) {
+    // Only fall back to legacy V1 table if the V2 relation does not exist (error 42P01)
+    if (errV2.code === "42P01") {
+      const { data: dataV1, error: errV1 } = await supabase
+        .from("cryptographic_keys")
+        .select("*")
+        .eq("user_id", dbUserId)
+        .order("created_at", { ascending: false });
+
+      if (errV1 && errV1.code !== "42P01") {
+        console.warn("Failed to query legacy cryptographic_keys table:", errV1.message);
+      }
+      if (dataV1 && dataV1.length > 0) {
+        const remoteKeys = dataV1.map(mapV1Row);
+        const localMap = new Map(cachedKeys.map(k => [k.id, k]));
+        remoteKeys.forEach(k => localMap.set(k.id, k));
+        cachedKeys = Array.from(localMap.values()).sort((a, b) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime());
+        try {
+          localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
+        } catch {}
+        notifyUpdate();
+      }
+    } else {
+      console.warn("Failed to query cryptographic_keys_v2 table:", errV2.message);
     }
-    const remoteKeys = dataV2.map((row: unknown) => {
-      const r = row as CryptographicKeyV2Row;
-      return {
-        id: r.id,
-        keyType: r.key_type as CryptographicKey["keyType"],
-        keyValue: r.key_value,
-        keySize: r.key_size,
-        label: r.label,
-        generatedAt: r.generated_at,
-        description: r.description || "",
-        documentName: r.document_name || "",
-        plaintextSnippet: r.plaintext_snippet || "",
-        ciphertextPayload: r.ciphertext_payload || "",
-        encryptedSessionKey: r.encrypted_session_key || "",
-        aesIV: r.aes_iv || "",
-        aesMode: r.aes_mode || "",
-        pairedKeyId: r.paired_key_id || "",
-      };
-    });
-    
-    // Merge remote keys with local cachedKeys
+    return;
+  }
+
+  if (dataV2 && dataV2.length > 0) {
+    const remoteKeys = dataV2.map(mapV2Row);
     const localMap = new Map(cachedKeys.map(k => [k.id, k]));
     remoteKeys.forEach(k => localMap.set(k.id, k));
     cachedKeys = Array.from(localMap.values()).sort((a, b) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime());
-    
     try {
       localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
     } catch {}
@@ -293,55 +364,21 @@ export async function syncKeysForUser(clerkUserId: string) {
     return;
   }
 
-  // Fallback to legacy V1 table
-  const { data: dataV1 } = await supabase
+  // V2 relation exists but is empty; check if there are legacy keys to import
+  const { data: dataV1, error: errV1 } = await supabase
     .from("cryptographic_keys")
     .select("*")
     .eq("user_id", dbUserId)
     .order("created_at", { ascending: false });
 
-  if (dataV1) {
-    cachedKeys = dataV1.map((row: Record<string, unknown>) => {
-      let desc = row.description as string || "";
-      let docName = "";
-      let pSnippet = "";
-      let cPayload = "";
-      let encSessionKey = "";
-      let iv = "";
-      let mode = "";
-      let pairedId = "";
-
-      if (desc.startsWith("METADATA_JSON:")) {
-        try {
-          const parsed = JSON.parse(desc.substring(14));
-          desc = parsed.description || "";
-          docName = parsed.documentName || "";
-          pSnippet = parsed.plaintextSnippet || "";
-          cPayload = parsed.ciphertextPayload || "";
-          encSessionKey = parsed.encryptedSessionKey || "";
-          iv = parsed.aesIV || "";
-          mode = parsed.aesMode || "";
-          pairedId = parsed.pairedKeyId || "";
-        } catch {}
-      }
-
-      return {
-        id: row.id as string,
-        keyType: row.key_type as CryptographicKey["keyType"],
-        keyValue: row.key_value as string,
-        keySize: row.key_size as number,
-        label: row.label as string,
-        generatedAt: row.generated_at as string,
-        description: desc,
-        documentName: docName,
-        plaintextSnippet: pSnippet,
-        ciphertextPayload: cPayload,
-        encryptedSessionKey: encSessionKey,
-        aesIV: iv,
-        aesMode: mode,
-        pairedKeyId: pairedId,
-      };
-    });
+  if (errV1 && errV1.code !== "42P01") {
+    console.warn("Failed to query legacy cryptographic_keys table:", errV1.message);
+  }
+  if (dataV1 && dataV1.length > 0) {
+    const remoteKeys = dataV1.map(mapV1Row);
+    const localMap = new Map(cachedKeys.map(k => [k.id, k]));
+    remoteKeys.forEach(k => localMap.set(k.id, k));
+    cachedKeys = Array.from(localMap.values()).sort((a, b) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime());
     try {
       localStorage.setItem("cipher_scope_keys_db", JSON.stringify(cachedKeys));
     } catch {}
@@ -411,12 +448,8 @@ export function saveKey(key: CryptographicKey, clerkUserId?: string): void {
                 description: descVal,
               })
               .then(({ error: errV1 }) => {
-                if (errV1) {
-                  console.error("Failed to sync to fallback cryptographic_keys table:", errV1);
-                  console.error("Supabase Fallback Error Message:", errV1.message);
-                  console.error("Supabase Fallback Error Details:", errV1.details);
-                  console.error("Supabase Fallback Error Hint:", errV1.hint);
-                  console.error("Supabase Fallback Error Code:", errV1.code);
+                if (errV1 && errV1.code !== '42P01') {
+                  console.warn("Failed to sync key to legacy cryptographic_keys table:", errV1.message);
                 }
               });
           }
@@ -441,7 +474,7 @@ export function deleteKey(id: string, clerkUserId?: string): void {
         .delete()
         .eq("id", id)
         .then(({ error }) => {
-          if (error) console.error("Failed to delete key from cryptographic_keys_v2:", error);
+          if (error) console.warn("Failed to delete key from cryptographic_keys_v2:", error.message);
         });
 
       supabase
