@@ -21,6 +21,7 @@ import {
 } from "recharts";
 import { BorderBeam } from "@/components/ui/border-beam";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 // ─── Animations ──────────────────────────────────────────────────────────────
 const container: Variants = {
@@ -165,7 +166,7 @@ export default function Dashboard() {
 
     setIsGeneratingAudio(true);
     try {
-      const res = await fetch("http://localhost:8000/generate/dashboard-audio", {
+      const res = await fetch(`${BACKEND_URL}/generate/dashboard-audio`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

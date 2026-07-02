@@ -16,6 +16,8 @@ import { getKeys, CryptographicKey, syncKeysForUser, saveReport } from "@/lib/st
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
 const NAV = [
   { title: "Home", href: "/" },
   { title: "Dashboard", href: "/dashboard" },
@@ -590,7 +592,7 @@ export default function HybridLabPage() {
       const aesMode = selectedKey?.aesMode || "GCM";
       const aesSize = selectedKey?.keyType === "AES_SESSION" ? selectedKey.keySize : 256;
       
-      const res = await fetch("http://localhost:8000/analyze/vault", {
+      const res = await fetch(`${BACKEND_URL}/analyze/vault`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -670,7 +672,7 @@ export default function HybridLabPage() {
 
     setIsGeneratingAudio(true);
     try {
-      const res = await fetch("http://localhost:8000/generate/audio", {
+      const res = await fetch(`${BACKEND_URL}/generate/audio`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -21,6 +21,8 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { QRCodeSVG } from "qrcode.react";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
 const SUPPORTED_FORMATS = [".txt", ".pdf", ".docx", ".json", ".csv"];
 
 function validateFile(file: File) {
@@ -742,7 +744,7 @@ export default function OperationPage() {
       formData.append("file", file);
       addLog(`Uploading & extracting unstructured text from ${file.name}...`, "info");
 
-      const response = await fetch("http://localhost:8000/analyze/file", {
+      const response = await fetch(`${BACKEND_URL}/analyze/file`, {
         method: "POST",
         body: formData,
       });
@@ -788,7 +790,7 @@ export default function OperationPage() {
     try {
 
       const docName = uploadedFile ? uploadedFile.name : "Plaintext Notepad Document";
-      const response = await fetch("http://localhost:8000/analyze/text", {
+      const response = await fetch(`${BACKEND_URL}/analyze/text`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
